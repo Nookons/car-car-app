@@ -114,7 +114,11 @@ const TelegramForm = () => {
                             </SelectContent>
                         </Select>
 
-                        <Button id={'sendMainData'} className={`font-bold flex items-center gap-2`}>
+                        <Button
+                            id="sendMainData"
+                            className="font-bold flex items-center gap-2"
+                            onClick={onSendData}
+                        >
                             <Power />
                             <span>Start</span>
                         </Button>
