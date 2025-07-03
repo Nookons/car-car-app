@@ -20,9 +20,9 @@ export default async function Home() {
     return (
         <div>
             <div className="p-6 grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-4 gap-6">
-                <div className={`flex flex-col gap-4 w-full`}>
+                <div className={`flex items-center justify-between gap-4 w-full`}>
+                    <h1 className={`text-xs text-neutral-500`}>Welcome to <span className={`text-primary text-xl font-bold`}>CarCar</span></h1>
                     <ModeToggle />
-                    <TelegramForm />
                 </div>
                 {data.map((car) => {
                     if (car.image_url === 'unknown') return null;
