@@ -29,12 +29,14 @@ const TelegramForm = () => {
         };
 
         tg.sendData(JSON.stringify(data));
+        tg.close();
     }, [brandValue, fuelTypeValue, tg]);
 
 
     useEffect(() => {
         if (!tg) return;
 
+        tg.expand();
         tg.onEvent('sendMainData', onSendData)
 
         return () => {
