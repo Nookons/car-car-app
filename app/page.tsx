@@ -4,8 +4,7 @@ import dayjs from "dayjs";
 import {Card, CardContent, CardFooter, CardHeader, CardTitle} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {ModeToggle} from "@/components/ModeToggle/ModeToggle";
-import Script from 'next/script'
-import TelegramForm from "@/components/shared/telegramForm";
+import React from "react";
 
 
 async function getCars() {
@@ -61,10 +60,6 @@ export default async function Home() {
                     );
                 })}
             </div>
-            <Script
-                src="https://telegram.org/js/telegram-web-app.js?57"
-                strategy="beforeInteractive"
-            />
         </div>
     );
 }
