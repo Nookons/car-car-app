@@ -2,6 +2,7 @@ import type {Metadata} from "next";
 import {Nunito} from "next/font/google";
 import "./globals.css";
 import {ThemeProvider} from "next-themes";
+import Providers from "@/app/Providers";
 
 const nunito = Nunito({
     variable: '--font-nunito',
@@ -25,7 +26,9 @@ export default function RootLayout({
             className={`${nunito.className} antialiased`}
         >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            {children}
+            <Providers>
+                {children}
+            </Providers>
         </ThemeProvider>
         </body>
         </html>
