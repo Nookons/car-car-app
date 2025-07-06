@@ -4,9 +4,9 @@ import pool from '@/lib/db';
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { id, first_name, last_name, username, language_code } = body;
+        const { id, first_name, last_name, username, language_code, chat_id } = body;
 
-        if (!id || !first_name || !username) {
+        if (!id || !first_name || !username || !chat_id) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
@@ -14,10 +14,10 @@ export async function POST(request: NextRequest) {
 
         try {
             const query = `
-                INSERT INTO users (id, first_name, last_name, username, language_code)
-                VALUES ($1, $2, $3, $4, $5)
+                INSERT INTO users (id, first_name, last_name, username, language_code, chat_id)
+                VALUES ($1, $2, $3, $4, $5, $6)
                     ON CONFLICT (id) DO NOTHING
-                RETURNING id, first_name, last_name, username, language_code;
+                RETURNING id, first_name, last_name, username, language_code, chat_id;
             `;
 
             const values = [
@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
                 last_name?.trim() || null,
                 username.trim().toLowerCase(),
                 language_code || 'en',
+                chat_id,
             ];
 
             const result = await client.query(query, values);
