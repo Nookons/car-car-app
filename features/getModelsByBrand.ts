@@ -2,7 +2,7 @@ import {IModelsResponse} from "@/types/Model";
 
 export const getModelsByBrand = async (brand: string): Promise<IModelsResponse> => {
     try {
-        const res = await fetch(`/api/get-models-by-brand?brand=${brand}`, { cache: 'no-store' });
+        const res = await fetch(`https://car-car-app.vercel.app/api/get-models-by-brand?brand=${brand}`, { cache: 'no-store' });
 
         if (!res.ok) {
             console.error(`Failed to fetch brands: ${res.status} ${res.statusText}`);

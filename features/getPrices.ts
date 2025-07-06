@@ -2,7 +2,7 @@ import {IPriceResponse} from "@/types/Price";
 
 export const getPrices = async (model_value: string, brand_value: string): Promise<IPriceResponse> => {
     try {
-        const patch = `/api/get-prices?${model_value ? 'model' : 'brand'}=${model_value ? model_value : brand_value}`;
+        const patch = `https://car-car-app.vercel.app/api/get-prices?${model_value ? 'model' : 'brand'}=${model_value ? model_value : brand_value}`;
         const res = await fetch(patch, { cache: 'no-store' });
 
         if (!res.ok) {
