@@ -1,14 +1,12 @@
+import pool from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
 
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL, // В переменной окружения
-});
+
 
 export async function GET(request: NextRequest) {
     try {
         const client = await pool.connect();
-        const res = await client.query('SELECT * FROM cars LIMIT 20');
+        const res = await client.query('SELECT * FROM public.cars LIMIT 20');
         client.release();
 
         return NextResponse.json(res.rows);

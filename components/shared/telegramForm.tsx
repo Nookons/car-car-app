@@ -1,24 +1,17 @@
 'use client';
 
 import React, {useCallback, useEffect, useState} from 'react';
-import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectLabel,
-    SelectTrigger,
-    SelectValue
-} from "@/components/ui/select";
 import {Button} from "@/components/ui/button";
 import {Power} from "lucide-react";
 import BrandSelect from './Brand/BrandSelect';
 import ModelSelect from "@/components/shared/Model/ModelSelect";
-import PriceSelect from "@/components/shared/Price/PriceSelect";
-import {max} from "@floating-ui/utils";
+import PriceAccordion from "@/components/shared/Price/PriceAccordion";
+import YearsAccordion from "@/components/shared/Years/YearsAccordion";
 
 const TelegramForm = () => {
     const [tg, setTg] = useState<any>(null);
+
+    const [userName, setUserName] = useState<string>('')
 
 
     const [brandValue, setBrandValue] = useState<string>('');
@@ -28,6 +21,15 @@ const TelegramForm = () => {
     const [minPrice, setMinPrice] = useState<number>(0);
     const [maxPrice, setMaxPrice] = useState<number>(0);
 
+    const [minYear, setMinYear] = useState<string>('');
+    const [maxYear, setMaxYear] = useState<string>('');
+
+    useEffect(() => {
+        setMinPrice(0)
+        setMaxPrice(0)
+        setMinYear('')
+        setMaxYear('')
+    }, [brandValue, model]);
 
 
     const onSendData = useCallback(() => {
@@ -37,7 +39,9 @@ const TelegramForm = () => {
             brand: brandValue,
             model: model,
             min_price: minPrice,
-            max_price: maxPrice
+            max_price: maxPrice,
+            min_year: minYear,
+            max_year: maxYear
         };
 
         tg.sendData(JSON.stringify(data));
@@ -53,6 +57,8 @@ const TelegramForm = () => {
     useEffect(() => {
         if (!tg) return;
 
+        setUserName(tg.initDataUnsafe?.user?.username)
+
         tg.expand();
         tg.onEvent('sendMainData', onSendData);
 
@@ -65,7 +71,7 @@ const TelegramForm = () => {
         <div>
             {tg ? (
                 <div>
-                    <h2 className="font-bold">{tg.initDataUnsafe?.user?.username || "Kolomiiets Dmytro"}</h2>
+                    <h2 className="font-bold">{userName}</h2>
                     <p className="text-xs text-neutral-500 mb-4">Please set up your search params for start...</p>
                     <p className="text-xs font-semibold text-primary/75 mb-4">
                         Here you can pick only cars what we have on our data base, so if you can't find out car what you
@@ -80,16 +86,25 @@ const TelegramForm = () => {
 
                         {brandValue && (<ModelSelect value={model} onChange={setModel} search_value={brandValue}/>)}
 
-                        {model && (
-                            <PriceSelect
-                                minPrice={minPrice}
-                                maxPrice={maxPrice}
-                                minChange={setMinPrice}
-                                maxChange={setMaxPrice}
-                                search_value={model}
-                                type={'model'}
-                            />
-                        )}
+
+                        <PriceAccordion
+                            brandValue={brandValue}
+                            model={model}
+                            minPrice={minPrice}
+                            maxPrice={maxPrice}
+                            setMinPrice={setMinPrice}
+                            setMaxPrice={setMaxPrice}
+                        />
+
+                        <YearsAccordion
+                            brand_value={brandValue}
+                            model_value={model}
+                            minYear={minYear}
+                            maxYear={maxYear}
+                            setMinYear={setMinYear}
+                            setMaxYear={setMaxYear}
+                        />
+
 
 
                         <Button

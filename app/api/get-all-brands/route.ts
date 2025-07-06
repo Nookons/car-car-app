@@ -1,9 +1,6 @@
+import pool from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
 
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL, // В переменной окружения
-});
 
 export async function GET(request: NextRequest) {
     try {

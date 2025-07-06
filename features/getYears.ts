@@ -1,8 +1,8 @@
-import {IPriceResponse} from "@/types/Price";
+import {IYearResponse} from "@/types/Year";
 
-export const getPrices = async (model_value: string, brand_value: string): Promise<IPriceResponse> => {
+export const getYears = async (brand_value: string, model_value: string): Promise<IYearResponse> => {
     try {
-        const patch = `/api/get-prices?${model_value ? 'model' : 'brand'}=${model_value ? model_value : brand_value}`;
+        const patch = `/api/get-years?${model_value ? 'model' : 'brand'}=${model_value ? model_value : brand_value}`;
         const res = await fetch(patch, { cache: 'no-store' });
 
         if (!res.ok) {
@@ -15,8 +15,8 @@ export const getPrices = async (model_value: string, brand_value: string): Promi
         console.error('Failed to load brands:', error);
         return {
             model: 'unknown',
-            min_price: 0,
-            max_price: 0
+            min_year: '',
+            max_year: ''
         };
     }
 };
