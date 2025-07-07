@@ -6,7 +6,12 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
     try {
         const client = await pool.connect();
-        const res = await client.query('SELECT * FROM public.cars LIMIT 20');
+        const res = await client.query(`
+                SELECT *
+                FROM public.cars
+                WHERE posted_time >= NOW() - INTERVAL '7 days'
+                ORDER BY posted_time DESC;
+        `);
         client.release();
 
         return NextResponse.json(res.rows);
