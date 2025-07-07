@@ -4,13 +4,14 @@ import React, { useEffect, useState } from 'react'
 import { CircleGauge } from 'lucide-react'
 
 interface Props {
-    location: { lat: number; lng: number } | null
-    setLocation: (location: { lat: number; lng: number }) => void
+    location: { lat: number; lng: number } | null;
+    setLocation: (location: { lat: number; lng: number }) => void;
+    locationString: string;
+    setLocationString: (locationString: string) => void;
 }
 
-const GetUserLocation: React.FC<Props> = ({ location, setLocation }) => {
+const GetUserLocation: React.FC<Props> = ({ location, setLocation, locationString, setLocationString }) => {
     const [error, setError] = useState<string | null>(null)
-    const [locationString, setLocationString] = useState<string>('')
 
     useEffect(() => {
         if (!navigator.geolocation) {

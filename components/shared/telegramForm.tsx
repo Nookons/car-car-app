@@ -16,6 +16,7 @@ const TelegramForm = () => {
     const [userName, setUserName] = useState<string>('')
 
     const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
+    const [locationString, setLocationString] = useState<string>('');
 
     const [brandValue, setBrandValue] = useState<string>('');
 
@@ -48,7 +49,8 @@ const TelegramForm = () => {
             min_year: minYear,
             max_year: maxYear,
             lat: location?.lat || 0,
-            lng: location?.lat || 0
+            lng: location?.lat || 0,
+            locationString: locationString,
         };
 
         tg.sendData(JSON.stringify(data));
@@ -83,6 +85,8 @@ const TelegramForm = () => {
                         <GetUserLocation
                             location={location}
                             setLocation={setLocation}
+                            locationString={locationString}
+                            setLocationString={setLocationString}
                         />
 
                         <BrandSelect value={brandValue} onChange={setBrandValue}/>
