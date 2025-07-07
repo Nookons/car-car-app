@@ -5,14 +5,17 @@ import {Button} from "@/components/ui/button";
 import {Power} from "lucide-react";
 import BrandSelect from './Brand/BrandSelect';
 import ModelSelect from "@/components/shared/Model/ModelSelect";
-import PriceAccordion from "@/components/shared/Price/PriceAccordion";
-import YearsAccordion from "@/components/shared/Years/YearsAccordion";
+import ConditionCheckBox from "@/components/shared/Conditions/ConditionCheckBox";
+import PriceSelect from "@/components/shared/Price/PriceSelect";
+import YearsSelect from "@/components/shared/Years/YearsSelect";
+import GetUserLocation from "@/components/shared/UserLocation/getUserLocation";
 
 const TelegramForm = () => {
     const [tg, setTg] = useState<any>(null);
 
     const [userName, setUserName] = useState<string>('')
 
+    const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
 
     const [brandValue, setBrandValue] = useState<string>('');
 
@@ -23,6 +26,8 @@ const TelegramForm = () => {
 
     const [minYear, setMinYear] = useState<string>('');
     const [maxYear, setMaxYear] = useState<string>('');
+
+    const [isCondition, setIsCondition] = useState<boolean>(true)
 
     useEffect(() => {
         setMinPrice(0)
@@ -41,11 +46,13 @@ const TelegramForm = () => {
             min_price: minPrice,
             max_price: maxPrice,
             min_year: minYear,
-            max_year: maxYear
+            max_year: maxYear,
+            lat: location?.lat || 0,
+            lng: location?.lat || 0
         };
 
         tg.sendData(JSON.stringify(data));
-    }, [brandValue, model, minPrice, maxPrice, tg]);
+    }, [brandValue, model, minPrice, maxPrice, minYear, maxYear, location, tg]);
 
 
     useEffect(() => {
@@ -71,54 +78,56 @@ const TelegramForm = () => {
         <div>
             {tg ? (
                 <div>
-                    <h2 className="font-bold">{userName}</h2>
-                    <p className="text-xs text-neutral-500 mb-4">Please set up your search params for start...</p>
-                    <p className="text-xs font-semibold text-primary/75 mb-4">
-                        Here you can pick only cars what we have on our data base, so if you can't find out car what you
-                        interesting. Our team work on extend our base.
-                        <br/>
-                        <br/>
-                        Thank you for understanding!
-                    </p>
-
                     <div className="flex flex-col gap-2 w-full">
-                        <BrandSelect value={brandValue} onChange={setBrandValue}/>
 
+                        <GetUserLocation
+                            location={location}
+                            setLocation={setLocation}
+                        />
+
+                        <BrandSelect value={brandValue} onChange={setBrandValue}/>
                         {brandValue && (<ModelSelect value={model} onChange={setModel} search_value={brandValue}/>)}
 
 
-                        <PriceAccordion
-                            brandValue={brandValue}
-                            model={model}
-                            minPrice={minPrice}
-                            maxPrice={maxPrice}
-                            setMinPrice={setMinPrice}
-                            setMaxPrice={setMaxPrice}
-                        />
+                        <div className={`my-4`}>
+                            <PriceSelect
+                                brand_value={brandValue}
+                                model_value={model}
+                                minPrice={minPrice}
+                                maxPrice={maxPrice}
+                                minChange={setMinPrice}
+                                maxChange={setMaxPrice}
+                            />
 
-                        <YearsAccordion
-                            brand_value={brandValue}
-                            model_value={model}
-                            minYear={minYear}
-                            maxYear={maxYear}
-                            setMinYear={setMinYear}
-                            setMaxYear={setMaxYear}
-                        />
+                            <YearsSelect
+                                brand_value={brandValue}
+                                model_value={model}
+                                minYear={minYear}
+                                maxYear={maxYear}
+                                minChange={setMinYear}
+                                maxChange={setMaxYear}
+                            />
+                        </div>
 
 
+                        <div className={`my-4`}>
+                            <Button
+                                disabled={!isCondition}
+                                id="sendMainData"
+                                className="font-bold w-full flex items-center gap-2"
+                                onClick={onSendData}
+                            >
+                                <Power/>
+                                <span>Start</span>
+                            </Button>
 
-                        <Button
-                            id="sendMainData"
-                            className="font-bold flex items-center gap-2"
-                            onClick={onSendData}
-                        >
-                            <Power/>
-                            <span>Start</span>
-                        </Button>
-
-                        <p className="text-xs font-semibold text-neutral-500 mb-4">
-                            Also we will be add new features in search params in next updates, so stay tuned!
-                        </p>
+                            <div className={`mt-4`}>
+                                <ConditionCheckBox
+                                    value={isCondition}
+                                    onChange={setIsCondition}
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
             ) : (

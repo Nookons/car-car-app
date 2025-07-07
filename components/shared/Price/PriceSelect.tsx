@@ -2,7 +2,7 @@
 
 import React, {useEffect} from 'react';
 import {useQuery} from '@tanstack/react-query';
-import {LoaderCircle, Smile, Truck} from "lucide-react";
+import {ArrowLeftRight, LoaderCircle, Smile, Truck} from "lucide-react";
 import {getPrices} from "@/features/getPrices";
 import {IPriceResponse} from "@/types/Price";
 import {Input} from "@/components/ui/input";
@@ -30,65 +30,71 @@ const PriceSelect: React.FC<Props> = ({minPrice, maxPrice, minChange, maxChange,
     });
 
     return (
-        <div className="w-full grid grid-cols-2 gap-4">
-            <div className="relative">
-                <Input
-                    type="number"
-                    value={minPrice === 0 ? '' : minPrice}
-                    onChange={(event) => minChange(Number(event.target.value))}
-                    min={IPriceResponse.min_price}
-                    max={IPriceResponse.max_price}
-                    className="pr-15"
-                    placeholder={isLoading ? 'Loading...' : `${IPriceResponse.min_price.toLocaleString()}`}
-                />
-                {isLoading ? (
-                        <div className="absolute top-1/2 right-3 -translate-y-1/2">
-                            <LoaderCircle className="animate-spin text-gray-500"/>
-                        </div>
-                    )
-                    : (
-                        <div className="absolute top-1/2 right-3 -translate-y-1/2">
-                            PLN
-                        </div>
-                    )
-                }
-                {minPrice > 0 && (
-                    <p className="text-neutral-500 text-x absolute top-13 right-3 -translate-y-1/2">
-                        {Math.round(minPrice / 4).toLocaleString()} $
-                    </p>
-                )}
-            </div>
-            <div className="relative">
-                <Input
-                    value={maxPrice === 0 ? '' : maxPrice}
-                    onChange={(event) => maxChange(Number(event.target.value))}
-                    type="number"
-                    min={minPrice}
-                    maxLength={7}
-                    max={IPriceResponse.max_price}
-                    className={`pr-15`}
-                    placeholder={
-                        isLoading
-                            ? 'Loading...'
-                            : `${IPriceResponse.max_price.toLocaleString()}`
+        <div>
+            <article className={`my-2 text-neutral-500 text-xs`}>Price Ranges:</article>
+            <div className="w-full grid grid-cols-[1fr_20px_1fr] items-center gap-4">
+                <div className="relative">
+                    <Input
+                        type="number"
+                        value={minPrice === 0 ? '' : minPrice}
+                        onChange={(event) => minChange(Number(event.target.value))}
+                        min={IPriceResponse.min_price}
+                        max={IPriceResponse.max_price}
+                        className="pr-10"
+                        placeholder={isLoading ? 'Loading...' : `${IPriceResponse.min_price.toLocaleString()}`}
+                    />
+                    {isLoading ? (
+                            <div className="absolute top-1/2 right-3 -translate-y-1/2">
+                                <LoaderCircle className="animate-spin text-gray-500"/>
+                            </div>
+                        )
+                        : (
+                            <div className="absolute top-1/2 right-3 -translate-y-1/2">
+                                zł
+                            </div>
+                        )
                     }
-                />
-                {isLoading ? (
-                        <div className="absolute top-1/2 right-3 -translate-y-1/2">
-                            <LoaderCircle className="animate-spin text-gray-500"/>
-                        </div>
-                    )
-                    : (
-                        <div className="absolute top-1/2 right-3 -translate-y-1/2">
-                            PLN
-                        </div>
-                    )
-                }
-                {maxPrice > 0 && (
-                    <p className="text-neutral-500 text-x absolute top-13 right-3 -translate-y-1/2">
-                        {Math.round(maxPrice / 4).toLocaleString()} $
-                    </p>
-                )}
+                    {minPrice > 0 && (
+                        <p className="text-neutral-500 text-x absolute top-13 right-3 -translate-y-1/2">
+                            {Math.round(minPrice / 4).toLocaleString()} $
+                        </p>
+                    )}
+                </div>
+                <div>
+                    <ArrowLeftRight size={14} />
+                </div>
+                <div className="relative">
+                    <Input
+                        value={maxPrice === 0 ? '' : maxPrice}
+                        onChange={(event) => maxChange(Number(event.target.value))}
+                        type="number"
+                        min={minPrice}
+                        maxLength={7}
+                        max={IPriceResponse.max_price}
+                        className={`pr-10`}
+                        placeholder={
+                            isLoading
+                                ? 'Loading...'
+                                : `${IPriceResponse.max_price.toLocaleString()}`
+                        }
+                    />
+                    {isLoading ? (
+                            <div className="absolute top-1/2 right-3 -translate-y-1/2">
+                                <LoaderCircle className="animate-spin text-gray-500"/>
+                            </div>
+                        )
+                        : (
+                            <div className="absolute top-1/2 right-3 -translate-y-1/2">
+                                zł
+                            </div>
+                        )
+                    }
+                    {maxPrice > 0 && (
+                        <p className="text-neutral-500 text-x absolute top-13 right-3 -translate-y-1/2">
+                            {Math.round(maxPrice / 4).toLocaleString()} $
+                        </p>
+                    )}
+                </div>
             </div>
         </div>
     );

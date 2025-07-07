@@ -11,7 +11,9 @@ export async function POST(request: NextRequest) {
             search_from_year,
             search_to_year,
             search_from_price,
-            search_to_price
+            search_to_price,
+            lat,
+            lng
         } = body;
 
         if (id === 'none') {
@@ -29,9 +31,11 @@ export async function POST(request: NextRequest) {
                     search_from_year = $4,
                     search_to_year = $5,
                     search_from_price = $6,
-                    search_to_price = $7
+                    search_to_price = $7,
+                    lat = $8,
+                    lng = $9
                 WHERE id = $1
-                    RETURNING id, search_brand, search_model, search_from_year, search_to_year, search_from_price, search_to_price;
+                    RETURNING id, search_brand, search_model, search_from_year, search_to_year, search_from_price, search_to_price, lat, lng;
             `;
 
             const values = [
@@ -41,7 +45,9 @@ export async function POST(request: NextRequest) {
                 search_from_year?.toLowerCase() || '',
                 search_to_year?.toLowerCase() || '',
                 search_from_price || 0,
-                search_to_price || 0
+                search_to_price || 0,
+                lat,
+                lng
             ];
 
             const result = await client.query(query, values);
