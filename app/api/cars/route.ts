@@ -5,19 +5,27 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
     try {
+        const { searchParams } = new URL(request.url);
+        const offsetRaw = searchParams.get('offset');
+        const offset = offsetRaw ? parseInt(offsetRaw, 10) : 0;
+
+        if (isNaN(offset) || offset < 0) {
+            return NextResponse.json({ error: 'Invalid offset parameter' }, { status: 400 });
+        }
+
         const client = await pool.connect();
         const res = await client.query(`
-                SELECT *
-                FROM public.cars
-                WHERE posted_time >= NOW() - INTERVAL '7 days'
-                ORDER BY posted_time DESC;
-        `);
+            SELECT *
+            FROM public.cars
+            ORDER BY posted_time DESC
+            LIMIT 100 OFFSET $1;
+        `, [offset]);
         client.release();
 
         return NextResponse.json(res.rows);
     } catch (error) {
         console.error('Database query error:', error);
-        return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to fetch cars' }, { status: 500 });
     }
 }
 
