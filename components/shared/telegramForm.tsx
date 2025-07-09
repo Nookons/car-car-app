@@ -9,6 +9,7 @@ import ConditionCheckBox from "@/components/shared/Conditions/ConditionCheckBox"
 import PriceSelect from "@/components/shared/Price/PriceSelect";
 import YearsSelect from "@/components/shared/Years/YearsSelect";
 import GetUserLocation from "@/components/shared/UserLocation/getUserLocation";
+import { Slider } from "radix-ui";
 
 const TelegramForm = () => {
     const [tg, setTg] = useState<any>(null);
@@ -27,6 +28,12 @@ const TelegramForm = () => {
 
     const [minYear, setMinYear] = useState<string>('');
     const [maxYear, setMaxYear] = useState<string>('');
+
+    const [rangeValue, setRangeValue] = useState<number[]>([50]);
+
+    const [minMileage, setMinMileage] = useState<number | null>(null);
+    const [maxMileage, setMaxMileage] = useState<number | null>(null);
+
 
     const [isCondition, setIsCondition] = useState<boolean>(true)
 
@@ -51,6 +58,7 @@ const TelegramForm = () => {
             lat: location?.lat || 0,
             lng: location?.lat || 0,
             locationString: locationString,
+            range: rangeValue[0],
         };
 
         tg.sendData(JSON.stringify(data));
@@ -93,7 +101,7 @@ const TelegramForm = () => {
                         {brandValue && (<ModelSelect value={model} onChange={setModel} search_value={brandValue}/>)}
 
 
-                        <div className={`my-4`}>
+                        <div className={`my-4 flex flex-col gap-2 w-full`}>
                             <PriceSelect
                                 brand_value={brandValue}
                                 model_value={model}
@@ -111,6 +119,32 @@ const TelegramForm = () => {
                                 minChange={setMinYear}
                                 maxChange={setMaxYear}
                             />
+                        </div>
+
+                        <div className={`py-6 relative`}>
+                            <article className={`text-neutral-500 text-x pb-2`}>Range to your new car</article>
+                            <Slider.Root
+                                className="relative bg-neutral-500 rounded-2xl flex h-1 w-full touch-none select-none items-center"
+                                defaultValue={[50]}
+                                max={250}
+                                value={rangeValue}
+                                onValueChange={setRangeValue}
+                                step={10}
+                            >
+                            <Slider.Track className="relative h-[4px] grow rounded-full bg-blackA7">
+                                    <Slider.Range className="absolute h-full rounded-full bg-primary" />
+                                </Slider.Track>
+
+                                <Slider.Thumb
+                                    className="block size-3 rounded-[10px] bg-white shadow-[0_2px_10px] shadow-blackA4 hover:bg-violet3 focus:shadow-[0_0_0_5px] focus:shadow-blackA5 focus:outline-none"
+                                    aria-label="Volume"
+                                />
+                                <p
+                                    className={`absolute text-xs right-0 rounded p-1 font-bold transition top-4 ${rangeValue[0] >= 100 && 'bg-primary/25'}`}
+                                >
+                                    {rangeValue[0]} km
+                                </p>
+                            </Slider.Root>
                         </div>
 
 
