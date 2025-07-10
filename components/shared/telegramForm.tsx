@@ -56,7 +56,7 @@ const TelegramForm = () => {
             min_year: minYear,
             max_year: maxYear,
             lat: location?.lat || 0,
-            lng: location?.lat || 0,
+            lng: location?.lng || 0,
             locationString: locationString,
             range: rangeValue[0],
         };
