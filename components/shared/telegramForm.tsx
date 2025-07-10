@@ -62,7 +62,7 @@ const TelegramForm = () => {
         };
 
         tg.sendData(JSON.stringify(data));
-    }, [brandValue, model, minPrice, maxPrice, minYear, maxYear, location, locationString, tg]);
+    }, [brandValue, model, minPrice, maxPrice, minYear, maxYear, location, locationString, rangeValue, tg]);
 
 
     useEffect(() => {
