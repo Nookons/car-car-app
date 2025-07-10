@@ -8,7 +8,8 @@ export async function GET(request: NextRequest) {
         const query = `
             SELECT
                 user_search_settings.*,
-                users.chat_id
+                users.chat_id,
+                users.language_code
             FROM user_search_settings
             JOIN users ON user_search_settings.user_id = users.id
         `;
