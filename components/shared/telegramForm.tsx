@@ -2,18 +2,23 @@
 
 import React, {useCallback, useEffect, useState} from 'react';
 import {Button} from "@/components/ui/button";
-import {Power} from "lucide-react";
+import {CircleMinus, CirclePlus, Info, Power} from "lucide-react";
 import BrandSelect from './Brand/BrandSelect';
 import ModelSelect from "@/components/shared/Model/ModelSelect";
 import ConditionCheckBox from "@/components/shared/Conditions/ConditionCheckBox";
 import PriceSelect from "@/components/shared/Price/PriceSelect";
 import YearsSelect from "@/components/shared/Years/YearsSelect";
 import GetUserLocation from "@/components/shared/UserLocation/getUserLocation";
-import { Slider } from "radix-ui";
+import {Slider} from "@/components/ui/slider";
+import SellerSelect from "@/components/shared/Seller/SellerSelect";
+import PlatformSelect from "@/components/shared/Platform/PlatformSelect";
+import ConditionSelect from "@/components/shared/Condition/ConditionSelect";
+import { Skeleton } from '../ui/skeleton';
+import MilageSelect from "@/components/shared/Milage/MilageSelect";
+
 
 const TelegramForm = () => {
     const [tg, setTg] = useState<any>(null);
-
     const [userName, setUserName] = useState<string>('')
 
     const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
@@ -31,8 +36,11 @@ const TelegramForm = () => {
 
     const [rangeValue, setRangeValue] = useState<number[]>([50]);
 
-    const [minMileage, setMinMileage] = useState<number | null>(null);
-    const [maxMileage, setMaxMileage] = useState<number | null>(null);
+    const [maxMileage, setMaxMileage] = useState<number>(0);
+
+    const [sellerTypes, setSellerTypes] = useState<string[]>([ 'private' ]);
+    const [platformTypes, setPlatformTypes] = useState<string[]>([ 'oto_moto' ]);
+    const [conditionTypes, setConditionTypes] = useState<string[]>([ 'used', 'new' ]);
 
 
     const [isCondition, setIsCondition] = useState<boolean>(true)
@@ -59,10 +67,14 @@ const TelegramForm = () => {
             lng: location?.lng || 0,
             locationString: locationString,
             range: rangeValue[0],
+            maxMileage: maxMileage,
+            sellerTypes: sellerTypes,
+            platformTypes: platformTypes,
+            conditionTypes: conditionTypes
         };
 
         tg.sendData(JSON.stringify(data));
-    }, [brandValue, model, minPrice, maxPrice, minYear, maxYear, location, locationString, rangeValue, tg]);
+    }, [brandValue, model, minPrice, maxPrice, minYear, maxYear, location, locationString, rangeValue, maxMileage, sellerTypes, platformTypes, conditionTypes, tg]);
 
 
     useEffect(() => {
@@ -84,12 +96,13 @@ const TelegramForm = () => {
         };
     }, [tg, onSendData]);
 
+
+
     return (
         <div>
             {tg ? (
                 <div>
                     <div className="flex flex-col gap-2 w-full">
-
                         <GetUserLocation
                             location={location}
                             setLocation={setLocation}
@@ -122,29 +135,49 @@ const TelegramForm = () => {
                         </div>
 
                         <div className={`py-6 relative`}>
-                            <article className={`text-neutral-500 text-x pb-2`}>Range to your new car</article>
-                            <Slider.Root
-                                className="relative bg-neutral-500 rounded-2xl flex h-1 w-full touch-none select-none items-center"
-                                defaultValue={[50]}
-                                max={250}
+                            <article className={`text-neutral-500 text-x pb-4 grid grid-cols-2 items-center`}>
+                                Range to your new car
+                                <div className={`flex justify-end gap-8`}>
+                                    <CirclePlus onClick={() => setRangeValue(prev => [prev[0] + 25])}
+                                                className={`text-foreground`} size={20}/>
+                                    <CircleMinus onClick={() => setRangeValue(prev => [prev[0] - 25])}
+                                                 className={`text-foreground`} size={20}/>
+                                </div>
+                            </article>
+                            <Slider
                                 value={rangeValue}
+                                max={250}
+                                step={25}
                                 onValueChange={setRangeValue}
-                                step={10}
-                            >
-                            <Slider.Track className="relative h-[4px] grow rounded-full bg-blackA7">
-                                    <Slider.Range className="absolute h-full rounded-full bg-primary" />
-                                </Slider.Track>
+                                className="shadow-lg rounded-lg"
+                            />
+                            <div className={`w-full py-2`}>
+                                {rangeValue[0]} km
+                            </div>
+                        </div>
 
-                                <Slider.Thumb
-                                    className="block size-3 rounded-[10px] bg-white shadow-[0_2px_10px] shadow-blackA4 hover:bg-violet3 focus:shadow-[0_0_0_5px] focus:shadow-blackA5 focus:outline-none"
-                                    aria-label="Volume"
-                                />
-                                <p
-                                    className={`absolute text-xs right-0 rounded p-1 font-bold transition top-4 ${rangeValue[0] >= 100 && 'bg-primary/25'}`}
-                                >
-                                    {rangeValue[0]} km
-                                </p>
-                            </Slider.Root>
+                        <div>
+                            <MilageSelect
+                                maxMilage={maxMileage}
+                                setMaxMilage={setMaxMileage}
+                            />
+                        </div>
+
+                        <div>
+                            <SellerSelect
+                                sellerTypes={sellerTypes}
+                                change={setSellerTypes}
+                            />
+
+                            <PlatformSelect
+                                platformTypes={platformTypes}
+                                change={setPlatformTypes}
+                            />
+
+                            <ConditionSelect
+                                conditionTypes={conditionTypes}
+                                change={setConditionTypes}
+                            />
                         </div>
 
 
@@ -169,7 +202,15 @@ const TelegramForm = () => {
                     </div>
                 </div>
             ) : (
-                <p>Loading Telegram data...</p>
+                <div className="flex flex-col space-y-3">
+                    <Skeleton className="h-[50px] rounded" />
+                    <Skeleton className="h-[75px] rounded" />
+                    <Skeleton className="h-[125px] rounded" />
+                    <div className="space-y-2">
+                        <Skeleton className="h-4" />
+                        <Skeleton className="h-4" />
+                    </div>
+                </div>
             )}
         </div>
     );
