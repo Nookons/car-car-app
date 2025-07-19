@@ -20,7 +20,7 @@ export interface ICarAdd {
     body_type: string;
     gearbox: string;
     transmission: string;
-    mileage: string;
+    mileage: number;
     condition: string;
     platform: string;
     map_link: string;
