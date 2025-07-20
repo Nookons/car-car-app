@@ -18,6 +18,9 @@ import dayjs from "dayjs";
 import relativeTime from 'dayjs/plugin/relativeTime'
 import duration from 'dayjs/plugin/duration'
 import {ModeToggle} from "@/components/ModeToggle/ModeToggle";
+import {useSearchParams} from "next/navigation";
+import UserButton from "@/components/shared/UserButton/UserButton";
+import CarMainSkeleton from "@/Skeletons/Car/CarMainSkeleton";
 
 dayjs.extend(relativeTime)
 dayjs.extend(duration)
@@ -41,7 +44,7 @@ function getGoogleMapEmbedUrl(originalUrl: string): string | null {
 
 async function getCarById(id: string): Promise<ICarAdd> {
     try {
-        const res = await fetch(`https://car-car-app.vercel.app/api/get-car?car_id=${id}`);
+        const res = await fetch(`http://localhost:3000/api/get-car?car_id=${id}`);
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         return await res.json();
     } catch (error) {
@@ -51,15 +54,16 @@ async function getCarById(id: string): Promise<ICarAdd> {
 }
 
 type PageProps = {
-    params: Promise<{ // Теперь params - Promise
+    params: Promise<{
         id: string;
     }>;
 };
 
-// **DO NOT** make this component async because it has 'use client'
 const Page = ({ params }: PageProps) => {
     const resolvedParams = React.use(params);
     const carId = resolvedParams.id;
+    const searchParams = useSearchParams();
+    const uid = searchParams.get('uid');
 
     const {data, isLoading, isError} = useQuery<ICarAdd, Error>({
         queryKey: ["car", carId],
@@ -68,7 +72,7 @@ const Page = ({ params }: PageProps) => {
     });
 
     if (isLoading) {
-        return <div className="max-w-[1400px] m-auto px-4">Loading car details...</div>;
+        return <CarMainSkeleton />;
     }
 
     if (isError) {
@@ -92,14 +96,10 @@ const Page = ({ params }: PageProps) => {
     const googleMapEmbedUrl = getGoogleMapEmbedUrl(map_link);
 
     return (
-        <div className="max-w-[1400px] m-auto px-1 md:px-0">
+        <div className="max-w-[1400px] m-auto px-2 md:px-0">
             <div className={`py-4 flex justify-between`}>
                 <ModeToggle />
-                <Link href={`/user/662123629`}>
-                    <Button variant={`outline`} className={``}>
-                        <CircleUser />
-                    </Button>
-                </Link>
+                <UserButton uid={uid} />
             </div>
             <div className={`grid md:grid-cols-[1fr_400px] gap-4 md:gap-0`}>
                 <div className="p-0 overflow-hidden h-78 md:h-148 rounded relative">
