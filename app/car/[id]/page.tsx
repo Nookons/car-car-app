@@ -12,11 +12,12 @@ import {
     TableRow
 } from "@/components/ui/table";
 import {Button} from "@/components/ui/button";
-import {HeartPlus, SquareArrowOutUpRight} from "lucide-react";
+import {CircleUser, HeartPlus, SquareArrowOutUpRight} from "lucide-react";
 import Link from "next/link";
 import dayjs from "dayjs";
 import relativeTime from 'dayjs/plugin/relativeTime'
 import duration from 'dayjs/plugin/duration'
+import {ModeToggle} from "@/components/ModeToggle/ModeToggle";
 
 dayjs.extend(relativeTime)
 dayjs.extend(duration)
@@ -57,9 +58,8 @@ type PageProps = {
 
 // **DO NOT** make this component async because it has 'use client'
 const Page = ({ params }: PageProps) => {
-    // Разворачиваем Promise с помощью React.use()
     const resolvedParams = React.use(params);
-    const carId = resolvedParams.id; // Теперь безопасный доступ
+    const carId = resolvedParams.id;
 
     const {data, isLoading, isError} = useQuery<ICarAdd, Error>({
         queryKey: ["car", carId],
@@ -92,9 +92,17 @@ const Page = ({ params }: PageProps) => {
     const googleMapEmbedUrl = getGoogleMapEmbedUrl(map_link);
 
     return (
-        <div className="max-w-[1400px] m-auto px-4 md:px-0">
+        <div className="max-w-[1400px] m-auto px-1 md:px-0">
+            <div className={`py-4 flex justify-between`}>
+                <ModeToggle />
+                <Link href={`/user/662123629`}>
+                    <Button variant={`outline`} className={``}>
+                        <CircleUser />
+                    </Button>
+                </Link>
+            </div>
             <div className={`grid md:grid-cols-[1fr_400px] gap-4 md:gap-0`}>
-                <div className="p-0 overflow-hidden h-78 md:h-148 relative">
+                <div className="p-0 overflow-hidden h-78 md:h-148 rounded relative">
                     <Image
                         src={image_url || "/car-placeholder.jpg"}
                         alt={title}
