@@ -14,7 +14,7 @@ dayjs.extend(duration)
 
 
 async function getCars() {
-    const res = await fetch('https://car-car-app.vercel.app/api/cars', { cache: 'no-store' });
+    const res = await fetch('https://car-car-app.vercel.app/api/all-cars', { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch cars');
     return res.json();
 }
