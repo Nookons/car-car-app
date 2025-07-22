@@ -31,6 +31,8 @@ const LanguageSelect = () => {
                     <SelectItem value="zh">中文</SelectItem>
                     <SelectItem value="ru">Русский</SelectItem>
                     <SelectItem value="de">Deutsch</SelectItem>
+                    <SelectItem value="uk">Українська</SelectItem>
+                    <SelectItem value="pl">Polish</SelectItem>
                 </SelectGroup>
             </SelectContent>
         </Select>

@@ -31,15 +31,30 @@ const FullParams: React.FC<Props> = ({data, isLoading}) => {
             <TableBody>
                 <TableRow>
                     <TableCell className="font-medium">{t("brand")}</TableCell>
-                    <TableCell className="text-right">{data.brand}</TableCell>
+                    <TableCell className="text-right">
+                        {data.brand.length > 20
+                            ? `${data.brand.substring(0, 20)}...`
+                            : data.brand
+                        }
+                    </TableCell>
                 </TableRow>
                 <TableRow>
                     <TableCell className="font-medium">{t("model")}</TableCell>
-                    <TableCell className="text-right">{data.model}</TableCell>
+                    <TableCell className="text-right">
+                        {data.model.length > 20
+                            ? `${data.model.substring(0, 20)}...`
+                            : data.model
+                        }
+                    </TableCell>
                 </TableRow>
                 <TableRow>
                     <TableCell className="font-medium">{t("version")}</TableCell>
-                    <TableCell className="text-right">{data.version}</TableCell>
+                    <TableCell className="text-right">
+                        {data.version.length > 20
+                            ? `${data.version.substring(0, 20)}...`
+                            : data.version
+                        }
+                    </TableCell>
                 </TableRow>
                 <TableRow>
                     <TableCell className="font-medium">{t("color")}</TableCell>

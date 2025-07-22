@@ -1,0 +1,32 @@
+{
+  "greeting": "Cześć",
+  "change_language": "Zmień język:",
+  "favorite": "Ulubione",
+  "back": "Wstecz",
+
+  "brand": "Marka",
+  "model": "Model",
+  "version": "Wersja",
+  "color": "Kolor",
+  "door_count": "Liczba drzwi",
+  "seats_count": "Liczba miejsc",
+  "production_year": "Rok produkcji",
+  "generation": "Generacja",
+  "fuel_type": "Rodzaj paliwa",
+  "engine_capacity": "Pojemność silnika",
+  "engine_power": "Moc silnika",
+  "body_type": "Typ nadwozia",
+  "gearbox": "Skrzynia biegów",
+  "transmission": "Napęd",
+  "mileage": "Przebieg",
+  "condition": "Stan",
+  "from": "Od",
+  "seller_type": "Typ sprzedawcy",
+
+  "used": "Używany",
+  "new": "Nowy",
+
+  "firma": "Firma",
+  "dealer": "Dealer",
+  "private_person": "Osoba prywatna"
+}

@@ -1,0 +1,32 @@
+{
+  "greeting": "Привіт",
+  "change_language": "Змінити мову:",
+  "favorite": "Улюблене",
+  "back": "Назад",
+
+  "brand": "Марка",
+  "model": "Модель",
+  "version": "Версія",
+  "color": "Колір",
+  "door_count": "Кількість дверей",
+  "seats_count": "Кількість місць",
+  "production_year": "Рік випуску",
+  "generation": "Покоління",
+  "fuel_type": "Тип пального",
+  "engine_capacity": "Об’єм двигуна",
+  "engine_power": "Потужність двигуна",
+  "body_type": "Тип кузова",
+  "gearbox": "Коробка передач",
+  "transmission": "Привід",
+  "mileage": "Пробіг",
+  "condition": "Стан",
+  "from": "Від",
+  "seller_type": "Тип продавця",
+
+  "used": "Вживане",
+  "new": "Нове",
+
+  "firma": "Компанія",
+  "dealer": "Дилер",
+  "private_person": "Приватна особа"
+}

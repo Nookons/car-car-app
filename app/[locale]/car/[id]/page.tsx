@@ -15,7 +15,7 @@ import i18n from "@/app/i18n/i18n";
 
 async function getCarById(id: string): Promise<ICarAd> {
     try {
-        const res = await fetch(`https://car-car-app.vercel.app/api/get-car?car_id=${id}`);
+        const res = await fetch(`http://localhost:3000/api/get-car?car_id=${id}`);
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         return await res.json();
     } catch (error) {
