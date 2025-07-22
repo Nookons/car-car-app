@@ -1,0 +1,32 @@
+{
+  "greeting": "你好",
+  "change_language": "更改语言：",
+  "favorite": "最喜欢",
+  "back": "后",
+
+  "brand": "品牌",
+  "model": "型号",
+  "version": "版本",
+  "color": "颜色",
+  "door_count": "车门数量",
+  "seats_count": "座位数量",
+  "production_year": "生产年份",
+  "generation": "代际",
+  "fuel_type": "燃料类型",
+  "engine_capacity": "发动机排量",
+  "engine_power": "发动机功率",
+  "body_type": "车身类型",
+  "gearbox": "变速箱",
+  "transmission": "传动方式",
+  "mileage": "里程",
+  "condition": "车辆状况",
+  "from": "来自",
+  "seller_type": "卖家类型",
+
+  "used": "使用过。",
+  "new": "新",
+
+  "firma": "公司",
+  "dealer": "个人",
+  "private_person": "Private person"
+}

@@ -1,8 +1,17 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import path from 'path';
+import {NextConfig} from 'next';
+
+const nextConfig: NextConfig = {
+    webpack(config) {
+        config.resolve.alias = {
+            ...(config.resolve.alias || {}),
+            '@': path.resolve(__dirname),
+        };
+        return config;
+    },
     images: {
         domains: ['ireland.apollo.olxcdn.com'],
     },
 };
 
-module.exports = nextConfig;
+export default nextConfig;

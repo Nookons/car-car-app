@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
             const result = await client.query(query, values);
 
             if (result.rowCount === 0) {
-                return NextResponse.json({ message: "Car already exists" }, { status: 200 });
+                return NextResponse.json({ message: "ad already exists" }, { status: 200 });
             }
 
             return NextResponse.json({ car: result.rows[0] }, { status: 201 });

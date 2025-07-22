@@ -1,0 +1,32 @@
+{
+  "greeting": "Hello",
+  "change_language": "Change language:",
+  "favorite": "Favorite",
+  "back": "Back",
+
+  "brand": "Brand",
+  "model": "Model",
+  "version": "Version",
+  "color": "Color",
+  "door_count": "Door count",
+  "seats_count": "Seats count",
+  "production_year": "Production year",
+  "generation": "Generation",
+  "fuel_type": "Fuel type",
+  "engine_capacity": "Engine capacity",
+  "engine_power": "Engine power",
+  "body_type": "Body type",
+  "gearbox": "Gearbox",
+  "transmission": "Transmission",
+  "mileage": "Mileage",
+  "condition": "Condition",
+  "from": "From",
+  "seller_type": "Seller type",
+
+  "used": "Used",
+  "new": "New",
+
+  "firma": "Firma",
+  "dealer": "Dealer",
+  "private_person": "Private person"
+}

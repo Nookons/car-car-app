@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import {ICarAd} from "@/types/Car";
 
 
 const EARTH_RADIUS_KM = 6371;
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
 
         const allCars = carRes.rows;
 
-        const filteredCars = allCars.filter(car => {
+        const filteredCars = allCars.filter((car: ICarAd) => {
             if (!user.lat || !user.lng || !user.from_user_range) return true;
 
             const coords = extractLatLngFromGoogleMapsUrl(car.map_link);

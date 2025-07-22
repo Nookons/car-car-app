@@ -1,0 +1,32 @@
+{
+  "greeting": "Привет",
+  "change_language": "Change language:",
+  "favorite": "Избранное",
+  "back": "Назад",
+
+  "brand": "Марка",
+  "model": "Модель",
+  "version": "Версия",
+  "color": "Цвет",
+  "door_count": "Количество дверей",
+  "seats_count": "Количество сидений",
+  "production_year": "Год выпуска",
+  "generation": "Поколение",
+  "fuel_type": "Тип топлива",
+  "engine_capacity": "Объём двигателя",
+  "engine_power": "Мощность двигателя",
+  "body_type": "Тип кузова",
+  "gearbox": "Коробка передач",
+  "transmission": "Привод",
+  "mileage": "Пробег",
+  "condition": "Состояние",
+  "from": "От",
+  "seller_type": "Тип продавца",
+
+  "used": "Б/у",
+  "new": "Новая",
+
+  "firma": "Компания",
+  "dealer": "Дилер",
+  "private_person": "Частное лицо"
+}
