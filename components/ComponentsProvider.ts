@@ -33,4 +33,30 @@ export {Avatar} from "@/components/ui/avatar";
 export {AvatarImage} from "@/components/ui/avatar";
 export {AvatarFallback} from "@/components/ui/avatar";
 
+export {Accordion} from "@/components/ui/accordion";
+export {AccordionItem} from "@/components/ui/accordion";
+export {AccordionTrigger} from "@/components/ui/accordion";
+export {AccordionContent} from "@/components/ui/accordion";
+
+export {Slider} from "@/components/ui/slider";
+
+export {Checkbox} from "@/components/ui/checkbox";
+
+export {Input} from "@/components/ui/input";
+
+export {Popover} from "@/components/ui/popover";
+export {PopoverTrigger} from "@/components/ui/popover";
+export {PopoverContent} from "@/components/ui/popover";
+export {PopoverAnchor} from "@/components/ui/popover";
+
+export {Command} from "@/components/ui/command";
+export {CommandDialog} from "@/components/ui/command";
+export {CommandInput} from "@/components/ui/command";
+export {CommandList} from "@/components/ui/command";
+export {CommandEmpty} from "@/components/ui/command";
+export {CommandGroup} from "@/components/ui/command";
+export {CommandItem} from "@/components/ui/command";
+export {CommandShortcut} from "@/components/ui/command";
+export {CommandSeparator} from "@/components/ui/command";
+
 

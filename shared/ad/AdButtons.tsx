@@ -1,12 +1,12 @@
 import React from 'react';
 import {Button, Skeleton} from "@/components/ComponentsProvider";
-import {ICarAd} from "@/types/Car";
+import {ICarAdd} from "@/types/Car";
 import {useTranslation} from "react-i18next";
 import {ExternalLink, HeartPlus} from "lucide-react";
 import Link from "next/link";
 
 interface Props {
-    data: ICarAd | undefined;
+    data: ICarAdd | undefined;
     isLoading: boolean;
 }
 

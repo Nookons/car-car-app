@@ -1,10 +1,10 @@
 import React from 'react';
-import {ICarAd} from "@/types/Car";
+import {ICarAdd} from "@/types/Car";
 import {Skeleton} from "@/components/ui/skeleton";
 import {getBodyTypeLabel, getFuelTypeLabel, getGearBoxLabelType} from "@/feathers/getTypesLabels";
 
 interface Props {
-    data: ICarAd | undefined;
+    data: ICarAdd | undefined;
     isLoading: boolean;
     icon_size: number;
 }

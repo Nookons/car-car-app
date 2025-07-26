@@ -1,7 +1,7 @@
 'use client'
 import React from 'react';
 import {useQuery} from "@tanstack/react-query";
-import {ICarAd} from "@/types/Car";
+import {ICarAdd} from "@/types/Car";
 import {
     Badge,
     Card,
@@ -14,7 +14,7 @@ import {getConditionLabel, getSellerTypeLabel} from "@/feathers/getTypesLabels";
 import MainParams from "@/shared/ad/MainParams";
 import Link from "next/link";
 
-async function fetchCarData(): Promise<ICarAd[]> {
+async function fetchCarData(): Promise<ICarAdd[]> {
     try {
         const res = await fetch(`http://localhost:3000/api/all-cars`);
         if (!res.ok) throw new Error("Network response was not ok");
@@ -25,7 +25,7 @@ async function fetchCarData(): Promise<ICarAd[]> {
 }
 
 const Page = () => {
-    const {data, isLoading, isError, error} = useQuery<ICarAd[], Error>({
+    const {data, isLoading, isError, error} = useQuery<ICarAdd[], Error>({
         queryKey: ['cars_data'],
         queryFn: fetchCarData,
         staleTime: 5 * 60 * 1000,

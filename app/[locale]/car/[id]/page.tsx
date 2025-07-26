@@ -6,10 +6,10 @@ import AdButtons from "@/shared/ad/AdButtons";
 import MainParams from "@/shared/ad/MainParams";
 import FullParams from "@/shared/ad/FullParams";
 import AdMap from "@/shared/ad/AdMap";
-import {ICarAd} from "@/types/Car";
+import {ICarAdd} from "@/types/Car";
 import {useQuery} from '@tanstack/react-query';
 
-async function getCarById(id: string): Promise<ICarAd> {
+async function getCarById(id: string): Promise<ICarAdd> {
     try {
         const res = await fetch(`https://car-car-app.vercel.app/api/get-car?car_id=${id}`);
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -30,7 +30,7 @@ const Page = ({ params }: PageProps) => {
     const resolvedParams = React.use(params);
     const id = resolvedParams.id;
 
-    const {data, isLoading, isError, error} = useQuery<ICarAd, Error>({
+    const {data, isLoading, isError, error} = useQuery<ICarAdd, Error>({
         queryKey: ['car', id],
         queryFn: () => getCarById( id),
         enabled: !!id,

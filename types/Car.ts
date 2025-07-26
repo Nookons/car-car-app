@@ -1,5 +1,5 @@
 
-export interface ICarAd {
+export interface ICarAdd {
     id: number;
     title: string;
     posted_time: string; // ISO дата-время в строке

@@ -1,6 +1,6 @@
 import {Skeleton, Table, TableBody, TableCell, TableRow} from '@/components/ComponentsProvider';
 import React from 'react';
-import {ICarAd} from "@/types/Car";
+import {ICarAdd} from "@/types/Car";
 import {useTranslation} from "react-i18next";
 import {
     getBodyTypeLabel, getColorLabel,
@@ -11,7 +11,7 @@ import {
 } from "@/feathers/getTypesLabels";
 
 interface Props {
-    data: ICarAd | undefined;
+    data: ICarAdd | undefined;
     isLoading: boolean;
 }
 

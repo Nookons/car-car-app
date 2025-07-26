@@ -1,10 +1,10 @@
 import React from 'react';
-import {ICarAd} from "@/types/Car";
+import {ICarAdd} from "@/types/Car";
 import {Skeleton} from "@/components/ComponentsProvider";
 import Image from "next/image";
 
 interface Props {
-    data: ICarAd | undefined;
+    data: ICarAdd | undefined;
     isLoading: boolean;
 }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ICarAd } from "@/types/Car";
+import { ICarAdd } from "@/types/Car";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ComponentsProvider";
 import {useTranslation} from "react-i18next";
@@ -7,7 +7,7 @@ import {getConditionLabel, getSellerTypeLabel} from "@/feathers/getTypesLabels";
 
 
 interface Props {
-    data: ICarAd | undefined;
+    data: ICarAdd | undefined;
     isLoading: boolean;
 }
 
