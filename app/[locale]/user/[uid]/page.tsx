@@ -8,7 +8,7 @@ import UserSearchSettings from "@/components/shared/User/UserSearchSettings";
 
 
 async function fetchData(uid: string) {
-    return await fetch(`http://localhost:3000/api/get-user-data?uid=${uid}`)
+    return await fetch(`https://car-car-app.vercel.app/api/get-user-data?uid=${uid}`)
         .then((res) => res.json())
         .then((data) => {
             return data as IUserFull
