@@ -1,22 +1,25 @@
-// app/[locale]/layout.tsx
+import React from "react";
 
 export const generateStaticParams = () => [
     { locale: 'en' },
     { locale: 'zh' },
+    { locale: 'pl' },
+    { locale: 'uk' },
+    { locale: 'de' },
+    { locale: 'ru' },
 ];
 
-export default async function LocaleLayout({
-                                               children,
-                                               params,
-                                           }: {
+type PageProps = {
+    params: Promise<{ locale: string }>;
     children: React.ReactNode;
-    params: Promise<{ locale: string }>; // params теперь Promise
-}) {
-    const { locale } = await params; // await здесь обязателен
+};
+
+export default async function LocaleLayout({ children, params }: PageProps) {
+    const resolvedParams = await params;
 
     return (
-        <html lang={locale}>
-        <body>{children}</body>
-        </html>
+        <div lang={resolvedParams.locale}>
+            {children}
+        </div>
     );
 }

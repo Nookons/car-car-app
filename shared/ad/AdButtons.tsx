@@ -2,6 +2,8 @@ import React from 'react';
 import {Button, Skeleton} from "@/components/ComponentsProvider";
 import {ICarAd} from "@/types/Car";
 import {useTranslation} from "react-i18next";
+import {ExternalLink, HeartPlus} from "lucide-react";
+import Link from "next/link";
 
 interface Props {
     data: ICarAd | undefined;
@@ -20,9 +22,9 @@ const AdButtons: React.FC<Props> = ({data, isLoading}) => {
     if (!data) return null;
 
     return (
-        <div className={`space-y-2`}>
-            <Button className={`w-full`}>{t('favorite')}</Button>
-            <Button variant={`outline`} className={`w-full`}>{t('back')}</Button>
+        <div className={`grid grid-cols-[1fr_125px] gap-2`}>
+            <Link href={data.url}><Button className={`w-full`}><ExternalLink /> {t('open_original')}</Button></Link>
+            <Button variant={`outline`} className={`w-full`}><HeartPlus /> {t('favorite')}</Button>
         </div>
     );
 };

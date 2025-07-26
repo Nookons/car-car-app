@@ -1,10 +1,10 @@
 'use client';
 
-import { useTranslation } from 'react-i18next';
-import {useEffect, useState} from 'react';
+import {useTranslation} from 'react-i18next';
+import React, {useEffect, useState} from 'react';
 
 export default function Home() {
-    const { t, i18n } = useTranslation();
+    const {t, i18n} = useTranslation();
     const [ready, setReady] = useState(false);
 
     useEffect(() => {
@@ -18,7 +18,7 @@ export default function Home() {
     if (!ready) return null; // или <Skeleton />
 
     return (
-        <main style={{ padding: 20 }}>
+        <main style={{padding: 20}}>
             <h1>{t('greeting')}</h1>
             <p>{t('change_language')}</p>
         </main>

@@ -24,7 +24,7 @@ const AdImageBlock: React.FC<Props> = ({data, isLoading}) => {
                 className={`rounded`}
                 width={1200}
                 height={1200}
-                src={data.image_url}
+                src={data.image_url !== 'unknown' ? data.image_url : "https://dtprodvehicleimages.blob.core.windows.net/assets/marketplace/no-car-img.png"}
                 alt={data.title}
             />
         </>

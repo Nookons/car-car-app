@@ -2,6 +2,7 @@
   "greeting": "Hello",
   "change_language": "Change language:",
   "favorite": "Favorite",
+  "open_original": "Original",
   "back": "Back",
 
   "brand": "Brand",
@@ -22,11 +23,79 @@
   "condition": "Condition",
   "from": "From",
   "seller_type": "Seller type",
+  "min_price": "Min price",
+  "max_price": "Max price",
+  "min_year": "Min year",
+  "max_year": "Max year",
+  "saved_location": "Location",
+  "search_range": "Search range",
+  "picked_platforms": "Picked platforms",
 
   "used": "Used",
   "new": "New",
 
   "firma": "Firma",
   "dealer": "Dealer",
-  "private_person": "Private person"
+  "private_person": "Private person",
+
+  "support_contact": "Support Contact",
+
+  "transmission_object": {
+    "part_time_4x4": "4x4 (part-time)",
+    "full_time_4x4": "4x4 (full-time)",
+    "front_wheel_drive": "Front-wheel drive",
+    "rear_wheel_drive": "Rear-wheel drive",
+    "unknown": "We can't find any information."
+  },
+
+  "gear_box_object": {
+    "automatic": "Automatic",
+    "manual": "Manual",
+    "unknown": "Unknown"
+  },
+
+  "body_type_object": {
+    "small_car": "Small car",
+    "city_car": "City car",
+    "coupe": "Coupe",
+    "convertible": "Convertible",
+    "station_wagon": "Station wagon",
+    "compact": "Compact",
+    "minivan": "Minivan",
+    "sedan": "Sedan",
+    "suv": "SUV",
+    "unknown": "Unknown"
+  },
+
+  "fuel_type_object": {
+    "petrol": "Petrol",
+    "petrol_lpg": "Petrol + LPG",
+    "diesel": "Diesel",
+    "electric": "Electric",
+    "hybrid": "Hybrid",
+    "unknown": "Unknown"
+  },
+
+  "color_object": {
+    "beige": "Beige",
+    "white": "White",
+    "sky_blue": "Sky blue",
+    "burgundy": "Burgundy",
+    "brown": "Brown",
+    "black": "Black",
+    "red": "Red",
+    "purple": "Purple",
+    "navy": "Navy",
+    "other": "Other color",
+    "blue": "Blue",
+    "orange": "Orange",
+    "silver": "Silver",
+    "gray": "Gray",
+    "green": "Green",
+    "gold": "Gold",
+    "yellow": "Yellow",
+    "unknown": "Unknown"
+  },
+
+  "change_setting_not_available": "Change your setting available only from telegram right now. In next update you will be able to do this here )"
 }

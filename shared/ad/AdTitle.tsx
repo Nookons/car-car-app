@@ -3,6 +3,7 @@ import { ICarAd } from "@/types/Car";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ComponentsProvider";
 import {useTranslation} from "react-i18next";
+import {getConditionLabel, getSellerTypeLabel} from "@/feathers/getTypesLabels";
 
 
 interface Props {
@@ -24,36 +25,11 @@ const AdTitle: React.FC<Props> = ({ data, isLoading }) => {
 
     if (!data) return null;
 
-    function getConditionLabel(type: string) {
-        switch (type.toLowerCase()) {
-            case "nowy":
-                return t("new")
-            case "używany":
-                return t("used")
-            default:
-                return ""
-        }
-    }
-
-    function getSellerType(type: string) {
-        console.log(type.toLowerCase());
-        switch (type.toLowerCase()) {
-            case "firma":
-                return t("firma")
-            case "autoryzowany dealer":
-                return t("dealer")
-            case "osoba prywatna":
-                return t("private_person")
-            default:
-                return ""
-        }
-    }
-
     return (
         <div className="flex justify-between gap-2 mb-4">
             <div>
                 <h1 className="text-lg font-bold line-clamp-1">{data.title}</h1>
-                <p className="text-neutral-500 text-xs font-semibold">{getSellerType(data.seller_type)}</p>
+                <p className="text-neutral-500 text-xs font-semibold">{getSellerTypeLabel(data.seller_type)}</p>
                 <p className="text-neutral-500 text-xs font-semibold">{getConditionLabel(data.condition)} · {data.production_year}</p>
             </div>
             <div>

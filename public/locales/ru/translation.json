@@ -1,7 +1,8 @@
 {
   "greeting": "Привет",
-  "change_language": "Change language:",
+  "change_language": "Изменить язык:",
   "favorite": "Избранное",
+  "open_original": "Оригинал",
   "back": "Назад",
 
   "brand": "Марка",
@@ -9,24 +10,92 @@
   "version": "Версия",
   "color": "Цвет",
   "door_count": "Количество дверей",
-  "seats_count": "Количество сидений",
+  "seats_count": "Количество мест",
   "production_year": "Год выпуска",
   "generation": "Поколение",
   "fuel_type": "Тип топлива",
-  "engine_capacity": "Объём двигателя",
+  "engine_capacity": "Объем двигателя",
   "engine_power": "Мощность двигателя",
   "body_type": "Тип кузова",
-  "gearbox": "Коробка передач",
+  "gearbox": "КПП",
   "transmission": "Привод",
   "mileage": "Пробег",
   "condition": "Состояние",
   "from": "От",
   "seller_type": "Тип продавца",
+  "min_price": "Минимальная цена",
+  "max_price": "Максимальная цена",
+  "min_year": "Мин. год",
+  "max_year": "Макс. год",
+  "saved_location": "Местоположение",
+  "search_range": "Радиус поиска",
+  "picked_platforms": "Выбранные платформы",
 
   "used": "Б/у",
-  "new": "Новая",
+  "new": "Новый",
 
   "firma": "Компания",
   "dealer": "Дилер",
-  "private_person": "Частное лицо"
+  "private_person": "Частное лицо",
+
+  "support_contact": "Контакт поддержки",
+
+  "transmission_object": {
+    "part_time_4x4": "4x4 (частичный)",
+    "full_time_4x4": "4x4 (постоянный)",
+    "front_wheel_drive": "Передний привод",
+    "rear_wheel_drive": "Задний привод",
+    "unknown": "Информация не найдена."
+  },
+
+  "gear_box_object": {
+    "automatic": "Автоматическая",
+    "manual": "Механическая",
+    "unknown": "Неизвестно"
+  },
+
+  "body_type_object": {
+    "small_car": "Маленький автомобиль",
+    "city_car": "Городской автомобиль",
+    "coupe": "Купе",
+    "convertible": "Кабриолет",
+    "station_wagon": "Универсал",
+    "compact": "Компактный",
+    "minivan": "Минивэн",
+    "sedan": "Седан",
+    "suv": "Внедорожник",
+    "unknown": "Неизвестно"
+  },
+
+  "fuel_type_object": {
+    "petrol": "Бензин",
+    "petrol_lpg": "Бензин + Газ",
+    "diesel": "Дизель",
+    "electric": "Электро",
+    "hybrid": "Гибрид",
+    "unknown": "Неизвестно"
+  },
+
+  "color_object": {
+    "beige": "Бежевый",
+    "white": "Белый",
+    "sky_blue": "Голубой",
+    "burgundy": "Бордовый",
+    "brown": "Коричневый",
+    "black": "Чёрный",
+    "red": "Красный",
+    "purple": "Фиолетовый",
+    "navy": "Тёмно-синий",
+    "other": "Другой цвет",
+    "blue": "Синий",
+    "orange": "Оранжевый",
+    "silver": "Серебристый",
+    "gray": "Серый",
+    "green": "Зелёный",
+    "gold": "Золотой",
+    "yellow": "Жёлтый",
+    "unknown": "Неизвестно"
+  },
+
+  "change_setting_not_available": "Изменение настроек сейчас доступно только через Telegram. В следующем обновлении вы сможете сделать это и здесь :)"
 }

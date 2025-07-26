@@ -2,6 +2,7 @@
   "greeting": "Hallo",
   "change_language": "Sprache ändern:",
   "favorite": "Favorit",
+  "open_original": "Original",
   "back": "Zurück",
 
   "brand": "Marke",
@@ -15,18 +16,86 @@
   "fuel_type": "Kraftstoffart",
   "engine_capacity": "Hubraum",
   "engine_power": "Motorleistung",
-  "body_type": "Karosserietyp",
+  "body_type": "Karosserieform",
   "gearbox": "Getriebe",
   "transmission": "Antrieb",
   "mileage": "Kilometerstand",
   "condition": "Zustand",
-  "from": "Von",
+  "from": "Ab",
   "seller_type": "Verkäufertyp",
+  "min_price": "Mindestpreis",
+  "max_price": "Höchstpreis",
+  "min_year": "Min. Jahr",
+  "max_year": "Max. Jahr",
+  "saved_location": "Standort",
+  "search_range": "Suchradius",
+  "picked_platforms": "Ausgewählte Plattformen",
 
   "used": "Gebraucht",
   "new": "Neu",
 
   "firma": "Firma",
   "dealer": "Händler",
-  "private_person": "Privatperson"
+  "private_person": "Privatperson",
+
+  "support_contact": "Support-Kontakt",
+
+  "transmission_object": {
+    "part_time_4x4": "4x4 (partiell)",
+    "full_time_4x4": "4x4 (permanent)",
+    "front_wheel_drive": "Vorderradantrieb",
+    "rear_wheel_drive": "Hinterradantrieb",
+    "unknown": "Keine Informationen gefunden."
+  },
+
+  "gear_box_object": {
+    "automatic": "Automatik",
+    "manual": "Manuell",
+    "unknown": "Unbekannt"
+  },
+
+  "body_type_object": {
+    "small_car": "Kleinwagen",
+    "city_car": "Stadtwagen",
+    "coupe": "Coupé",
+    "convertible": "Cabrio",
+    "station_wagon": "Kombi",
+    "compact": "Kompakt",
+    "minivan": "Minivan",
+    "sedan": "Limousine",
+    "suv": "SUV",
+    "unknown": "Unbekannt"
+  },
+
+  "fuel_type_object": {
+    "petrol": "Benzin",
+    "petrol_lpg": "Benzin + LPG",
+    "diesel": "Diesel",
+    "electric": "Elektro",
+    "hybrid": "Hybrid",
+    "unknown": "Unbekannt"
+  },
+
+  "color_object": {
+    "beige": "Beige",
+    "white": "Weiß",
+    "sky_blue": "Himmelblau",
+    "burgundy": "Burgunderrot",
+    "brown": "Braun",
+    "black": "Schwarz",
+    "red": "Rot",
+    "purple": "Lila",
+    "navy": "Marineblau",
+    "other": "Andere Farbe",
+    "blue": "Blau",
+    "orange": "Orange",
+    "silver": "Silber",
+    "gray": "Grau",
+    "green": "Grün",
+    "gold": "Gold",
+    "yellow": "Gelb",
+    "unknown": "Unbekannt"
+  },
+
+  "change_setting_not_available": "Die Einstellungen können derzeit nur über Telegram geändert werden. Im nächsten Update wird dies auch hier möglich sein :)"
 }

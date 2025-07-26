@@ -2,6 +2,7 @@
   "greeting": "Cześć",
   "change_language": "Zmień język:",
   "favorite": "Ulubione",
+  "open_original": "Oryginał",
   "back": "Wstecz",
 
   "brand": "Marka",
@@ -22,11 +23,79 @@
   "condition": "Stan",
   "from": "Od",
   "seller_type": "Typ sprzedawcy",
+  "min_price": "Minimalna cena",
+  "max_price": "Maksymalna cena",
+  "min_year": "Min. rok",
+  "max_year": "Maks. rok",
+  "saved_location": "Lokalizacja",
+  "search_range": "Zasięg wyszukiwania",
+  "picked_platforms": "Wybrane platformy",
 
   "used": "Używany",
   "new": "Nowy",
 
   "firma": "Firma",
   "dealer": "Dealer",
-  "private_person": "Osoba prywatna"
+  "private_person": "Osoba prywatna",
+
+  "support_contact": "Kontakt wsparcia",
+
+  "transmission_object": {
+    "part_time_4x4": "4x4 (częściowy)",
+    "full_time_4x4": "4x4 (całodobowy)",
+    "front_wheel_drive": "Napęd na przednie koła",
+    "rear_wheel_drive": "Napęd na tylne koła",
+    "unknown": "Brak informacji."
+  },
+
+  "gear_box_object": {
+    "automatic": "Automatyczna",
+    "manual": "Manualna",
+    "unknown": "Nieznany"
+  },
+
+  "body_type_object": {
+    "small_car": "Mały samochód",
+    "city_car": "Samochód miejski",
+    "coupe": "Coupe",
+    "convertible": "Kabriolet",
+    "station_wagon": "Kombi",
+    "compact": "Kompakt",
+    "minivan": "Minivan",
+    "sedan": "Sedan",
+    "suv": "SUV",
+    "unknown": "Nieznany"
+  },
+
+  "fuel_type_object": {
+    "petrol": "Benzyna",
+    "petrol_lpg": "Benzyna + LPG",
+    "diesel": "Diesel",
+    "electric": "Elektryczny",
+    "hybrid": "Hybrydowy",
+    "unknown": "Nieznany"
+  },
+
+  "color_object": {
+    "beige": "Beżowy",
+    "white": "Biały",
+    "sky_blue": "Jasnoniebieski",
+    "burgundy": "Bordowy",
+    "brown": "Brązowy",
+    "black": "Czarny",
+    "red": "Czerwony",
+    "purple": "Fioletowy",
+    "navy": "Granatowy",
+    "other": "Inny kolor",
+    "blue": "Niebieski",
+    "orange": "Pomarańczowy",
+    "silver": "Srebrny",
+    "gray": "Szary",
+    "green": "Zielony",
+    "gold": "Złoty",
+    "yellow": "Żółty",
+    "unknown": "Nieznany"
+  },
+
+  "change_setting_not_available": "Zmiana ustawień jest obecnie możliwa tylko przez Telegram. W następnej aktualizacji będzie to możliwe także tutaj :)"
 }

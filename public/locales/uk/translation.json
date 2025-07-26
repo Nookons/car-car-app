@@ -1,7 +1,8 @@
 {
   "greeting": "Привіт",
   "change_language": "Змінити мову:",
-  "favorite": "Улюблене",
+  "favorite": "Обране",
+  "open_original": "Оригінал",
   "back": "Назад",
 
   "brand": "Марка",
@@ -13,20 +14,88 @@
   "production_year": "Рік випуску",
   "generation": "Покоління",
   "fuel_type": "Тип пального",
-  "engine_capacity": "Об’єм двигуна",
+  "engine_capacity": "Обʼєм двигуна",
   "engine_power": "Потужність двигуна",
   "body_type": "Тип кузова",
-  "gearbox": "Коробка передач",
+  "gearbox": "КПП",
   "transmission": "Привід",
   "mileage": "Пробіг",
   "condition": "Стан",
   "from": "Від",
   "seller_type": "Тип продавця",
+  "min_price": "Мінімальна ціна",
+  "max_price": "Максимальна ціна",
+  "min_year": "Мін. рік",
+  "max_year": "Макс. рік",
+  "saved_location": "Місцезнаходження",
+  "search_range": "Радіус пошуку",
+  "picked_platforms": "Обрані платформи",
 
   "used": "Вживане",
   "new": "Нове",
 
   "firma": "Компанія",
   "dealer": "Дилер",
-  "private_person": "Приватна особа"
+  "private_person": "Приватна особа",
+
+  "support_contact": "Контакт підтримки",
+
+  "transmission_object": {
+    "part_time_4x4": "4x4 (частковий)",
+    "full_time_4x4": "4x4 (постійний)",
+    "front_wheel_drive": "Передній привід",
+    "rear_wheel_drive": "Задній привід",
+    "unknown": "Інформацію не знайдено."
+  },
+
+  "gear_box_object": {
+    "automatic": "Автоматична",
+    "manual": "Механічна",
+    "unknown": "Невідомо"
+  },
+
+  "body_type_object": {
+    "small_car": "Малий автомобіль",
+    "city_car": "Міський автомобіль",
+    "coupe": "Купе",
+    "convertible": "Кабріолет",
+    "station_wagon": "Універсал",
+    "compact": "Компакт",
+    "minivan": "Мінівен",
+    "sedan": "Седан",
+    "suv": "Позашляховик",
+    "unknown": "Невідомо"
+  },
+
+  "fuel_type_object": {
+    "petrol": "Бензин",
+    "petrol_lpg": "Бензин + Газ",
+    "diesel": "Дизель",
+    "electric": "Електро",
+    "hybrid": "Гібрид",
+    "unknown": "Невідомо"
+  },
+
+  "color_object": {
+    "beige": "Бежевий",
+    "white": "Білий",
+    "sky_blue": "Блакитний",
+    "burgundy": "Бордовий",
+    "brown": "Коричневий",
+    "black": "Чорний",
+    "red": "Червоний",
+    "purple": "Фіолетовий",
+    "navy": "Темно-синій",
+    "other": "Інший колір",
+    "blue": "Синій",
+    "orange": "Оранжевий",
+    "silver": "Сріблястий",
+    "gray": "Сірий",
+    "green": "Зелений",
+    "gold": "Золотий",
+    "yellow": "Жовтий",
+    "unknown": "Невідомо"
+  },
+
+  "change_setting_not_available": "Змінювати налаштування наразі можна лише через Telegram. У наступному оновленні ви зможете зробити це й тут :)"
 }
