@@ -2,13 +2,13 @@ import React, {useEffect, useState} from 'react';
 import {Input} from "@/components/ui/input";
 import {IMileageResponse} from "@/types/Mileage";
 import {Skeleton} from "@/components/ui/skeleton";
+import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 
-interface Props {
-    maxMilage: number;
-    setMaxMilage: (value: number) => void;
-}
 
-const MilageSelect: React.FC <Props> = ({maxMilage, setMaxMilage}) => {
+
+const MilageSelect= () => {
+    const telegramData = useTelegramFormStore(state => state.data)
+    const setMaxMilage = useTelegramFormStore(state => state.setMaxMilage)
     const [milageData, setMilageData] = useState<IMileageResponse | null>(null)
 
     useEffect(() => {
@@ -35,7 +35,10 @@ const MilageSelect: React.FC <Props> = ({maxMilage, setMaxMilage}) => {
     return (
         <div className={`flex flex-col gap-2`}>
             <article>Milage</article>
-            <Input type={`number`} value={maxMilage === 0 ? '' : maxMilage} onChange={(e) => setMaxMilage(Number(e.target.value))}
+            <Input
+                type={`number`}
+                value={telegramData.maxMilage === 0 ? '' : telegramData.maxMilage}
+                onChange={(e) => setMaxMilage(Number(e.target.value))}
                 placeholder={milageData.max_mileage ? `${milageData.max_mileage.toLocaleString()} km` : 'Enter max milage'}
             />
         </div>

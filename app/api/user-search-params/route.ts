@@ -89,8 +89,8 @@ export async function POST(request: NextRequest) {
 
                 const updateValues = [
                     id,
-                    brand || null,
-                    model || null,
+                    brand?.toLowerCase() || null,
+                    model?.toLowerCase() || null,
                     min_year || null,
                     max_year || null,
                     min_price || 0,

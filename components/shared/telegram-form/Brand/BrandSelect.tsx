@@ -5,7 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import { IBrand } from '@/types/Brand';
 import { getAllBrands } from "@/features/getAllBrands";
 import {
-    BadgeCheck,
     Check,
     ChevronsUpDown
 } from "lucide-react";
@@ -21,14 +20,12 @@ import {
     PopoverContent,
     PopoverTrigger
 } from '@/components/ComponentsProvider';
-import { cn } from "@/lib/utils";
+import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 
-interface Props {
-    value: string[];
-    onChange: (value: string[]) => void;
-}
 
-const BrandSelect: React.FC<Props> = ({ value, onChange }) => {
+const BrandSelect = () => {
+    const setBrandsStore = useTelegramFormStore(state => state.setBrands)
+
     const { data: brandsData = [], isLoading, isError } = useQuery<IBrand[]>({
         queryKey: ['brands'],
         queryFn: getAllBrands,
@@ -37,8 +34,11 @@ const BrandSelect: React.FC<Props> = ({ value, onChange }) => {
 
     const [open, setOpen] = useState(false);
     const [brandsDataFormatted, setBrandsDataFormatted] = useState<{ value: string, label: string }[]>([]);
+
     const triggerRef = useRef<HTMLButtonElement>(null);
     const [popoverWidth, setPopoverWidth] = useState<string | number>('auto');
+
+    const [brands, setBrands] = useState<string[]>([]);
 
     useEffect(() => {
         if (brandsData) {
@@ -50,7 +50,10 @@ const BrandSelect: React.FC<Props> = ({ value, onChange }) => {
         }
     }, [brandsData]);
 
-    // Ensure Popover width matches trigger
+    useEffect(() => {
+        setBrandsStore(brands)
+    }, [brands]);
+
     useEffect(() => {
         if (triggerRef.current) {
             setPopoverWidth(triggerRef.current.offsetWidth);
@@ -67,9 +70,9 @@ const BrandSelect: React.FC<Props> = ({ value, onChange }) => {
                     aria-expanded={open}
                     className="w-full justify-between"
                 >
-                    {value.length > 0
+                    {brands.length > 0
                         ? brandsDataFormatted
-                            .filter((brand) => value.includes(brand.value))
+                            .filter((brand) => brands.includes(brand.value))
                             .map((f) => f.label)
                             .join(", ")
                         : "Select brand..."}
@@ -91,15 +94,15 @@ const BrandSelect: React.FC<Props> = ({ value, onChange }) => {
                                     key={brand.value}
                                     value={brand.value}
                                     onSelect={() => {
-                                        const newValue = value.includes(brand.value)
-                                            ? value.filter((val) => val !== brand.value)
-                                            : [...value, brand.value];
-                                        onChange(newValue);
+                                        const newValue = brands.includes(brand.value)
+                                            ? brands.filter((val) => val !== brand.value)
+                                            : [...brands, brand.value];
+                                        setBrands(newValue);
                                         setOpen(false)
                                     }}
                                 >
                                     {brand.label}
-                                    {value.includes(brand.value) && <Check />}
+                                    {brands.includes(brand.value) && <Check />}
                                 </CommandItem>
                             ))}
                         </CommandGroup>

@@ -1,6 +1,7 @@
 import React, { Dispatch, SetStateAction } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 
 const sellerTypesInit = [
     { value: 'dealer', label: 'Autoryzowany Dealer' },
@@ -8,18 +9,16 @@ const sellerTypesInit = [
     { value: 'private', label: 'Osoba prywatna' },
 ];
 
-interface Props {
-    sellerTypes: string[];
-    change: Dispatch<SetStateAction<string[]>>;
-}
 
-const SellerSelect: React.FC<Props> = ({ sellerTypes, change }) => {
+const SellerSelect = () => {
+    const telegramData = useTelegramFormStore(state => state.data)
+    const setSellerTypes = useTelegramFormStore(state => state.setSellerTypes)
 
     const onSellerHandler = (type: string) => {
-        if (sellerTypes.includes(type)) {
-            change(prev => prev.filter(item => item !== type));
+        if (telegramData.sellerTypes.includes(type)) {
+            setSellerTypes(telegramData.sellerTypes.filter(item => item !== type));
         } else {
-            change(prev => [...prev, type]);
+            setSellerTypes([...telegramData.sellerTypes, type]);
         }
     };
 
@@ -40,7 +39,7 @@ const SellerSelect: React.FC<Props> = ({ sellerTypes, change }) => {
                     <AccordionContent className="flex flex-col gap-4 text-balance">
                         <div className="flex gap-2 flex-wrap">
                             {sellerTypesInit.map((type) => {
-                                const isSelected = sellerTypes.includes(type.value);
+                                const isSelected = telegramData.sellerTypes.includes(type.value);
                                 return (
                                     <Badge
                                         key={type.value}

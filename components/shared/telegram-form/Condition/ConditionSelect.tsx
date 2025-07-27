@@ -1,24 +1,22 @@
 import React, { Dispatch, SetStateAction } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 
 const conditionTypesInit = [
     { value: 'used', label: 'Używany' },
     { value: 'new', label: 'Nowy' },
 ]
 
-interface Props {
-    conditionTypes: string[];
-    change: Dispatch<SetStateAction<string[]>>;
-}
-
-const ConditionSelect: React.FC<Props> = ({ conditionTypes, change }) => {
+const ConditionSelect = () => {
+    const telegramData = useTelegramFormStore(state => state.data)
+    const setConditionTypes = useTelegramFormStore(state => state.setConditionTypes)
 
     const onSellerHandler = (type: string) => {
-        if (conditionTypes.includes(type)) {
-            change(prev => prev.filter(item => item !== type));
+        if (telegramData.conditionTypes.includes(type)) {
+            setConditionTypes(telegramData.conditionTypes.filter(item => item !== type));
         } else {
-            change(prev => [...prev, type]);
+            setConditionTypes([...telegramData.conditionTypes, type]);
         }
     };
 
@@ -38,7 +36,7 @@ const ConditionSelect: React.FC<Props> = ({ conditionTypes, change }) => {
                     <AccordionContent className="flex flex-col gap-4 text-balance">
                         <div className="flex gap-2 flex-wrap">
                             {conditionTypesInit.map((type) => {
-                                const isSelected = conditionTypes.includes(type.value);
+                                const isSelected = telegramData.conditionTypes.includes(type.value);
                                 return (
                                     <Badge
                                         key={type.value}

@@ -1,6 +1,7 @@
 import React, { Dispatch, SetStateAction } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 
 const platformTypesInit = [
     { value: 'oto_moto', label: 'Oto Moto' },
@@ -9,18 +10,16 @@ const platformTypesInit = [
     { value: 'sprzedajemy', label: 'Sprzedajemy Pl' },
 ]
 
-interface Props {
-    platformTypes: string[];
-    change: Dispatch<SetStateAction<string[]>>;
-}
 
-const PlatformSelect: React.FC<Props> = ({ platformTypes, change }) => {
+const PlatformSelect = () => {
+    const telegramData = useTelegramFormStore(state => state.data)
+    const setPlatformTypes = useTelegramFormStore(state => state.setPlatformTypes)
 
     const onSellerHandler = (type: string) => {
-        if (platformTypes.includes(type)) {
-            change(prev => prev.filter(item => item !== type));
+        if (telegramData.platformTypes.includes(type)) {
+            setPlatformTypes(telegramData.platformTypes.filter(item => item !== type));
         } else {
-            change(prev => [...prev, type]);
+            setPlatformTypes([...telegramData.platformTypes, type]);
         }
     };
 
@@ -40,7 +39,7 @@ const PlatformSelect: React.FC<Props> = ({ platformTypes, change }) => {
                     <AccordionContent className="flex flex-col gap-4 text-balance">
                         <div className="flex gap-2 flex-wrap">
                             {platformTypesInit.map((type) => {
-                                const isSelected = platformTypes.includes(type.value);
+                                const isSelected = telegramData.platformTypes.includes(type.value);
                                 return (
                                     <Badge
                                         key={type.value}

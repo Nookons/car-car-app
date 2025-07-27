@@ -24,3 +24,17 @@ export interface IUserFull {
     language_code: string;
     chat_id: string;
 }
+
+export interface IUserFormTelegram {
+    brands: string[];
+    models: string[];
+    minPrice: number;
+    maxPrice: number;
+    minYear: string;
+    maxYear: string;
+    rangeValue: number;
+    maxMilage: number;
+    sellerTypes: string[];
+    platformTypes: string[];
+    conditionTypes: string[];
+}

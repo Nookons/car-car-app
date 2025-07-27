@@ -6,22 +6,19 @@ import {ArrowLeftRight, LoaderCircle} from "lucide-react";
 import {Input} from "@/components/ui/input";
 import {getYears} from "@/features/getYears";
 import {IYearResponse} from "@/types/Year";
+import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 
-interface Props {
-    minYear: string;
-    maxYear: string;
 
-    minChange: (value: string) => void;
-    maxChange: (value: string) => void;
-}
+const YearsSelect = () => {
+    const telegramData = useTelegramFormStore(state => state.data)
+    const setMinYear = useTelegramFormStore(state => state.setMinYear)
+    const setMaxYear = useTelegramFormStore(state => state.setMaxYear)
 
-const YearsSelect: React.FC<Props> = ({minYear, maxYear, minChange, maxChange}) => {
     const {data: IYearResponse = {model: '', min_year: 0, max_year: 0}, isLoading, isError} = useQuery<IYearResponse>({
         queryKey: ['years_range'],
         queryFn: () => getYears(),
         staleTime: 5 * 60 * 1000,
     });
-
 
     return (
         <div>
@@ -30,8 +27,8 @@ const YearsSelect: React.FC<Props> = ({minYear, maxYear, minChange, maxChange}) 
                 <div className="relative">
                     <Input
                         type={"number"}
-                        value={minYear}
-                        onChange={(event) => minChange(event.target.value)}
+                        value={telegramData.minYear}
+                        onChange={(event) => setMinYear(event.target.value)}
                         className="pr-10"
                         placeholder={isLoading ? 'Loading...' : `${IYearResponse.min_year}`}
                     />
@@ -48,8 +45,8 @@ const YearsSelect: React.FC<Props> = ({minYear, maxYear, minChange, maxChange}) 
                 <div className="relative">
                     <Input
                         type={"number"}
-                        value={maxYear}
-                        onChange={(event) => maxChange(event.target.value)}
+                        value={telegramData.maxYear}
+                        onChange={(event) => setMaxYear(event.target.value)}
                         className="pr-10"
                         placeholder={
                             isLoading

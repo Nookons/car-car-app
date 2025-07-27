@@ -1,11 +1,11 @@
 'use client'
 import React from 'react';
-import AdImageBlock from "@/shared/ad/AdImageBlock";
-import AdTitle from "@/shared/ad/AdTitle";
-import AdButtons from "@/shared/ad/AdButtons";
-import MainParams from "@/shared/ad/MainParams";
-import FullParams from "@/shared/ad/FullParams";
-import AdMap from "@/shared/ad/AdMap";
+import AdImageBlock from "@/components/shared/ad/AdImageBlock";
+import AdTitle from "@/components/shared/ad/AdTitle";
+import AdButtons from "@/components/shared/ad/AdButtons";
+import MainParams from "@/components/shared/ad/MainParams";
+import FullParams from "@/components/shared/ad/FullParams";
+import AdMap from "@/components/shared/ad/AdMap";
 import {ICarAdd} from "@/types/Car";
 import {useQuery} from '@tanstack/react-query';
 

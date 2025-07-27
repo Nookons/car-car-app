@@ -10,8 +10,8 @@ import {
     CardHeader,
 } from '@/components/ComponentsProvider';
 import Image from "next/image";
-import {getConditionLabel, getSellerTypeLabel} from "@/feathers/getTypesLabels";
-import MainParams from "@/shared/ad/MainParams";
+import {getConditionLabel, getSellerTypeLabel} from "@/features/getTypesLabels";
+import MainParams from "@/components/shared/ad/MainParams";
 import Link from "next/link";
 
 async function fetchCarData(): Promise<ICarAdd[]> {
