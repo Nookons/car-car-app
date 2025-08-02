@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
         return config;
     },
     images: {
-        domains: ['ireland.apollo.olxcdn.com', 'dtprodvehicleimages.blob.core.windows.net'],
+        domains: ['ireland.apollo.olxcdn.com', 'dtprodvehicleimages.blob.core.windows.net', 'i.ytimg.com', 'png.pngtree.com', 'w7.pngwing.com'],
     },
 };
 

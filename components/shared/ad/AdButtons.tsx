@@ -23,7 +23,7 @@ const AdButtons: React.FC<Props> = ({data, isLoading}) => {
 
     return (
         <div className={`grid grid-cols-[1fr_125px] gap-2`}>
-            <Link href={data.url}><Button className={`w-full`}><ExternalLink /> {t('open_original')}</Button></Link>
+            <Link href={data.ad_link}><Button className={`w-full`}><ExternalLink /> {t('open_original')}</Button></Link>
             <Button variant={`outline`} className={`w-full`}><HeartPlus /> {t('favorite')}</Button>
         </div>
     );

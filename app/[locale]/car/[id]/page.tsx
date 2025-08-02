@@ -8,17 +8,8 @@ import FullParams from "@/components/shared/ad/FullParams";
 import AdMap from "@/components/shared/ad/AdMap";
 import {ICarAdd} from "@/types/Car";
 import {useQuery} from '@tanstack/react-query';
+import { getCarById } from '@/features/getCarById';
 
-async function getCarById(id: string): Promise<ICarAdd> {
-    try {
-        const res = await fetch(`https://car-car-app.vercel.app/api/get-car?car_id=${id}`);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        return await res.json();
-    } catch (error) {
-        console.error("Fetch error:", error);
-        throw new Error("Failed to load car data");
-    }
-}
 
 type PageProps = {
     params: Promise<{
@@ -26,13 +17,13 @@ type PageProps = {
     }>;
 };
 
-const Page = ({ params }: PageProps) => {
+const Page = ({params}: PageProps) => {
     const resolvedParams = React.use(params);
     const id = resolvedParams.id;
 
     const {data, isLoading, isError, error} = useQuery<ICarAdd, Error>({
         queryKey: ['car', id],
-        queryFn: () => getCarById( id),
+        queryFn: () => getCarById(id),
         enabled: !!id,
         staleTime: 5 * 60 * 1000,
     });
@@ -50,11 +41,13 @@ const Page = ({ params }: PageProps) => {
 
             <AdTitle
                 isLoading={isLoading}
-                data={data}/>
+                data={data}
+            />
 
             <AdButtons
                 isLoading={isLoading}
-                data={data}/>
+                data={data}
+            />
 
             <div className={`mt-10`}>
                 <MainParams
@@ -70,8 +63,12 @@ const Page = ({ params }: PageProps) => {
             />
 
             <AdMap
-                link={data?.map_link}
+                link={data?.map_url}
             />
+
+            <div className={`flex justify-center pt-12`}>
+                <b className={`text-neutral-500 text-x`}>© 2025, CarCar.</b>
+            </div>
         </div>
     );
 };

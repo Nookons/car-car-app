@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
         const filteredCars = allCars.filter((car: ICarAdd) => {
             if (!user.lat || !user.lng || !user.from_user_range) return true;
 
-            const coords = extractLatLngFromGoogleMapsUrl(car.map_link);
+            const coords = extractLatLngFromGoogleMapsUrl(car.map_url);
             if (!coords) return false;
 
             const distance = calculateDistanceKm(user.lat, user.lng, coords.lat, coords.lng);

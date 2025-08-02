@@ -2,7 +2,8 @@ import {IPriceResponse} from "@/types/Price";
 
 export const getPrices = async (): Promise<IPriceResponse> => {
     try {
-        const patch = `https://car-car-app.vercel.app/api/get-prices`;
+        const base_url = process.env.NEXT_PUBLIC_BASE_URL;
+        const patch = `${base_url}api/get-prices`;
         const res = await fetch(patch, { cache: 'no-store' });
 
         if (!res.ok) {

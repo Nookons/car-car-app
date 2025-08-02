@@ -42,9 +42,11 @@ export async function GET(request: NextRequest) {
     }
 }
 
+
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
+
         const {
             id,
             brand,
@@ -55,8 +57,12 @@ export async function POST(request: NextRequest) {
             max_price,
             lat,
             lng,
-            locationString,
-            from_user_range
+            location_string,
+            from_user_range,
+            max_milage,
+            sellerTypes,
+            platformTypes,
+            conditionTypes
         } = body;
 
         if (!id || id === 'none') {
@@ -69,67 +75,66 @@ export async function POST(request: NextRequest) {
             const checkQuery = 'SELECT user_id FROM user_search_settings WHERE user_id = $1';
             const checkResult = await client.query(checkQuery, [id]);
 
+            const values = [
+                id,
+                brand || null,
+                model || null,
+                min_year || null,
+                max_year || null,
+                min_price || 0,
+                max_price || 0,
+                lat || null,
+                lng || null,
+                location_string || null,
+                from_user_range || null,
+                max_milage || null,
+                sellerTypes || null,
+                platformTypes || null,
+                conditionTypes || null
+            ];
+
             if ((checkResult?.rowCount ?? 0) > 0) {
                 const updateQuery = `
                     UPDATE user_search_settings SET
-                        brand = $2,
-                        model = $3,
-                        min_year = $4,
-                        max_year = $5,
-                        min_price = $6,
-                        max_price = $7,
-                        lat = $8,
-                        lng = $9,
-                        locationString = $10,
-                        from_user_range = $11,
-                        updated_at = NOW()
+                                                    brand = $2,
+                                                    model = $3,
+                                                    min_year = $4,
+                                                    max_year = $5,
+                                                    min_price = $6,
+                                                    max_price = $7,
+                                                    lat = $8,
+                                                    lng = $9,
+                                                    location = ST_SetSRID(ST_MakePoint($9, $8), 4326),
+                                                    location_string = $10,
+                                                    from_user_range = $11,
+                                                    max_mileage = $12,
+                                                    seller_types = $13,
+                                                    platform_types = $14,
+                                                    condition_types = $15,
+                                                    updated_at = NOW()
                     WHERE user_id = $1
-                    RETURNING *;
+                        RETURNING *;
                 `;
 
-                const updateValues = [
-                    id,
-                    brand?.toLowerCase() || null,
-                    model?.toLowerCase() || null,
-                    min_year || null,
-                    max_year || null,
-                    min_price || 0,
-                    max_price || 0,
-                    lat || null,
-                    lng || null,
-                    locationString || null,
-                    from_user_range || null
-                ];
-
-                const result = await client.query(updateQuery, updateValues);
+                const result = await client.query(updateQuery, values);
                 return NextResponse.json({ settings: result.rows[0] }, { status: 200 });
             } else {
                 const insertQuery = `
                     INSERT INTO user_search_settings (
                         user_id, brand, model, min_year, max_year, min_price, max_price,
-                        lat, lng, locationString, from_user_range, created_at, updated_at
+                        lat, lng, location, location_string, from_user_range,
+                        max_mileage, seller_types, platform_types, condition_types,
+                        created_at, updated_at
                     ) VALUES (
-                        $1, $2, $3, $4, $5, $6, $7,
-                        $8, $9, $10, $11, NOW(), NOW()
-                    )
-                    RETURNING *;
+                                 $1, $2, $3, $4, $5, $6, $7,
+                                 $8, $9, ST_SetSRID(ST_MakePoint($9, $8), 4326), $10, $11,
+                                 $12, $13, $14, $15,
+                                 NOW(), NOW()
+                             )
+                        RETURNING *;
                 `;
 
-                const insertValues = [
-                    id,
-                    brand?.toLowerCase() || null,
-                    model?.toLowerCase() || null,
-                    min_year || null,
-                    max_year || null,
-                    min_price || 0,
-                    max_price || 0,
-                    lat || null,
-                    lng || null,
-                    locationString || null,
-                    from_user_range || null
-                ];
-
-                const result = await client.query(insertQuery, insertValues);
+                const result = await client.query(insertQuery, values);
                 return NextResponse.json({ settings: result.rows[0] }, { status: 201 });
             }
         } finally {
@@ -140,3 +145,4 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to save user search settings' }, { status: 500 });
     }
 }
+

@@ -13,16 +13,8 @@ import Image from "next/image";
 import {getConditionLabel, getSellerTypeLabel} from "@/features/getTypesLabels";
 import MainParams from "@/components/shared/ad/MainParams";
 import Link from "next/link";
+import {fetchCarData} from "@/features/getCarData";
 
-async function fetchCarData(): Promise<ICarAdd[]> {
-    try {
-        const res = await fetch(`http://localhost:3000/api/all-cars`);
-        if (!res.ok) throw new Error("Network response was not ok");
-        return await res.json();
-    } catch (err) {
-        throw err instanceof Error ? err : new Error("Unknown error");
-    }
-}
 
 const Page = () => {
     const {data, isLoading, isError, error} = useQuery<ICarAdd[], Error>({
@@ -47,7 +39,7 @@ const Page = () => {
                                         className={`rounded`}
                                         width={600}
                                         height={600}
-                                        src={car.image_url !== 'unknown' ? car.image_url : "https://dtprodvehicleimages.blob.core.windows.net/assets/marketplace/no-car-img.png"}
+                                        src={car.images[0] !== 'unknown' ? car.images[0] : "https://dtprodvehicleimages.blob.core.windows.net/assets/marketplace/no-car-img.png"}
                                         alt={car.title}
                                     />
                                 </CardDescription>
@@ -59,13 +51,13 @@ const Page = () => {
                                         <h2 className={`line-clamp-1`}>{car.title}</h2>
                                         <div className={`flex items-center gap-1 flex-wrap`}>
                                             <p className={`text-xs text-neutral-500`}>
-                                                {getConditionLabel(car.condition)} •
+                                                {getConditionLabel(car.new_used)} •
                                             </p>
                                             <p className={`text-xs text-neutral-500`}>
                                                 {getSellerTypeLabel(car.seller_type)} •
                                             </p>
                                             <p className={`text-xs text-neutral-500`}>
-                                                {car.production_year}
+                                                {car.year}
                                             </p>
                                         </div>
                                     </div>

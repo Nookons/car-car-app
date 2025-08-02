@@ -7,6 +7,8 @@
 
   "brand": "Brand",
   "model": "Model",
+  "price": "Price",
+  "engine": "Engine",
   "version": "Version",
   "color": "Color",
   "door_count": "Door count",
@@ -95,6 +97,10 @@
     "gold": "Gold",
     "yellow": "Yellow",
     "unknown": "Unknown"
+  },
+  "bot_buttons": {
+    "open_ad": "open_ad",
+    "open_map": "open_map"
   },
 
   "change_setting_not_available": "Change your setting available only from telegram right now. In next update you will be able to do this here )"

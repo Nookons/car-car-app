@@ -59,4 +59,10 @@ export {CommandItem} from "@/components/ui/command";
 export {CommandShortcut} from "@/components/ui/command";
 export {CommandSeparator} from "@/components/ui/command";
 
+export {Carousel} from "@/components/ui/carousel";
+export {CarouselContent} from "@/components/ui/carousel";
+export {CarouselItem} from "@/components/ui/carousel";
+export {CarouselNext} from "@/components/ui/carousel";
+export {CarouselPrevious} from "@/components/ui/carousel";
+
 

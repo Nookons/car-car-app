@@ -2,18 +2,18 @@
 export interface ICarAdd {
     id: number;
     title: string;
-    posted_time: string; // ISO дата-время в строке
+    post_date: string; // ISO дата-время в строке
     price: number;
-    url: string;
+    ad_link: string;
     brand: string;
     model: string;
     version: string;
     color: string;
     door_count: number;
     seats_count: number;
-    production_year: string;
+    year: string;
     generation: string;
-    image_url: string;
+    images: string[];
     fuel_type: string;
     engine_capacity: string;
     engine_power: string;
@@ -21,9 +21,9 @@ export interface ICarAdd {
     gearbox: string;
     transmission: string;
     mileage: number;
-    condition: string;
+    new_used: string;
     platform: string;
-    map_link: string;
+    map_url: string;
     city: string;
     seller_type: string;
     created_at: string; // ISO дата-время

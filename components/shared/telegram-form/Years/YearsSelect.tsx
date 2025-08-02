@@ -7,6 +7,7 @@ import {Input} from "@/components/ui/input";
 import {getYears} from "@/features/getYears";
 import {IYearResponse} from "@/types/Year";
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
+import dayjs from "dayjs";
 
 
 const YearsSelect = () => {
@@ -30,7 +31,7 @@ const YearsSelect = () => {
                         value={telegramData.minYear}
                         onChange={(event) => setMinYear(event.target.value)}
                         className="pr-10"
-                        placeholder={isLoading ? 'Loading...' : `${IYearResponse.min_year}`}
+                        placeholder={isLoading ? 'Loading...' : `${dayjs(IYearResponse.min_year).format("YYYY")}`}
                     />
                     {isLoading && (
                         <div className="absolute top-1/2 right-3 -translate-y-1/2">
@@ -51,7 +52,7 @@ const YearsSelect = () => {
                         placeholder={
                             isLoading
                                 ? 'Loading...'
-                                : `${IYearResponse.max_year}`
+                                : `${dayjs(IYearResponse.max_year).format("YYYY")}`
                         }
                     />
                     {isLoading && (

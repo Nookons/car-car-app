@@ -2,9 +2,9 @@ import {t} from "i18next";
 
 export function getConditionLabel(type: string) {
     switch (type.toLowerCase()) {
-        case "nowy":
+        case "new":
             return t("new")
-        case "używany":
+        case "used":
             return t("used")
         default:
             return ""
@@ -13,13 +13,13 @@ export function getConditionLabel(type: string) {
 
 export function getTransmissionTypeLabel(type: string) {
     switch (type.toLowerCase()) {
-        case "4x4 (dołączany automatycznie)":
+        case "part_time_4x4":
             return t("transmission_object.part_time_4x4")     // 4x4 (automatically engaged)
-        case "4x4 (stały)":
+        case "full_time_4x4":
             return t("transmission_object.full_time_4x4")      // 4x4 (permanent)
-        case "na przednie koła":
+        case "front_wheel_drive":
             return t("transmission_object.front_wheel_drive")  // front-wheel drive
-        case "na tylne koła":
+        case "rear_wheel_drive":
             return t("transmission_object.rear_wheel_drive")   // rear-wheel drive
         case "unknown":
             return t("transmission_object.unknown")            // unknown
@@ -43,9 +43,9 @@ export function getSellerTypeLabel(type: string) {
 
 export function getGearBoxLabelType(type: string) {
     switch (type.toLowerCase()) {
-        case "automatyczna":
+        case "automatic":
             return t("gear_box_object.automatic")      // автоматическая коробка
-        case "manualna":
+        case "manual":
             return t("gear_box_object.manual")         // механическая коробка
         case "unknown":
             return t("gear_box_object.unknown")        // неизвестно
@@ -56,17 +56,17 @@ export function getGearBoxLabelType(type: string) {
 
 export function getBodyTypeLabel(type: string) {
     switch (type.toLowerCase()) {
-        case "auta małe":
+        case "small_car":
             return t("body_type_object.small_car")
-        case "auta miejskie":
+        case "city_car":
             return t("body_type_object.city_car")
         case "coupe":
             return t("body_type_object.coupe")
-        case "kabriolet":
+        case "convertible":
             return t("body_type_object.convertible")
-        case "kombi":
+        case "station_wagon":
             return t("body_type_object.station_wagon")
-        case "kompakt":
+        case "compact":
             return t("body_type_object.compact")
         case "minivan":
             return t("body_type_object.minivan")
@@ -83,15 +83,15 @@ export function getBodyTypeLabel(type: string) {
 
 export function getFuelTypeLabel(type: string) {
     switch (type.toLowerCase()) {
-        case "benzyna":
+        case "petrol":
             return t("fuel_type_object.petrol")
-        case "benzyna+lpg":
+        case "petrol_lpg":
             return t("fuel_type_object.petrol_lpg")
         case "diesel":
             return t("fuel_type_object.diesel")
-        case "elektryczny":
+        case "electric":
             return t("fuel_type_object.electric")
-        case "hybryda":
+        case "hybrid":
             return t("fuel_type_object.hybrid")
         case "unknown":
             return t("fuel_type_object.unknown")
@@ -102,39 +102,39 @@ export function getFuelTypeLabel(type: string) {
 
 export function getColorLabel(type: string) {
     switch (type.toLowerCase()) {
-        case "beżowy":
+        case "beige":
             return t("color_object.beige")
-        case "biały":
+        case "white":
             return t("color_object.white")
-        case "błękitny":
+        case "sky_blue":
             return t("color_object.sky_blue")
-        case "bordowy":
+        case "burgundy":
             return t("color_object.burgundy")
-        case "brązowy":
+        case "brown":
             return t("color_object.brown")
-        case "czarny":
+        case "black":
             return t("color_object.black")
-        case "czerwony":
+        case "red":
             return t("color_object.red")
-        case "fioletowy":
+        case "purple":
             return t("color_object.purple")
-        case "granatowy":
+        case "navy":
             return t("color_object.navy")
-        case "inny kolor":
+        case "other":
             return t("color_object.other")
-        case "niebieski":
+        case "blue":
             return t("color_object.blue")
-        case "pomarańczowy":
+        case "orange":
             return t("color_object.orange")
-        case "srebrny":
+        case "silver":
             return t("color_object.silver")
-        case "szary":
+        case "gray":
             return t("color_object.gray")
-        case "zielony":
+        case "green":
             return t("color_object.green")
-        case "złoty":
+        case "gold":
             return t("color_object.gold")
-        case "żółty":
+        case "yellow":
             return t("color_object.yellow")
         case "unknown":
             return t("color_object.unknown")

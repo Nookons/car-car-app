@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ComponentsProvider";
 import {useTranslation} from "react-i18next";
 import {getConditionLabel, getSellerTypeLabel} from "@/features/getTypesLabels";
+import dayjs from "dayjs";
 
 
 interface Props {
@@ -30,7 +31,7 @@ const AdTitle: React.FC<Props> = ({ data, isLoading }) => {
             <div>
                 <h1 className="text-lg font-bold line-clamp-1">{data.title}</h1>
                 <p className="text-neutral-500 text-xs font-semibold">{getSellerTypeLabel(data.seller_type)}</p>
-                <p className="text-neutral-500 text-xs font-semibold">{getConditionLabel(data.condition)} · {data.production_year}</p>
+                <p className="text-neutral-500 text-xs font-semibold">{getConditionLabel(data.new_used.toLowerCase())} · {dayjs(data.year).format("YYYY")}</p>
             </div>
             <div>
                 <Badge variant="outline" className="font-bold text-base">

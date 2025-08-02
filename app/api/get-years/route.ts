@@ -7,8 +7,8 @@ export async function GET(request: NextRequest) {
     try {
         const query = `
             SELECT
-                MIN(production_year) AS min_year,
-                MAX(production_year) AS max_year
+                MIN(year) AS min_year,
+                MAX(year) AS max_year
             FROM cars;
         `;
 

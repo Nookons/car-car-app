@@ -5,15 +5,8 @@ import {useQuery} from "@tanstack/react-query";
 import UserMainInfo from "@/components/shared/User/UserMainInfo";
 import UserButtons from "@/components/shared/User/UserButtons";
 import UserSearchSettings from "@/components/shared/User/UserSearchSettings";
+import {getUserByUID} from "@/features/getUserByUID";
 
-
-async function fetchData(uid: string) {
-    return await fetch(`https://car-car-app.vercel.app/api/get-user-data?uid=${uid}`)
-        .then((res) => res.json())
-        .then((data) => {
-            return data as IUserFull
-        })
-}
 
 type PageProps = {
     params: Promise<{
@@ -28,7 +21,7 @@ const Page =  ({ params }: PageProps) => {
 
     const {data, isLoading, isError} = useQuery<IUserFull | null>({
         queryKey: [uid],
-        queryFn: () => fetchData(uid),
+        queryFn: () => getUserByUID(uid),
         enabled: !!uid,
         staleTime: 5 * 60 * 1000,
     });

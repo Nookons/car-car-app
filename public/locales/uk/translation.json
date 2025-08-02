@@ -4,42 +4,39 @@
   "favorite": "Обране",
   "open_original": "Оригінал",
   "back": "Назад",
-
   "brand": "Марка",
   "model": "Модель",
+  "price": "Ціна",
+  "engine": "Двигун",
   "version": "Версія",
   "color": "Колір",
   "door_count": "Кількість дверей",
   "seats_count": "Кількість місць",
-  "production_year": "Рік випуску",
+  "production_year": "Рік виробництва",
   "generation": "Покоління",
-  "fuel_type": "Тип пального",
-  "engine_capacity": "Обʼєм двигуна",
+  "fuel_type": "Тип палива",
+  "engine_capacity": "Об’єм двигуна",
   "engine_power": "Потужність двигуна",
   "body_type": "Тип кузова",
-  "gearbox": "КПП",
-  "transmission": "Привід",
+  "gearbox": "Коробка передач",
+  "transmission": "Трансмісія",
   "mileage": "Пробіг",
   "condition": "Стан",
   "from": "Від",
   "seller_type": "Тип продавця",
-  "min_price": "Мінімальна ціна",
-  "max_price": "Максимальна ціна",
+  "min_price": "Мін. ціна",
+  "max_price": "Макс. ціна",
   "min_year": "Мін. рік",
   "max_year": "Макс. рік",
   "saved_location": "Місцезнаходження",
   "search_range": "Радіус пошуку",
   "picked_platforms": "Обрані платформи",
-
   "used": "Вживане",
   "new": "Нове",
-
   "firma": "Компанія",
   "dealer": "Дилер",
   "private_person": "Приватна особа",
-
   "support_contact": "Контакт підтримки",
-
   "transmission_object": {
     "part_time_4x4": "4x4 (частковий)",
     "full_time_4x4": "4x4 (постійний)",
@@ -47,13 +44,11 @@
     "rear_wheel_drive": "Задній привід",
     "unknown": "Інформацію не знайдено."
   },
-
   "gear_box_object": {
     "automatic": "Автоматична",
     "manual": "Механічна",
     "unknown": "Невідомо"
   },
-
   "body_type_object": {
     "small_car": "Малий автомобіль",
     "city_car": "Міський автомобіль",
@@ -66,7 +61,6 @@
     "suv": "Позашляховик",
     "unknown": "Невідомо"
   },
-
   "fuel_type_object": {
     "petrol": "Бензин",
     "petrol_lpg": "Бензин + Газ",
@@ -75,7 +69,6 @@
     "hybrid": "Гібрид",
     "unknown": "Невідомо"
   },
-
   "color_object": {
     "beige": "Бежевий",
     "white": "Білий",
@@ -96,6 +89,9 @@
     "yellow": "Жовтий",
     "unknown": "Невідомо"
   },
-
+  "bot_buttons": {
+    "open_ad": "Відкрити оголошення",
+    "open_map": "Відкрити карту"
+  },
   "change_setting_not_available": "Змінювати налаштування наразі можна лише через Telegram. У наступному оновленні ви зможете зробити це й тут :)"
 }

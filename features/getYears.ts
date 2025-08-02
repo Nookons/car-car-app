@@ -2,7 +2,8 @@ import {IYearResponse} from "@/types/Year";
 
 export const getYears = async (): Promise<IYearResponse> => {
     try {
-        const patch = `https://car-car-app.vercel.app/api/get-years`;
+        const base_url = process.env.NEXT_PUBLIC_BASE_URL;
+        const patch = `${base_url}api/get-years`;
         const res = await fetch(patch, { cache: 'no-store' });
 
         if (!res.ok) {

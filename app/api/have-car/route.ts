@@ -2,7 +2,6 @@ import pool from "@/lib/db";
 import {NextRequest, NextResponse} from "next/server";
 import {PoolClient} from "pg";
 
-// Универсальная функция безопасного запроса с повторной попыткой
 async function safeQuery(
     client: PoolClient,
     queryText: string,
@@ -39,7 +38,7 @@ export async function GET(request: NextRequest) {
         try {
             const res = await safeQuery(
                 client,
-                `SELECT 1 AS exists FROM cars WHERE url = $1 LIMIT 1`,
+                `SELECT 1 AS exists FROM cars WHERE ad_link = $1 LIMIT 1`,
                 [carUrl]
             );
 

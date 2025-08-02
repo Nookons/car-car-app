@@ -9,6 +9,7 @@ import {
     getSellerTypeLabel,
     getTransmissionTypeLabel
 } from "@/features/getTypesLabels";
+import dayjs from "dayjs";
 
 interface Props {
     data: ICarAdd | undefined;
@@ -54,17 +55,6 @@ const FullParams: React.FC<Props> = ({data, isLoading}) => {
                         }
                     </TableCell>
                 </TableRow>
-                {data.version !== "unknown" &&
-                    <TableRow>
-                        <TableCell className="font-medium text-neutral-500">{t("version")}</TableCell>
-                        <TableCell className="text-right font-semibold">
-                            {data.version.length > 20
-                                ? `${data.version.substring(0, 20)}...`
-                                : data.version
-                            }
-                        </TableCell>
-                    </TableRow>
-                }
                 <TableRow>
                     <TableCell className="font-medium text-neutral-500">{t("color")}</TableCell>
                     <TableCell className="text-right font-semibold">{getColorLabel(data.color)}</TableCell>
@@ -83,14 +73,8 @@ const FullParams: React.FC<Props> = ({data, isLoading}) => {
                 }
                 <TableRow>
                     <TableCell className="font-medium text-neutral-500">{t("production_year")}</TableCell>
-                    <TableCell className="text-right font-semibold">{data.production_year}</TableCell>
+                    <TableCell className="text-right font-semibold">{dayjs(data.year).format("YYYY")}</TableCell>
                 </TableRow>
-                {data.generation !== "unknown" &&
-                    <TableRow>
-                        <TableCell className="font-medium text-neutral-500">{t("generation")}</TableCell>
-                        <TableCell className="text-right font-semibold">{data.generation}</TableCell>
-                    </TableRow>
-                }
                 <TableRow>
                     <TableCell className="font-medium text-neutral-500">{t("fuel_type")}</TableCell>
                     <TableCell className="text-right font-semibold">{getFuelTypeLabel(data.fuel_type)}</TableCell>
@@ -109,19 +93,21 @@ const FullParams: React.FC<Props> = ({data, isLoading}) => {
                 </TableRow>
                 <TableRow>
                     <TableCell className="font-medium text-neutral-500">{t("gearbox")}</TableCell>
-                    <TableCell className="text-right font-semibold">{getGearBoxLabelType(data.gearbox)}</TableCell>
+                    <TableCell className="text-right font-semibold">{getGearBoxLabelType(data.gearbox.toLowerCase())}</TableCell>
                 </TableRow>
-                <TableRow>
-                    <TableCell className="font-medium text-neutral-500">{t("transmission")}</TableCell>
-                    <TableCell className="text-right font-semibold">{getTransmissionTypeLabel(data.transmission)}</TableCell>
-                </TableRow>
+                {data.transmission &&
+                    <TableRow>
+                        <TableCell className="font-medium text-neutral-500">{t("transmission")}</TableCell>
+                        <TableCell className="text-right font-semibold">{data.transmission}</TableCell>
+                    </TableRow>
+                }
                 <TableRow>
                     <TableCell className="font-medium text-neutral-500">{t("mileage")}</TableCell>
                     <TableCell className="text-right font-semibold">{Number(data.mileage).toLocaleString()} km</TableCell>
                 </TableRow>
                 <TableRow>
                     <TableCell className="font-medium text-neutral-500">{t("condition")}</TableCell>
-                    <TableCell className="text-right font-semibold">{getConditionLabel(data.condition)}</TableCell>
+                    <TableCell className="text-right font-semibold">{getConditionLabel(data.new_used)}</TableCell>
                 </TableRow>
                 <TableRow>
                     <TableCell className="font-medium text-neutral-500">{t("from")}</TableCell>

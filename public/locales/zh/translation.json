@@ -4,42 +4,39 @@
   "favorite": "收藏",
   "open_original": "原文",
   "back": "返回",
-
   "brand": "品牌",
   "model": "型号",
+  "price": "价格",
+  "engine": "发动机",
   "version": "版本",
   "color": "颜色",
-  "door_count": "车门数",
+  "door_count": "车门数量",
   "seats_count": "座位数",
   "production_year": "生产年份",
-  "generation": "代数",
+  "generation": "代",
   "fuel_type": "燃料类型",
   "engine_capacity": "发动机排量",
   "engine_power": "发动机功率",
   "body_type": "车身类型",
   "gearbox": "变速箱",
-  "transmission": "驱动方式",
+  "transmission": "传动系统",
   "mileage": "里程",
-  "condition": "车况",
-  "from": "起",
+  "condition": "状况",
+  "from": "从",
   "seller_type": "卖家类型",
-  "min_price": "最低价格",
-  "max_price": "最高价格",
+  "min_price": "最低价",
+  "max_price": "最高价",
   "min_year": "最小年份",
   "max_year": "最大年份",
   "saved_location": "位置",
   "search_range": "搜索范围",
   "picked_platforms": "选择的平台",
-
   "used": "二手",
   "new": "全新",
-
   "firma": "公司",
   "dealer": "经销商",
   "private_person": "私人",
-
   "support_contact": "支持联系方式",
-
   "transmission_object": {
     "part_time_4x4": "4x4（部分时间）",
     "full_time_4x4": "4x4（全时）",
@@ -47,13 +44,11 @@
     "rear_wheel_drive": "后轮驱动",
     "unknown": "无法获取信息。"
   },
-
   "gear_box_object": {
     "automatic": "自动",
     "manual": "手动",
     "unknown": "未知"
   },
-
   "body_type_object": {
     "small_car": "小型车",
     "city_car": "城市车",
@@ -66,7 +61,6 @@
     "suv": "SUV",
     "unknown": "未知"
   },
-
   "fuel_type_object": {
     "petrol": "汽油",
     "petrol_lpg": "汽油+液化气",
@@ -75,7 +69,6 @@
     "hybrid": "混合动力",
     "unknown": "未知"
   },
-
   "color_object": {
     "beige": "米色",
     "white": "白色",
@@ -96,6 +89,9 @@
     "yellow": "黄色",
     "unknown": "未知"
   },
-
+  "bot_buttons": {
+    "open_ad": "打开广告",
+    "open_map": "打开地图"
+  },
   "change_setting_not_available": "目前仅能通过 Telegram 更改设置。下次更新后，您也可以在这里操作 :)"
 }
