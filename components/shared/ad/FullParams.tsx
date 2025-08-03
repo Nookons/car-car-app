@@ -75,10 +75,12 @@ const FullParams: React.FC<Props> = ({data, isLoading}) => {
                     <TableCell className="font-medium text-neutral-500">{t("production_year")}</TableCell>
                     <TableCell className="text-right font-semibold">{dayjs(data.year).format("YYYY")}</TableCell>
                 </TableRow>
-                <TableRow>
-                    <TableCell className="font-medium text-neutral-500">{t("fuel_type")}</TableCell>
-                    <TableCell className="text-right font-semibold">{getFuelTypeLabel(data.fuel_type)}</TableCell>
-                </TableRow>
+                {data.fuel_type &&
+                    <TableRow>
+                        <TableCell className="font-medium text-neutral-500">{t("fuel_type")}</TableCell>
+                        <TableCell className="text-right font-semibold">{getFuelTypeLabel(data.fuel_type)}</TableCell>
+                    </TableRow>
+                }
                 <TableRow>
                     <TableCell className="font-medium text-neutral-500">{t("engine_capacity")}</TableCell>
                     <TableCell className="text-right font-semibold">{data.engine_capacity}</TableCell>
@@ -98,7 +100,7 @@ const FullParams: React.FC<Props> = ({data, isLoading}) => {
                 {data.transmission &&
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("transmission")}</TableCell>
-                        <TableCell className="text-right font-semibold">{data.transmission}</TableCell>
+                        <TableCell className="text-right font-semibold">{getTransmissionTypeLabel(data.transmission.toLowerCase())}</TableCell>
                     </TableRow>
                 }
                 <TableRow>

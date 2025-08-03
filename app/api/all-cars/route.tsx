@@ -1,22 +1,18 @@
-import {NextRequest, NextResponse} from "next/server";
-import pool from "@/lib/db";
+import { NextResponse } from "next/server";
+import {supabase} from "@/lib/supabaseClient";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
     try {
-        const client = await pool.connect();
+        const { data, error } = await supabase.rpc('get_cars');
 
-        const res = await client.query(`
-            SELECT *
-            FROM public.cars
-                     LIMIT 100;
-        `);
+        if (error) {
+            console.error('RPC error:', error);
+            return NextResponse.json({ error: 'Failed to fetch cars from Supabase function' }, { status: 500 });
+        }
 
-
-        client.release();
-
-        return NextResponse.json(res.rows);
-    } catch (error) {
-        console.error('Database query error:', error);
-        return NextResponse.json({ error: 'Failed to fetch cars' }, { status: 500 });
+        return NextResponse.json(data);
+    } catch (err) {
+        console.error('Server error:', err);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
