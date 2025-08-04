@@ -10,6 +10,8 @@ const UserButton = () => {
     const uid = searchParams.get('uid');
     const params = useParams();
 
+    if (!uid) return null;
+
     return (
         <Link href={`/${params.locale}/user/${uid}`}>
             <Button variant={`outline`}>

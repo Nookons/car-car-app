@@ -8,7 +8,10 @@ import FullParams from "@/components/shared/ad/FullParams";
 import AdMap from "@/components/shared/ad/AdMap";
 import {ICarAdd} from "@/types/Car";
 import {useQuery} from '@tanstack/react-query';
-import { getCarById } from '@/features/getCarById';
+import {getCarById} from '@/features/getCarById';
+import ErrorTemplate from "@/components/shared/ad/ErrorTemplate";
+import SellerCard from "@/components/shared/ad/SellerCard";
+import {Dot} from "lucide-react";
 
 
 type PageProps = {
@@ -28,12 +31,14 @@ const Page = ({params}: PageProps) => {
         staleTime: 5 * 60 * 1000,
     });
 
-    if (isError) {
-        return <div>Error</div>
+    console.log(error);
+
+    if (isError && error) {
+        return <ErrorTemplate error={error}/>
     }
 
     return (
-        <div className={`grid grid-cols-1 gap-2 px-2 pb-10 max-w-[1200px] m-auto`}>
+        <div className={`grid grid-cols-1 gap-2 px-2 py-4 pb-10 max-w-[1200px] m-auto`}>
             <AdImageBlock
                 isLoading={isLoading}
                 data={data}
@@ -61,6 +66,15 @@ const Page = ({params}: PageProps) => {
                 isLoading={isLoading}
                 data={data}
             />
+
+            <div className={`grid grid-cols-2 gap-2 p-2 text-xs`}>
+                {data?.attribute.map((el) => (
+                    <div className={`grid grid-cols-[25px_1fr] gap-1 pr-2 rounded bg-primary/15 items-center`}>
+                        <Dot size={16} className={`bg-primary rounded-l`}/>
+                        <span className={`line-clamp-1`}>{el}</span>
+                    </div>
+                ))}
+            </div>
 
             <AdMap
                 link={data?.map_url}

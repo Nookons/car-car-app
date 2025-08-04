@@ -14,6 +14,7 @@ export interface ICarAdd {
     year: string;
     generation: string;
     images: string[];
+    attribute: string[];
     fuel_type: string;
     engine_capacity: string;
     engine_power: string;
@@ -25,7 +26,9 @@ export interface ICarAdd {
     platform: string;
     map_url: string;
     city: string;
+    description: string;
     seller_type: string;
+    seller_name: string;
     created_at: string; // ISO дата-время
     updated_at: string; // ISO дата-время
 }

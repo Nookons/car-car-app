@@ -5,6 +5,7 @@ import "./globals.css";
 import Providers from "@/app/Providers";
 import { ThemeProvider } from "next-themes";
 import HeaderWrapper from "@/components/shared/Header/HeaderWrapper";
+import { Toaster } from 'sonner'
 
 const nunito = Nunito({
     variable: '--font-nunito',
@@ -29,7 +30,12 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
         >
-            <Providers>
+            <Providers >
+                <Toaster
+                    closeButton
+                    richColors
+                    position="top-center"
+                />
                 <HeaderWrapper />
                 {children}
             </Providers>

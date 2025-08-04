@@ -65,4 +65,10 @@ export {CarouselItem} from "@/components/ui/carousel";
 export {CarouselNext} from "@/components/ui/carousel";
 export {CarouselPrevious} from "@/components/ui/carousel";
 
+export {Toaster} from "@/components/ui/sonner";
+
+export {Alert} from "@/components/ui/alert";
+export {AlertTitle} from "@/components/ui/alert";
+export {AlertDescription} from "@/components/ui/alert";
+
 

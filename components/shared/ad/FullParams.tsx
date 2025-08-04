@@ -37,28 +37,34 @@ const FullParams: React.FC<Props> = ({data, isLoading}) => {
     return (
         <Table className={`mt-8`}>
             <TableBody>
-                <TableRow>
-                    <TableCell className="font-medium text-neutral-500">{t("brand")}</TableCell>
-                    <TableCell className="text-right font-semibold">
-                        {data.brand.length > 20
-                            ? `${data.brand.substring(0, 20)}...`
-                            : data.brand
-                        }
-                    </TableCell>
-                </TableRow>
-                <TableRow>
-                    <TableCell className="font-medium text-neutral-500">{t("model")}</TableCell>
-                    <TableCell className="text-right font-semibold">
-                        {data.model.length > 20
-                            ? `${data.model.substring(0, 20)}...`
-                            : data.model
-                        }
-                    </TableCell>
-                </TableRow>
-                <TableRow>
-                    <TableCell className="font-medium text-neutral-500">{t("color")}</TableCell>
-                    <TableCell className="text-right font-semibold">{getColorLabel(data.color)}</TableCell>
-                </TableRow>
+                {data.brand &&
+                    <TableRow>
+                        <TableCell className="font-medium text-neutral-500">{t("brand")}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                            {data.brand.length > 20
+                                ? `${data.brand.substring(0, 20)}...`
+                                : data.brand
+                            }
+                        </TableCell>
+                    </TableRow>
+                }
+                {data.model &&
+                    <TableRow>
+                        <TableCell className="font-medium text-neutral-500">{t("model")}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                            {data.model.length > 20
+                                ? `${data.model.substring(0, 20)}...`
+                                : data.model
+                            }
+                        </TableCell>
+                    </TableRow>
+                }
+                {data.color &&
+                    <TableRow>
+                        <TableCell className="font-medium text-neutral-500">{t("color")}</TableCell>
+                        <TableCell className="text-right font-semibold">{getColorLabel(data.color)}</TableCell>
+                    </TableRow>
+                }
                 {data.door_count &&
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("door_count")}</TableCell>
@@ -71,32 +77,42 @@ const FullParams: React.FC<Props> = ({data, isLoading}) => {
                         <TableCell className="text-right font-semibold">{data.seats_count}</TableCell>
                     </TableRow>
                 }
-                <TableRow>
-                    <TableCell className="font-medium text-neutral-500">{t("production_year")}</TableCell>
-                    <TableCell className="text-right font-semibold">{dayjs(data.year).format("YYYY")}</TableCell>
-                </TableRow>
-                {data.fuel_type &&
+                {data.year &&
+                    <TableRow>
+                        <TableCell className="font-medium text-neutral-500">{t("production_year")}</TableCell>
+                        <TableCell className="text-right font-semibold">{dayjs(data.year).format("YYYY")}</TableCell>
+                    </TableRow>
+                }
+                {data.fuel_type !== null &&
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("fuel_type")}</TableCell>
                         <TableCell className="text-right font-semibold">{getFuelTypeLabel(data.fuel_type)}</TableCell>
                     </TableRow>
                 }
-                <TableRow>
-                    <TableCell className="font-medium text-neutral-500">{t("engine_capacity")}</TableCell>
-                    <TableCell className="text-right font-semibold">{data.engine_capacity}</TableCell>
-                </TableRow>
-                <TableRow>
-                    <TableCell className="font-medium text-neutral-500">{t("engine_power")}</TableCell>
-                    <TableCell className="text-right font-semibold">{data.engine_power}</TableCell>
-                </TableRow>
-                <TableRow>
-                    <TableCell className="font-medium text-neutral-500">{t("body_type")}</TableCell>
-                    <TableCell className="text-right font-semibold">{getBodyTypeLabel(data.body_type)}</TableCell>
-                </TableRow>
-                <TableRow>
-                    <TableCell className="font-medium text-neutral-500">{t("gearbox")}</TableCell>
-                    <TableCell className="text-right font-semibold">{getGearBoxLabelType(data.gearbox.toLowerCase())}</TableCell>
-                </TableRow>
+                {data.engine_capacity &&
+                    <TableRow>
+                        <TableCell className="font-medium text-neutral-500">{t("engine_capacity")}</TableCell>
+                        <TableCell className="text-right font-semibold">{data.engine_capacity}</TableCell>
+                    </TableRow>
+                }
+                {data.engine_power &&
+                    <TableRow>
+                        <TableCell className="font-medium text-neutral-500">{t("engine_power")}</TableCell>
+                        <TableCell className="text-right font-semibold">{data.engine_power}</TableCell>
+                    </TableRow>
+                }
+                {data.body_type &&
+                    <TableRow>
+                        <TableCell className="font-medium text-neutral-500">{t("body_type")}</TableCell>
+                        <TableCell className="text-right font-semibold">{getBodyTypeLabel(data.body_type)}</TableCell>
+                    </TableRow>
+                }
+                {data.gearbox &&
+                    <TableRow>
+                        <TableCell className="font-medium text-neutral-500">{t("gearbox")}</TableCell>
+                        <TableCell className="text-right font-semibold">{getGearBoxLabelType(data.gearbox.toLowerCase())}</TableCell>
+                    </TableRow>
+                }
                 {data.transmission &&
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("transmission")}</TableCell>
@@ -110,14 +126,6 @@ const FullParams: React.FC<Props> = ({data, isLoading}) => {
                 <TableRow>
                     <TableCell className="font-medium text-neutral-500">{t("condition")}</TableCell>
                     <TableCell className="text-right font-semibold">{getConditionLabel(data.new_used)}</TableCell>
-                </TableRow>
-                <TableRow>
-                    <TableCell className="font-medium text-neutral-500">{t("from")}</TableCell>
-                    <TableCell className="text-right font-semibold">{data.platform}</TableCell>
-                </TableRow>
-                <TableRow>
-                    <TableCell className="font-medium text-neutral-500">{t("seller_type")}</TableCell>
-                    <TableCell className="text-right font-semibold">{getSellerTypeLabel(data.seller_type)}</TableCell>
                 </TableRow>
             </TableBody>
         </Table>

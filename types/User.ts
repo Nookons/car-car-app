@@ -38,3 +38,7 @@ export interface IUserFormTelegram {
     platformTypes: string[];
     conditionTypes: string[];
 }
+
+export interface IUserStore {
+    favorite: number[]
+}

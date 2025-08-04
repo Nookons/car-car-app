@@ -1,7 +1,8 @@
 'use client'
-import React, { useEffect, useState } from 'react'
-import { ICarAdd } from "@/types/Car"
+import React, {useEffect, useState} from 'react'
+import {ICarAdd} from "@/types/Car"
 import {
+    Button,
     Card,
     CardContent,
     Carousel,
@@ -12,14 +13,16 @@ import {
     Skeleton
 } from "@/components/ComponentsProvider"
 import Image from "next/image"
-import { CarouselApi } from "@/components/ui/carousel"
+import {CarouselApi} from "@/components/ui/carousel"
+import Autoplay from "embla-carousel-autoplay"
+import { toast } from "sonner"
 
 interface Props {
     data: ICarAdd | undefined;
     isLoading: boolean;
 }
 
-const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
+const AdImageBlock: React.FC<Props> = ({data, isLoading}) => {
     const [api, setApi] = useState<CarouselApi>()
     const [current, setCurrent] = useState(0)
     const [count, setCount] = useState(0)
@@ -48,35 +51,47 @@ const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
     // Загрузка
     if (isLoading) {
         return (
-            <Skeleton className="w-full h-[200px]" />
+            <Skeleton className="w-full h-[200px]"/>
         )
     }
+
 
     // Пустой блок
     if (!data) return null;
 
     return (
         <>
-            <Carousel setApi={setApi} className="w-full max-w-auto">
-                <CarouselContent>
-                    {ready_data.map((img, index) => (
-                        <CarouselItem key={index}>
-                            <Card className="relative">
-                                <Image
-                                    priority
-                                    className="rounded w-full h-auto object-cover"
-                                    width={1200}
-                                    height={1200}
-                                    src={
-                                        img !== 'unknown'
-                                            ? img.replace(/;s=\d+x\d+/, ";s=1000x1000")
-                                            : "https://dtprodvehicleimages.blob.core.windows.net/assets/marketplace/no-car-img.png"
-                                    }
-                                    alt={data.title || "Car image"}
-                                />
-                            </Card>
-                        </CarouselItem>
-                    ))}
+            <Carousel
+                plugins={[
+                    Autoplay({
+                        delay: 5000,
+                    }),
+                ]}
+                setApi={setApi}
+                className="w-full"
+            >
+                <CarouselContent className={`h-auto`}>
+                    {ready_data.map((img, index) => {
+
+                        return (
+                            <CarouselItem className={``} key={index}>
+                                <div>
+                                    <Image
+                                        priority
+                                        className="rounded h-[280px] w-full object-cover"
+                                        width={1200}
+                                        height={270}
+                                        src={
+                                            img !== 'unknown'
+                                                ? img.replace(/;s=\d+x\d+/, ";s=640x320")
+                                                : "https://dtprodvehicleimages.blob.core.windows.net/assets/marketplace/no-car-img.png"
+                                        }
+                                        alt={data.title || "Car image"}
+                                    />
+                                </div>
+                            </CarouselItem>
+                        )
+                    })}
                 </CarouselContent>
             </Carousel>
             <div className="text-muted-foreground py-2 text-center text-sm">
