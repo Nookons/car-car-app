@@ -1,5 +1,5 @@
 'use client'
-import React from 'react';
+import React, {useEffect} from 'react';
 import AdImageBlock from "@/components/shared/ad/AdImageBlock";
 import AdTitle from "@/components/shared/ad/AdTitle";
 import AdButtons from "@/components/shared/ad/AdButtons";
@@ -11,7 +11,16 @@ import {useQuery} from '@tanstack/react-query';
 import {getCarById} from '@/features/getCarById';
 import ErrorTemplate from "@/components/shared/ad/ErrorTemplate";
 import SellerCard from "@/components/shared/ad/SellerCard";
-import {Dot} from "lucide-react";
+import {Dot, Eye} from "lucide-react";
+import Attribute from "@/components/shared/ad/attribute";
+import {
+    Button,
+    Drawer, DrawerClose,
+    DrawerContent,
+    DrawerDescription, DrawerFooter,
+    DrawerHeader, DrawerTitle,
+    DrawerTrigger
+} from "@/components/ComponentsProvider";
 
 
 type PageProps = {
@@ -31,7 +40,9 @@ const Page = ({params}: PageProps) => {
         staleTime: 5 * 60 * 1000,
     });
 
-    console.log(error);
+    useEffect(() => {
+        console.log(data?.description)
+    }, [data]);
 
     if (isError && error) {
         return <ErrorTemplate error={error}/>
@@ -67,14 +78,35 @@ const Page = ({params}: PageProps) => {
                 data={data}
             />
 
-            <div className={`grid grid-cols-2 gap-2 p-2 text-xs`}>
-                {data?.attribute.map((el) => (
-                    <div className={`grid grid-cols-[25px_1fr] gap-1 pr-2 rounded bg-primary/15 items-center`}>
-                        <Dot size={16} className={`bg-primary rounded-l`}/>
-                        <span className={`line-clamp-1`}>{el}</span>
-                    </div>
-                ))}
+            <div className={`mt-10`}>
+                <Attribute
+                    isLoading={isLoading}
+                    data={data}
+                />
             </div>
+
+
+            <Drawer>
+                <DrawerTrigger
+                    className=""
+                >
+                    <Button variant={'outline'} className={`w-full`}>Read Description</Button>
+                </DrawerTrigger>
+                <DrawerContent
+                    className=" flex flex-col rounded-t-[10px] mt-24 h-[100%] lg:h-[100%] fixed bottom-0 left-0 right-0 outline-none"
+                >
+                    <div className="p-4 rounded-t-[10px] flex-1 overflow-y-auto">
+                        <div className="max-w-md mx-auto space-y-4">
+                            <div
+                                aria-hidden
+                                 className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mb-8"
+                            />
+                            <DrawerTitle className="font-bold text-xl mb-4 line-clamp-1">{data?.title}</DrawerTitle>
+                            <p>{data?.description}</p>
+                        </div>
+                    </div>
+                </DrawerContent>
+            </Drawer>
 
             <AdMap
                 link={data?.map_url}
@@ -84,7 +116,8 @@ const Page = ({params}: PageProps) => {
                 <b className={`text-neutral-500 text-x`}>© 2025, CarCar.</b>
             </div>
         </div>
-    );
+    )
+        ;
 };
 
 export default Page;

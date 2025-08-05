@@ -69,6 +69,16 @@ export {Toaster} from "@/components/ui/sonner";
 
 export {Alert} from "@/components/ui/alert";
 export {AlertTitle} from "@/components/ui/alert";
-export {AlertDescription} from "@/components/ui/alert";
+export {AlertDescription} from "@/components/ui/alert"
 
+export {Drawer} from "@/components/ui/drawer";
+export {DrawerPortal} from "@/components/ui/drawer";
+export {DrawerOverlay} from "@/components/ui/drawer";
+export {DrawerTrigger} from "@/components/ui/drawer";
+export {DrawerClose} from "@/components/ui/drawer";
+export {DrawerContent} from "@/components/ui/drawer";
+export {DrawerHeader} from "@/components/ui/drawer";
+export {DrawerFooter} from "@/components/ui/drawer";
+export {DrawerTitle} from "@/components/ui/drawer";
+export {DrawerDescription} from "@/components/ui/drawer";
 
