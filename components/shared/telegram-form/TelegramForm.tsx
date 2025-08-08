@@ -44,7 +44,12 @@ const TelegramForm = () => {
 
     useEffect(() => {
         if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-            setTg(window.Telegram.WebApp); // step 1: set tg
+            const tg: any = window.Telegram.WebApp;
+            setTg(tg); // step 1: set tg
+
+            if (tg?.version && parseFloat(tg.version) >= 7.0 && tg.viewport?.requestFullscreen?.isAvailable()) {
+                tg.viewport.requestFullscreen();
+            }
         }
     }, []); // runs once
 
