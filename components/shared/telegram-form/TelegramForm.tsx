@@ -41,15 +41,12 @@ const TelegramForm = () => {
     }, [data, location, locationString, tg]);
 
 
-
     useEffect(() => {
         if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
             const tg: any = window.Telegram.WebApp;
             setTg(tg); // step 1: set tg
 
-            if (tg?.version && parseFloat(tg.version) >= 7.0 && tg.viewport?.requestFullscreen?.isAvailable()) {
-                tg.viewport.requestFullscreen();
-            }
+            tg.requestFullscreen();
         }
     }, []); // runs once
 
@@ -58,6 +55,7 @@ const TelegramForm = () => {
 
         const tg: any = window.Telegram.WebApp;
         setTg(tg);
+        tg.requestFullscreen();
 
         // Проверка доступности
         console.log('TG version:', tg.version, 'Platform:', tg.platform);
@@ -70,22 +68,10 @@ const TelegramForm = () => {
         };
     }, [onSendData]);
 
-    // Кнопка для ручного запроса fullscreen
-    const goFull = () => {
-        console.log('work')
-        if (tg?.version && parseFloat(tg.version) >= 7.0 && tg.viewport?.requestFullscreen?.isAvailable()) {
-            tg.viewport.requestFullscreen();
-        }
-    };
-
-
-
-
     return (
         <div>
             <div>
                 <div className="flex flex-col gap-2 w-full">
-                    <Button onClick={goFull}>Go Fullscreen</Button>
                     <BrandSelect/>
                     {data.brands.length > 0 && (<ModelSelect/>)}
 
