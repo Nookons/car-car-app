@@ -23,6 +23,7 @@ import {
     PopoverTrigger, Skeleton
 } from '@/components/ComponentsProvider';
 import { useTelegramFormStore } from "@/store/telegram-form/TelegramForm";
+import {t} from "i18next";
 
 const BrandSelect = () => {
     const setBrandsStore = useTelegramFormStore(state => state.setBrands);
@@ -73,7 +74,6 @@ const BrandSelect = () => {
         );
     }, []);
 
-    if (isLoading) return <Skeleton className={`w-full h-[50px]`} />
     if (isError) return (
         <Alert variant="destructive">
             <AlertCircleIcon />
@@ -102,7 +102,7 @@ const BrandSelect = () => {
                             .filter(brand => brands.includes(brand.value))
                             .map(f => f.label)
                             .join(", ")
-                        : "Select brand..."}
+                        : `${t('telegram_form.select_brand')}`}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
@@ -112,9 +112,9 @@ const BrandSelect = () => {
                 align="start"
             >
                 <Command>
-                    <CommandInput placeholder="Search brand..." />
+                    <CommandInput placeholder={`${t('telegram_form.search_brands')}`} />
                     <CommandList>
-                        <CommandEmpty>No brand found.</CommandEmpty>
+                        <CommandEmpty>{t('telegram_form.no_brands_find')}</CommandEmpty>
                         <CommandGroup>
                             {brandsDataFormatted.map(brand => (
                                 <CommandItem

@@ -93,5 +93,19 @@
     "open_ad": "打开广告",
     "open_map": "打开地图"
   },
+
+  "telegram_form": {
+    "select_brand": "选择品牌...",
+    "search_brands": "输入您感兴趣的品牌",
+    "no_brands_find": "未找到任何品牌",
+
+    "select_models": "选择型号...",
+    "search_models": "输入您感兴趣的型号",
+    "no_models_find": "未找到任何型号",
+
+    "price_range": "价格范围",
+    "years_range": "年份范围"
+  },
+
   "change_setting_not_available": "目前仅能通过 Telegram 更改设置。下次更新后，您也可以在这里操作 :)"
 }

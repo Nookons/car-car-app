@@ -8,6 +8,7 @@ import {getYears} from "@/features/getYears";
 import {IYearResponse} from "@/types/Year";
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 import dayjs from "dayjs";
+import {t} from "i18next";
 
 
 const YearsSelect = () => {
@@ -23,7 +24,7 @@ const YearsSelect = () => {
 
     return (
         <div>
-            <article className={`my-2 text-neutral-500 text-xs`}>Years:</article>
+            <article className={`my-2 text-neutral-500 text-xs`}>{t("telegram_form.years_range")}</article>
             <div className="w-full grid grid-cols-[1fr_20px_1fr] items-center gap-4">
                 <div className="relative">
                     <Input

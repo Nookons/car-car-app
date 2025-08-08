@@ -7,6 +7,7 @@ import {getPrices} from "@/features/getPrices";
 import {IPriceResponse} from "@/types/Price";
 import {Input} from "@/components/ui/input";
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
+import {t} from "i18next";
 
 
 
@@ -23,7 +24,7 @@ const PriceSelect = () => {
 
     return (
         <div>
-            <article className={`my-2 text-neutral-500 text-xs`}>Price Ranges:</article>
+            <article className={`my-2 text-neutral-500 text-xs`}>{t("telegram_form.price_range")}</article>
             <div className="w-full grid grid-cols-[1fr_20px_1fr] items-center gap-4">
                 <div className="relative">
                     <Input

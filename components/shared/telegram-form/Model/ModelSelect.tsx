@@ -18,6 +18,7 @@ import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Button} from "@/components/ui/button";
 import {Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
+import {t} from "i18next";
 
 
 export interface BrandWithModelList {
@@ -88,7 +89,7 @@ const ModelSelect = () => {
                             .filter((brand) => models.includes(brand.value))
                             .map((f) => f.label)
                             .join(", ")
-                        : "Select models..."}
+                        : `${t("telegram_from.select_models")}`}
                     <ChevronsUpDown className="ml-2 opacity-50" />
                 </Button>
             </PopoverTrigger>
@@ -98,9 +99,9 @@ const ModelSelect = () => {
                 align="start"
             >
                 <Command>
-                    <CommandInput placeholder="Search models..." className="h-9" />
+                    <CommandInput placeholder={`${t("telegram_from.search_models")}`} className="h-9" />
                     <CommandList>
-                        <CommandEmpty>No models found.</CommandEmpty>
+                        <CommandEmpty>{t("telegram_from.no_models_find")}</CommandEmpty>
                         <CommandGroup>
                             {brandsDataFormatted.map((model) => (
                                 <CommandItem

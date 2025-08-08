@@ -93,5 +93,19 @@
     "open_ad": "Otwórz ogłoszenie",
     "open_map": "Otwórz mapę"
   },
+
+  "telegram_form": {
+    "select_brand": "Wybierz marki...",
+    "search_brands": "Wpisz markę, która Cię interesuje",
+    "no_brands_find": "Nie znaleziono żadnych marek",
+
+    "select_models": "Wybierz modele...",
+    "search_models": "Wpisz model, który Cię interesuje",
+    "no_models_find": "Nie znaleziono żadnych modeli",
+
+    "price_range": "Przedział cenowy",
+    "years_range": "Zakres lat"
+  },
+
   "change_setting_not_available": "Zmiana ustawień jest obecnie możliwa tylko przez Telegram. W następnej aktualizacji będzie to możliwe także tutaj :)"
 }

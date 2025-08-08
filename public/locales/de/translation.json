@@ -93,5 +93,19 @@
     "open_ad": "Anzeige öffnen",
     "open_map": "Karte öffnen"
   },
+
+  "telegram_form": {
+    "select_brand": "Marken auswählen...",
+    "search_brands": "Geben Sie die Marke ein, die Sie interessiert",
+    "no_brands_find": "Keine Marken gefunden",
+
+    "select_models": "Modelle auswählen...",
+    "search_models": "Geben Sie das Modell ein, das Sie interessiert",
+    "no_models_find": "Keine Modelle gefunden",
+
+    "price_range": "Preisspanne",
+    "years_range": "Jahresbereich"
+  },
+
   "change_setting_not_available": "Die Einstellungen können derzeit nur über Telegram geändert werden. Im nächsten Update wird dies auch hier möglich sein :)"
 }

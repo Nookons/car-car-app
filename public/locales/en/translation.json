@@ -103,5 +103,18 @@
     "open_map": "open_map"
   },
 
+  "telegram_form": {
+    "select_brand": "Select brands...",
+    "search_brands": "Input brand what you interesting",
+    "no_brands_find": "No find any brands",
+
+    "select_models": "Select models...",
+    "search_models": "Input brand what you interesting",
+    "no_models_find": "No find any models",
+
+    "price_range": "Price Range",
+    "years_range": "Years Range"
+  },
+
   "change_setting_not_available": "Change your setting available only from telegram right now. In next update you will be able to do this here )"
 }
