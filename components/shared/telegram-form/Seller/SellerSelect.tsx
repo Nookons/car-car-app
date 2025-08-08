@@ -4,9 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 
 const sellerTypesInit = [
-    { value: 'dealer', label: 'Autoryzowany Dealer' },
-    { value: 'firma', label: 'Firma' },
-    { value: 'private', label: 'Osoba prywatna' },
+    { value: 'dealer', label: 'Autoryzowany Dealer', disabled: false },
+    { value: 'firma', label: 'Firma', disabled: false },
+    { value: 'private', label: 'Osoba prywatna', disabled: false },
 ];
 
 
@@ -40,6 +40,19 @@ const SellerSelect = () => {
                         <div className="flex gap-2 flex-wrap">
                             {sellerTypesInit.map((type) => {
                                 const isSelected = telegramData.sellerTypes.includes(type.value);
+
+                                if (type.disabled) {
+                                    return (
+                                        <Badge
+                                            key={type.value}
+                                            className="px-2 transition cursor-pointer select-none"
+                                            variant={'destructive'}
+                                        >
+                                            <article className="font-bold text-md">{type.label}</article>
+                                        </Badge>
+                                    );
+                                }
+
                                 return (
                                     <Badge
                                         key={type.value}

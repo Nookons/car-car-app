@@ -18,7 +18,6 @@ import RangeFromUser from "@/components/shared/telegram-form/RangeFromUser/Range
 
 const TelegramForm = () => {
     const [tg, setTg] = useState<any>(null);
-    const [userName, setUserName] = useState<string>('')
 
     const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
     const [locationString, setLocationString] = useState<string>('');
@@ -42,31 +41,26 @@ const TelegramForm = () => {
     }, [data, location, locationString, tg]);
 
 
+
     useEffect(() => {
-        const init = async () => {
-            if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-                const webApp = window.Telegram.WebApp;
-                setTg(webApp);
-
-                tg.requestFullscreen();
-            }
-        };
-
-        init(); // run async code inside here
-    }, []);
+        if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+            setTg(window.Telegram.WebApp); // step 1: set tg
+        }
+    }, []); // runs once
 
     useEffect(() => {
         if (!tg) return;
 
-        setUserName(tg.initDataUnsafe?.user?.username)
+        if (tg?.version && parseFloat(tg.version) >= 7.0 && tg.viewport?.requestFullscreen?.isAvailable()) {
+            tg.viewport.requestFullscreen();
+        }
 
-        tg.requestFullscreen();
         tg.onEvent('sendMainData', onSendData);
-
         return () => {
             tg.offEvent('sendMainData', onSendData);
         };
     }, [tg, onSendData]);
+
 
 
     return (
@@ -87,10 +81,7 @@ const TelegramForm = () => {
 
                     <RangeFromUser />
 
-                    <div>
-                        <MilageSelect
-                        />
-                    </div>
+                        <MilageSelect/>
 
                     <div>
                         <SellerSelect

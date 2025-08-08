@@ -13,7 +13,7 @@ interface State {
     setRangeValue: (rangeValue: number[]) => void;
     setMaxMilage: (maxMilage: number) => void;
     setSellerTypes: (sellerTypes: string[]) => void;
-    setPlatformTypes: (platformTypes: string[]) => void;
+    setPlatformTypes: (types: string[]) => void;
     setConditionTypes: (conditionTypes: string[]) => void;
 }
 
@@ -25,7 +25,7 @@ export const useTelegramFormStore = create<State>((set) => ({
         maxPrice: 0,
         minYear: '',
         maxYear: '',
-        rangeValue: 50,
+        rangeValue: 10,
         maxMilage: 100000,
         sellerTypes: ["private"],
         platformTypes: ["oto_moto"],
@@ -90,7 +90,7 @@ export const useTelegramFormStore = create<State>((set) => ({
 
     setRangeValue: (rangeValue) =>
         set((state) => {
-            if (rangeValue[0] > 250 || rangeValue[0] < 0) return state;
+            if (rangeValue[0] > 100 || rangeValue[0] < 10) return state;
             return {
                 data: {
                     ...state.data,
@@ -101,7 +101,7 @@ export const useTelegramFormStore = create<State>((set) => ({
 
     setMaxMilage: (maxMilage) =>
         set((state) => {
-            if (maxMilage > 1000000 || maxMilage < 0) return state;
+            if (maxMilage > 1000000 || maxMilage < 10) return state;
 
             return {
                 data: {
@@ -119,13 +119,12 @@ export const useTelegramFormStore = create<State>((set) => ({
             },
         })),
 
-    setPlatformTypes: (platformTypes) =>
-        set((state) => ({
-            data: {
-                ...state.data,
-                platformTypes
-            },
-        })),
+    setPlatformTypes: (types) => set(state => ({
+        data: {
+            ...state.data,
+            platformTypes: types
+        }
+    })),
 
     setConditionTypes: (conditionTypes) =>
         set((state) => ({

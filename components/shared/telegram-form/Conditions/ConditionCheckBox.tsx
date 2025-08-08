@@ -15,7 +15,7 @@ const ConditionCheckBox: React.FC <Props> = ({value, onChange}) => {
             </div>
             <div className="grid gap-2">
                 <p className="text-muted-foreground text-xs">
-                    By clicking this checkbox, you agree to the <Link className={`text-primary font-semibold`} href={`/`}>Terms and conditions</Link>.
+                    By clicking this checkbox, you agree to the <Link className={`text-primary font-semibold`} href={`/en/privacy`}>Terms and conditions</Link>.
                 </p>
             </div>
         </div>

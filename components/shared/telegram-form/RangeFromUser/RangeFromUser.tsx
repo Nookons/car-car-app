@@ -13,19 +13,19 @@ const RangeFromUser = () => {
                 Range to your new car
                 <div className={`flex justify-end gap-8`}>
                     <CirclePlus
-                        onClick={() => setRangeValue([telegramData.rangeValue + 25])}
+                        onClick={() => setRangeValue([telegramData.rangeValue + 10])}
                         className={`text-foreground`} size={20}
                     />
                     <CircleMinus
-                        onClick={() => setRangeValue([telegramData.rangeValue - 25])}
+                        onClick={() => setRangeValue([telegramData.rangeValue - 10])}
                         className={`text-foreground`} size={20}
                     />
                 </div>
             </article>
             <Slider
                 value={[telegramData.rangeValue]}
-                max={250}
-                step={25}
+                max={100}
+                step={10}
                 onValueChange={setRangeValue}
                 className="shadow-lg rounded-lg"
             />

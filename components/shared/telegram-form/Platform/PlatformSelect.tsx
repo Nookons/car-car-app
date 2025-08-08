@@ -1,35 +1,39 @@
-import React, { Dispatch, SetStateAction } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
+import { useTelegramFormStore } from "@/store/telegram-form/TelegramForm";
 
-const platformTypesInit = [
-    { value: 'oto_moto', label: 'Oto Moto' },
-    { value: 'olx', label: 'Olx' },
-    { value: 'facebook', label: 'Facebook' },
-    { value: 'sprzedajemy', label: 'Sprzedajemy Pl' },
-]
+interface PlatformType {
+    value: string;
+    label: string;
+    disabled: boolean;
+}
 
+const platformTypesInit: PlatformType[] = [
+    { value: 'oto_moto', label: 'Oto Moto', disabled: false },
+    { value: 'olx', label: 'Olx', disabled: true },
+    { value: 'facebook', label: 'Facebook', disabled: true },
+    { value: 'sprzedajemy', label: 'Sprzedajemy Pl', disabled: true },
+];
 
 const PlatformSelect = () => {
-    const telegramData = useTelegramFormStore(state => state.data)
-    const setPlatformTypes = useTelegramFormStore(state => state.setPlatformTypes)
+    const platformTypes = useTelegramFormStore(state => state.data.platformTypes);
+    const setPlatformTypes = useTelegramFormStore(state => state.setPlatformTypes);
 
     const onSellerHandler = (type: string) => {
-        if (telegramData.platformTypes.includes(type)) {
-            setPlatformTypes(telegramData.platformTypes.filter(item => item !== type));
+        if (platformTypes.includes(type)) {
+            setPlatformTypes(platformTypes.filter(item => item !== type));
         } else {
-            setPlatformTypes([...telegramData.platformTypes, type]);
+            setPlatformTypes([...platformTypes, type]);
         }
     };
 
+    // Мемоизация списка платформ
+    const memoizedPlatformTypes = useMemo(() => platformTypesInit, []);
+
     return (
         <div className="w-full">
-            <Accordion
-                type="single"
-                collapsible
-                className="w-full"
-            >
+            <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="item-1">
                     <AccordionTrigger>
                         <div className="flex justify-start gap-2 items-center pb-2">
@@ -38,8 +42,21 @@ const PlatformSelect = () => {
                     </AccordionTrigger>
                     <AccordionContent className="flex flex-col gap-4 text-balance">
                         <div className="flex gap-2 flex-wrap">
-                            {platformTypesInit.map((type) => {
-                                const isSelected = telegramData.platformTypes.includes(type.value);
+                            {memoizedPlatformTypes.map((type) => {
+                                const isSelected = platformTypes.includes(type.value);
+
+                                if (type.disabled) {
+                                    return (
+                                        <Badge
+                                            key={type.value}
+                                            className="px-2 transition opacity-50 cursor-not-allowed select-none"
+                                            variant={'destructive'}
+                                        >
+                                            <article className="font-bold text-md">{type.label}</article>
+                                        </Badge>
+                                    );
+                                }
+
                                 return (
                                     <Badge
                                         key={type.value}
