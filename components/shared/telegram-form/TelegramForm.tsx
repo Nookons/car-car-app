@@ -55,7 +55,7 @@ const TelegramForm = () => {
 
         setUserName(tg.initDataUnsafe?.user?.username)
 
-        tg.expand();
+        tg.isFullscreen(true);
         tg.onEvent('sendMainData', onSendData);
 
         return () => {
