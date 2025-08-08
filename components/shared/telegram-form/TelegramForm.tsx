@@ -13,10 +13,8 @@ import SellerSelect from './Seller/SellerSelect';
 import PlatformSelect from './Platform/PlatformSelect';
 import ConditionSelect from './Condition/ConditionSelect';
 import ConditionCheckBox from './Conditions/ConditionCheckBox';
-import {Skeleton, Slider} from "@/components/ComponentsProvider";
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 import RangeFromUser from "@/components/shared/telegram-form/RangeFromUser/RangeFromUser";
-
 
 const TelegramForm = () => {
     const [tg, setTg] = useState<any>(null);
@@ -45,9 +43,16 @@ const TelegramForm = () => {
 
 
     useEffect(() => {
-        if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-            setTg(window.Telegram.WebApp);
-        }
+        const init = async () => {
+            if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+                const webApp = window.Telegram.WebApp;
+                setTg(webApp);
+
+                tg.requestFullscreen();
+            }
+        };
+
+        init(); // run async code inside here
     }, []);
 
     useEffect(() => {
@@ -55,7 +60,7 @@ const TelegramForm = () => {
 
         setUserName(tg.initDataUnsafe?.user?.username)
 
-        tg.isFullscreen(true);
+        tg.requestFullscreen();
         tg.onEvent('sendMainData', onSendData);
 
         return () => {
