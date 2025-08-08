@@ -54,17 +54,30 @@ const TelegramForm = () => {
     }, []); // runs once
 
     useEffect(() => {
-        if (!tg) return;
+        if (typeof window === 'undefined' || !window.Telegram?.WebApp) return;
 
-        if (tg?.version && parseFloat(tg.version) >= 7.0 && tg.viewport?.requestFullscreen?.isAvailable()) {
-            tg.viewport.requestFullscreen();
-        }
+        const tg: any = window.Telegram.WebApp;
+        setTg(tg);
+
+        // Проверка доступности
+        console.log('TG version:', tg.version, 'Platform:', tg.platform);
+        console.log('Fullscreen available:', tg.viewport?.requestFullscreen?.isAvailable?.());
 
         tg.onEvent('sendMainData', onSendData);
+
         return () => {
             tg.offEvent('sendMainData', onSendData);
         };
-    }, [tg, onSendData]);
+    }, [onSendData]);
+
+    // Кнопка для ручного запроса fullscreen
+    const goFull = () => {
+        console.log('work')
+        if (tg?.version && parseFloat(tg.version) >= 7.0 && tg.viewport?.requestFullscreen?.isAvailable()) {
+            tg.viewport.requestFullscreen();
+        }
+    };
+
 
 
 
@@ -72,6 +85,7 @@ const TelegramForm = () => {
         <div>
             <div>
                 <div className="flex flex-col gap-2 w-full">
+                    <Button onClick={goFull}>Go Fullscreen</Button>
                     <BrandSelect/>
                     {data.brands.length > 0 && (<ModelSelect/>)}
 
@@ -84,9 +98,9 @@ const TelegramForm = () => {
                         />
                     </div>
 
-                    <RangeFromUser />
+                    <RangeFromUser/>
 
-                        <MilageSelect/>
+                    <MilageSelect/>
 
                     <div>
                         <SellerSelect
