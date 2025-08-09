@@ -40,7 +40,7 @@ const ConditionSelect = () => {
                                 return (
                                     <Badge
                                         key={type.value}
-                                        className="px-2 transition cursor-pointer select-none"
+                                        className="px-2 text-foreground transition cursor-pointer select-none"
                                         variant={isSelected ? 'default' : 'secondary'}
                                         onClick={() => onSellerHandler(type.value)}
                                     >

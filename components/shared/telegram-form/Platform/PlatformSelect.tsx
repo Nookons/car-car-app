@@ -49,7 +49,7 @@ const PlatformSelect = () => {
                                     return (
                                         <Badge
                                             key={type.value}
-                                            className="px-2 transition opacity-50 cursor-not-allowed select-none"
+                                            className="px-2 text-foreground transition opacity-50 cursor-not-allowed select-none"
                                             variant={'destructive'}
                                         >
                                             <article className="font-bold text-md">{type.label}</article>
@@ -60,7 +60,7 @@ const PlatformSelect = () => {
                                 return (
                                     <Badge
                                         key={type.value}
-                                        className="px-2 transition cursor-pointer select-none"
+                                        className="px-2 text-foreground transition cursor-pointer select-none"
                                         variant={isSelected ? 'default' : 'secondary'}
                                         onClick={() => onSellerHandler(type.value)}
                                     >

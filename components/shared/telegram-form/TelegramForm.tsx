@@ -41,7 +41,7 @@ const TelegramForm = () => {
     }, [data, location, locationString, tg]);
 
 
-    /*useEffect(() => {
+    useEffect(() => {
         if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
             const tg: any = window.Telegram.WebApp;
             setTg(tg); // step 1: set tg
@@ -66,13 +66,13 @@ const TelegramForm = () => {
         return () => {
             tg.offEvent('sendMainData', onSendData);
         };
-    }, [onSendData]);*/
+    }, [onSendData]);
 
     return (
         <div>
             <div>
                 <div className="flex flex-col gap-2 w-full">
-                    <div>
+                    <div className={`flex flex-col gap-4`}>
                         <BrandSelect/>
                         {data.brands.length > 0 && (<ModelSelect/>)}
                         <MileageSelect/>
@@ -80,11 +80,15 @@ const TelegramForm = () => {
                         />
                         <YearsSelect
                         />
-                        <RangeFromUser/>
+                        <div className={`mt-4`}>
+                            <RangeFromUser/>
+                        </div>
                         <SellerSelect
                         />
+                        <hr/>
                         <PlatformSelect
                         />
+                        <hr/>
                         <ConditionSelect
                         />
                     </div>
@@ -100,7 +104,7 @@ const TelegramForm = () => {
                         <Button
                             disabled={!isCondition}
                             id="sendMainData"
-                            className="font-bold w-full flex items-center gap-2"
+                            className="font-bold text-foreground w-full flex items-center gap-2"
                             onClick={onSendData}
                         >
                             <Power/>
