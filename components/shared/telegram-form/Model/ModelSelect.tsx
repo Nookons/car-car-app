@@ -42,13 +42,8 @@ const ModelSelect = () => {
 
     const [models, setModels] = useState<string[]>([])
 
-    useEffect(() => {
-        setTelegramModels(models)
-    }, [models])
-
-
     const [open, setOpen] = useState(false);
-    const [brandsDataFormatted, setBrandsDataFormatted] = useState<{ value: string, label: string }[]>([]);
+    const [modelsDataFormatted, setModelsDataFormatted] = useState<{ value: string, label: string }[]>([]);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const [popoverWidth, setPopoverWidth] = useState<string | number>('auto');
 
@@ -56,7 +51,7 @@ const ModelSelect = () => {
         if (triggerRef.current) {
             setPopoverWidth(triggerRef.current.offsetWidth);
         }
-    }, [triggerRef.current, brandsDataFormatted]);
+    }, [triggerRef.current, modelsDataFormatted]);
 
     useEffect(() => {
         if (data) {
@@ -70,27 +65,44 @@ const ModelSelect = () => {
                 });
             })
 
-            setBrandsDataFormatted(result);
+            setModelsDataFormatted(result);
             filterTelegramModels(allModels);
         }
     }, [data])
+
+    const pickHandler = (model: string) => {
+        console.log('test')
+        const isHave = models.includes(model)
+
+        if (isHave) {
+            const filtered = models.filter(item => item !== model)
+            setModels(filtered)
+            setTelegramModels(filtered)
+            return
+        }
+
+        setModels((prev) => ([...prev, model]))
+        setTelegramModels(models)
+    }
+
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
                 <Button
+                    ref={triggerRef}
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className="w-full justify-between"
+                    className="w-full justify-between truncate"
                 >
                     {models.length > 0
-                        ? brandsDataFormatted
-                            .filter((brand) => models.includes(brand.value))
-                            .map((f) => f.label)
+                        ? modelsDataFormatted
+                            .filter(model => models.includes(model.value))
+                            .map(f => f.label)
                             .join(", ")
-                        : `${t("telegram_from.select_models")}`}
-                    <ChevronsUpDown className="ml-2 opacity-50" />
+                        : `${t('telegram_form.select_models')}`}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
             <PopoverContent
@@ -99,24 +111,20 @@ const ModelSelect = () => {
                 align="start"
             >
                 <Command>
-                    <CommandInput placeholder={`${t("telegram_from.search_models")}`} className="h-9" />
+                    <CommandInput placeholder={`${t('telegram_form.search_models')}`} />
                     <CommandList>
-                        <CommandEmpty>{t("telegram_from.no_models_find")}</CommandEmpty>
+                        <CommandEmpty>{t('telegram_form.no_models_find')}</CommandEmpty>
                         <CommandGroup>
-                            {brandsDataFormatted.map((model) => (
+                            {modelsDataFormatted.map(model => (
                                 <CommandItem
                                     key={model.value}
                                     value={model.value}
-                                    onSelect={() => {
-                                        const newValue = models.includes(model.value)
-                                            ? models.filter((val) => val !== model.value)
-                                            : [...models, model.value];
-                                        setModels(newValue);
-                                        setOpen(false)
-                                    }}
+                                    onSelect={() => pickHandler(model.value)}
                                 >
                                     {model.label}
-                                    {models.includes(model.value) && <Check />}
+                                    {models.includes(model.value) && (
+                                        <Check className="ml-auto h-4 w-4" />
+                                    )}
                                 </CommandItem>
                             ))}
                         </CommandGroup>

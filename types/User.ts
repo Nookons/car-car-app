@@ -33,7 +33,7 @@ export interface IUserFormTelegram {
     minYear: string;
     maxYear: string;
     rangeValue: number;
-    maxMilage: number;
+    maxMileage: number;
     sellerTypes: string[];
     platformTypes: string[];
     conditionTypes: string[];

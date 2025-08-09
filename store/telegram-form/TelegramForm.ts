@@ -5,13 +5,13 @@ interface State {
     data: IUserFormTelegram;
     setBrands: (brandsStr: string[]) => void;
     setModels: (modelsStr: string[]) => void;
-    filterModels: (modelsStr: string[]) => void;
+    filterModels: (modelsData: string[]) => void;
     setMinPrice: (minPrice: number) => void;
     setMaxPrice: (minPrice: number) => void;
     setMinYear: (minYear: string) => void;
     setMaxYear: (maxYear: string) => void;
     setRangeValue: (rangeValue: number[]) => void;
-    setMaxMilage: (maxMilage: number) => void;
+    setMaxMileage: (maxMileage: number) => void;
     setSellerTypes: (sellerTypes: string[]) => void;
     setPlatformTypes: (types: string[]) => void;
     setConditionTypes: (conditionTypes: string[]) => void;
@@ -26,7 +26,7 @@ export const useTelegramFormStore = create<State>((set) => ({
         minYear: '',
         maxYear: '',
         rangeValue: 10,
-        maxMilage: 100000,
+        maxMileage: 0,
         sellerTypes: ["private"],
         platformTypes: ["oto_moto"],
         conditionTypes: ["used", "new"]
@@ -40,11 +40,11 @@ export const useTelegramFormStore = create<State>((set) => ({
             },
         })),
 
-    setModels: (modelsStr) =>
+    setModels: (modelsData) =>
         set((state) => ({
             data: {
                 ...state.data,
-                models: modelsStr,
+                models: modelsData,
             },
         })),
 
@@ -99,14 +99,14 @@ export const useTelegramFormStore = create<State>((set) => ({
             };
         }),
 
-    setMaxMilage: (maxMilage) =>
+    setMaxMileage: (maxMileage) =>
         set((state) => {
-            if (maxMilage > 1000000 || maxMilage < 10) return state;
+            if (maxMileage > 1000000 || maxMileage < 0) return state;
 
             return {
                 data: {
                     ...state.data,
-                    maxMilage
+                    maxMileage
                 },
             };
         }),

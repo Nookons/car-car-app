@@ -2,13 +2,13 @@
 
 import React, {useCallback, useEffect, useState} from 'react';
 import {Button} from "@/components/ui/button";
-import {CircleMinus, CirclePlus, Power} from "lucide-react";
+import {Power} from "lucide-react";
 import GetUserLocation from './UserLocation/getUserLocation';
 import BrandSelect from './Brand/BrandSelect';
 import ModelSelect from './Model/ModelSelect';
 import PriceSelect from './Price/PriceSelect';
 import YearsSelect from './Years/YearsSelect';
-import MilageSelect from "@/components/shared/telegram-form/Milage/MilageSelect";
+import MileageSelect from "@/components/shared/telegram-form/Mileage/MileageSelect";
 import SellerSelect from './Seller/SellerSelect';
 import PlatformSelect from './Platform/PlatformSelect';
 import ConditionSelect from './Condition/ConditionSelect';
@@ -41,7 +41,7 @@ const TelegramForm = () => {
     }, [data, location, locationString, tg]);
 
 
-    useEffect(() => {
+    /*useEffect(() => {
         if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
             const tg: any = window.Telegram.WebApp;
             setTg(tg); // step 1: set tg
@@ -66,35 +66,25 @@ const TelegramForm = () => {
         return () => {
             tg.offEvent('sendMainData', onSendData);
         };
-    }, [onSendData]);
+    }, [onSendData]);*/
 
     return (
         <div>
             <div>
                 <div className="flex flex-col gap-2 w-full">
-                    <BrandSelect/>
-                    {data.brands.length > 0 && (<ModelSelect/>)}
-
-
-                    <div className={`my-4 flex flex-col gap-2 w-full`}>
+                    <div>
+                        <BrandSelect/>
+                        {data.brands.length > 0 && (<ModelSelect/>)}
+                        <MileageSelect/>
                         <PriceSelect
                         />
-
                         <YearsSelect
                         />
-                    </div>
-
-                    <RangeFromUser/>
-
-                    <MilageSelect/>
-
-                    <div>
+                        <RangeFromUser/>
                         <SellerSelect
                         />
-
                         <PlatformSelect
                         />
-
                         <ConditionSelect
                         />
                     </div>

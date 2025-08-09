@@ -89,6 +89,7 @@ const BrandSelect = () => {
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
+            <span className={`text-neutral-500 text-xs`}>{t('telegram_form.title_brand')}</span>
             <PopoverTrigger asChild>
                 <Button
                     ref={triggerRef}
@@ -103,16 +104,16 @@ const BrandSelect = () => {
                             .map(f => f.label)
                             .join(", ")
                         : `${t('telegram_form.select_brand')}`}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
                 </Button>
             </PopoverTrigger>
             <PopoverContent
                 className="p-0"
-                style={{ width: popoverWidth }}
+                style={{width: popoverWidth}}
                 align="start"
             >
                 <Command>
-                    <CommandInput placeholder={`${t('telegram_form.search_brands')}`} />
+                    <CommandInput placeholder={`${t('telegram_form.search_brands')}`}/>
                     <CommandList>
                         <CommandEmpty>{t('telegram_form.no_brands_find')}</CommandEmpty>
                         <CommandGroup>
@@ -124,7 +125,7 @@ const BrandSelect = () => {
                                 >
                                     {brand.label}
                                     {brands.includes(brand.value) && (
-                                        <Check className="ml-auto h-4 w-4" />
+                                        <Check className="ml-auto h-4 w-4"/>
                                     )}
                                 </CommandItem>
                             ))}

@@ -104,16 +104,21 @@
   },
 
   "telegram_form": {
+    "title_brand": "Select brands and models below if you need you can left it's empty",
     "select_brand": "Select brands...",
     "search_brands": "Input brand what you interesting",
     "no_brands_find": "No find any brands",
 
     "select_models": "Select models...",
-    "search_models": "Input brand what you interesting",
+    "search_models": "Input Models what you interesting",
     "no_models_find": "No find any models",
 
     "price_range": "Price Range",
-    "years_range": "Years Range"
+    "years_range": "Years Range",
+
+    "range_to_car": "Range from you to car",
+    "mileage": "Max mileage value",
+    "mileage_placeholder": "Input max mileage value"
   },
 
   "change_setting_not_available": "Change your setting available only from telegram right now. In next update you will be able to do this here )"

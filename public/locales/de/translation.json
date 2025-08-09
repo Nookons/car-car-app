@@ -95,16 +95,21 @@
   },
 
   "telegram_form": {
+    "title_brand": "Wählen Sie unten Marken und Modelle aus, bei Bedarf können Sie dies leer lassen",
     "select_brand": "Marken auswählen...",
-    "search_brands": "Geben Sie die Marke ein, die Sie interessiert",
+    "search_brands": "Geben Sie die gewünschte Marke ein",
     "no_brands_find": "Keine Marken gefunden",
 
     "select_models": "Modelle auswählen...",
-    "search_models": "Geben Sie das Modell ein, das Sie interessiert",
+    "search_models": "Geben Sie das gewünschte Modell ein",
     "no_models_find": "Keine Modelle gefunden",
 
     "price_range": "Preisspanne",
-    "years_range": "Jahresbereich"
+    "years_range": "Baujahr-Bereich",
+
+    "range_to_car": "Entfernung von Ihnen zum Auto",
+    "mileage": "Maximaler Kilometerstand",
+    "mileage_placeholder": "Maximalen Kilometerstand eingeben"
   },
 
   "change_setting_not_available": "Die Einstellungen können derzeit nur über Telegram geändert werden. Im nächsten Update wird dies auch hier möglich sein :)"

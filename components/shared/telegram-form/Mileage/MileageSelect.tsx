@@ -3,13 +3,14 @@ import {Input} from "@/components/ui/input";
 import {IMileageResponse} from "@/types/Mileage";
 import {Skeleton} from "@/components/ui/skeleton";
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
+import {t} from "i18next";
 
 
 
-const MilageSelect= () => {
+const MileageSelect= () => {
     const telegramData = useTelegramFormStore(state => state.data)
-    const setMaxMilage = useTelegramFormStore(state => state.setMaxMilage)
-    const [milageData, setMilageData] = useState<IMileageResponse | null>(null)
+    const setMaxMileage = useTelegramFormStore(state => state.setMaxMileage)
+    const [mileageData, setMileageData] = useState<IMileageResponse | null>(null)
 
     useEffect(() => {
         const fetchMilageData = async () => {
@@ -19,30 +20,30 @@ const MilageSelect= () => {
                     throw new Error('Network response was not ok');
                 }
                 const data: IMileageResponse = await response.json();
-                setMilageData(data);
+                setMileageData(data);
             } catch (error) {
-                console.error('Error fetching milage data:', error);
+                console.error('Error fetching mileage data:', error);
             }
         };
 
         fetchMilageData();
     }, [])
 
-    if (!milageData) {
+    if (!mileageData) {
         return <Skeleton className="h-[50px] rounded" />
     }
 
     return (
         <div className={`flex flex-col gap-2`}>
-            <article>Milage</article>
+            <article className={`text-xs text-neutral-500`}>{t("telegram_form.mileage")}</article>
             <Input
                 type={`number`}
-                value={telegramData.maxMilage === 0 ? '' : telegramData.maxMilage}
-                onChange={(e) => setMaxMilage(Number(e.target.value))}
-                placeholder={milageData.max_mileage ? `${milageData.max_mileage.toLocaleString()} km` : 'Enter max milage'}
+                value={telegramData.maxMileage === 0 ? '' : telegramData.maxMileage}
+                onChange={(e) => setMaxMileage(Number(e.target.value))}
+                placeholder={mileageData.max_mileage ? `${mileageData.max_mileage.toLocaleString()} km` : `${t("telegram_form.mileage_placeholder")}`}
             />
         </div>
     );
 };
 
-export default MilageSelect;
+export default MileageSelect;
