@@ -32,6 +32,7 @@ type PageProps = {
 };
 
 const Page = ({params}: PageProps) => {
+    const [tg, setTg] = useState<any>(null);
     const resolvedParams = React.use(params);
     const id = resolvedParams.id;
 
@@ -43,13 +44,20 @@ const Page = ({params}: PageProps) => {
     });
 
     useEffect(() => {
-        if (typeof window === 'undefined' || !window.Telegram?.WebApp) return;
-        const tg: any = window.Telegram.WebApp;
-        try {
+        if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+            const tg: any = window.Telegram.WebApp;
+            setTg(tg); // step 1: set tg
+
             tg.requestFullscreen();
-        } catch (e) {
-            console.warn("requestFullscreen not supported:", e);
         }
+    }, []); // runs once
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || !window.Telegram?.WebApp) return;
+
+        const tg: any = window.Telegram.WebApp;
+        setTg(tg);
+        tg.requestFullscreen();
     }, []);
 
     if (isError && error) {
