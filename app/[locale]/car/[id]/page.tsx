@@ -44,21 +44,14 @@ const Page = ({params}: PageProps) => {
     });
 
     useEffect(() => {
-        if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-            const tg: any = window.Telegram.WebApp;
-            setTg(tg); // step 1: set tg
-
+        if (typeof window === 'undefined' || !window.Telegram?.WebApp) return;
+        const tg: any = window.Telegram.WebApp;
+        setTg(tg)
+        if (typeof tg.requestFullscreen === 'function') {
             tg.requestFullscreen();
         }
-    }, []); // runs once
-
-    useEffect(() => {
-        if (typeof window === 'undefined' || !window.Telegram?.WebApp) return;
-
-        const tg: any = window.Telegram.WebApp;
-        setTg(tg);
-        tg.requestFullscreen();
     }, []);
+
 
     if (isError && error) {
         return <ErrorTemplate error={error}/>
