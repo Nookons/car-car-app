@@ -40,10 +40,6 @@ const Header = () => {
                     </div>
                 </div>
             </div>
-            <Script
-                src="https://telegram.org/js/telegram-web-app.js?57"
-                strategy="beforeInteractive"
-            />
         </div>
     );
 };

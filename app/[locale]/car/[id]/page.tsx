@@ -47,10 +47,17 @@ const Page = ({params}: PageProps) => {
         if (typeof window === 'undefined' || !window.Telegram?.WebApp) return;
         const tg: any = window.Telegram.WebApp;
         setTg(tg)
-        if (typeof tg.requestFullscreen === 'function') {
-            tg.requestFullscreen();
-        }
     }, []);
+
+    useEffect(() => {
+        if (tg) {
+            try {
+                tg.requestFullscreen();
+            } catch (e) {
+                console.warn("requestFullscreen not supported:", e);
+            }
+        }
+    }, [tg]);
 
 
     if (isError && error) {
