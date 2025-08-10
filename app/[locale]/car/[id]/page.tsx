@@ -45,9 +45,12 @@ const Page = ({params}: PageProps) => {
     useEffect(() => {
         if (typeof window === 'undefined' || !window.Telegram?.WebApp) return;
         const tg: any = window.Telegram.WebApp;
-        tg.requestFullscreen();
+        try {
+            tg.requestFullscreen();
+        } catch (e) {
+            console.warn("requestFullscreen not supported:", e);
+        }
     }, []);
-
 
     if (isError && error) {
         return <ErrorTemplate error={error}/>
