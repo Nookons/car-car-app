@@ -1,5 +1,5 @@
 'use client'
-import React, {useEffect} from 'react';
+import React, {useEffect, useState} from 'react';
 import AdImageBlock from "@/components/shared/ad/AdImageBlock";
 import AdTitle from "@/components/shared/ad/AdTitle";
 import AdButtons from "@/components/shared/ad/AdButtons";
@@ -41,8 +41,12 @@ const Page = ({params}: PageProps) => {
     });
 
     useEffect(() => {
-        console.log(data?.description)
-    }, [data]);
+        if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+            const tg: any = window.Telegram.WebApp;
+            tg.requestFullscreen();
+        }
+    }, []);
+
 
     if (isError && error) {
         return <ErrorTemplate error={error}/>

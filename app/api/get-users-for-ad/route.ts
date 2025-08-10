@@ -33,12 +33,15 @@ export async function POST(request: NextRequest) {
         const query = `
             SELECT
                 uss.*,
+                u.language_code,
                 ST_Distance(
                         ST_SetSRID(ST_MakePoint(uss.lng, uss.lat), 4326)::geography,
                         ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
                 ) AS distance_meters
             FROM
                 user_search_settings uss
+            JOIN
+                users u ON u.id = uss.user_id
             WHERE
                 (uss.brand IS NULL OR $3::text IS NULL OR $3 = ANY(LOWER(uss.brand::text)::text[]))
               AND
@@ -80,6 +83,8 @@ export async function POST(request: NextRequest) {
         ];
 
         const result = await pool.query(query, values);
+
+        console.log(result.rows);
 
         return NextResponse.json(
             { message: "success", users: result.rows },
