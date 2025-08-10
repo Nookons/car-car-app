@@ -5,6 +5,7 @@ import LanguageSelect from "@/components/shared/LanuageSelect/LanguageSelect";
 import {ModeToggle} from "@/components/shared/ModeToggle/ModeToggle";
 import {useTranslation} from "react-i18next";
 import UserButton from "@/components/shared/UserButton/UserButton";
+import Script from "next/script";
 
 
 const Header = () => {
@@ -21,7 +22,7 @@ const Header = () => {
 
     return (
         <div
-            className="w-full relative items-center pt-15 grad h-full absolute top-0 left-0 bg-gradient-to-b from-primary via-background to-background animate-gradient-shift"
+            className="w-full relative items-center pt-15 grad h-full top-0 left-0 bg-gradient-to-b from-primary via-background to-background animate-gradient-shift"
         >
             <div className={`grid grid-cols-2`}>
                 <div className={`col-span-2 text-center`}>
@@ -39,6 +40,10 @@ const Header = () => {
                     </div>
                 </div>
             </div>
+            <Script
+                src="https://telegram.org/js/telegram-web-app.js?57"
+                strategy="beforeInteractive"
+            />
         </div>
     );
 };

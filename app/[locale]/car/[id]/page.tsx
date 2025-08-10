@@ -1,5 +1,5 @@
 'use client'
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import AdImageBlock from "@/components/shared/ad/AdImageBlock";
 import AdTitle from "@/components/shared/ad/AdTitle";
 import AdButtons from "@/components/shared/ad/AdButtons";
@@ -14,6 +14,7 @@ import SellerCard from "@/components/shared/ad/SellerCard";
 import {Dot, Eye} from "lucide-react";
 import Attribute from "@/components/shared/ad/attribute";
 import {
+    Badge,
     Button,
     Drawer, DrawerClose,
     DrawerContent,
@@ -21,6 +22,7 @@ import {
     DrawerHeader, DrawerTitle,
     DrawerTrigger
 } from "@/components/ComponentsProvider";
+import Script from "next/script";
 
 
 type PageProps = {
@@ -41,10 +43,9 @@ const Page = ({params}: PageProps) => {
     });
 
     useEffect(() => {
-        if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-            const tg: any = window.Telegram.WebApp;
-            tg.requestFullscreen();
-        }
+        if (typeof window === 'undefined' || !window.Telegram?.WebApp) return;
+        const tg: any = window.Telegram.WebApp;
+        tg.requestFullscreen();
     }, []);
 
 
@@ -94,7 +95,7 @@ const Page = ({params}: PageProps) => {
                 <DrawerTrigger
                     className=""
                 >
-                    <Button variant={'outline'} className={`w-full`}>Read Description</Button>
+                    <Badge variant={'outline'} className={`w-full py-2`}>Read Description</Badge>
                 </DrawerTrigger>
                 <DrawerContent
                     className=" flex flex-col rounded-t-[10px] mt-24 h-[100%] lg:h-[100%] fixed bottom-0 left-0 right-0 outline-none"
@@ -119,6 +120,10 @@ const Page = ({params}: PageProps) => {
             <div className={`flex justify-center pt-12`}>
                 <b className={`text-neutral-500 text-x`}>© 2025, CarCar.</b>
             </div>
+            <Script
+                src="https://telegram.org/js/telegram-web-app.js?57"
+                strategy="beforeInteractive"
+            />
         </div>
     )
         ;
