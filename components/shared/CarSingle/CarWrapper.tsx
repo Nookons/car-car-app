@@ -36,11 +36,7 @@ const CarWrapper = ({id}: {id: string}) => {
         if (tg) {
             console.log('TG version:', Number(tg.version), 'Platform:', tg.platform);
             console.log('Fullscreen available:', tg.viewport?.requestFullscreen?.isAvailable?.());
-            const location = tg.LocationManager.getLocation();
-            console.log(location);
-            if (Number(tg.version) > 6.0) {
-                tg.requestFullscreen();
-            }
+            tg.requestFullscreen();
         }
     }, [tg]);
 
