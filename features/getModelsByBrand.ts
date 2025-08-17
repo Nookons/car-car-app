@@ -16,7 +16,7 @@ export const getModelsByBrand = async (brands: string[]): Promise<BrandWithModel
         return [
             {
                 brand: 'unknown',
-                models: ''
+                models: []
             }
         ]
     }
