@@ -22,7 +22,7 @@ const CarWrapper = ({id}: {id: string}) => {
         staleTime: 5 * 60 * 1000,
     });
 
-    /*useEffect(() => {
+    useEffect(() => {
         if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
             const tg: any = window.Telegram.WebApp;
             console.log(tg);
@@ -38,7 +38,7 @@ const CarWrapper = ({id}: {id: string}) => {
             console.log('Fullscreen available:', tg.viewport?.requestFullscreen?.isAvailable?.());
             tg.requestFullscreen();
         }
-    }, [tg]);*/
+    }, [tg]);
 
     return (
         <div>
