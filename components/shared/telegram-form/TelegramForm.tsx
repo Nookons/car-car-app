@@ -45,8 +45,6 @@ const TelegramForm = () => {
         if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
             const tg: any = window.Telegram.WebApp;
             setTg(tg); // step 1: set tg
-
-            tg.requestFullscreen();
         }
     }, []); // runs once
 
@@ -55,13 +53,14 @@ const TelegramForm = () => {
 
         const tg: any = window.Telegram.WebApp;
         setTg(tg);
-        tg.requestFullscreen();
-
-        // Проверка доступности
-        console.log('TG version:', tg.version, 'Platform:', tg.platform);
-        console.log('Fullscreen available:', tg.viewport?.requestFullscreen?.isAvailable?.());
 
         tg.onEvent('sendMainData', onSendData);
+
+        if (Number(tg.version) > 6) {
+            tg.requestFullscreen();
+        } else {
+            console.log('Fullscreen is not available for this version of Telegram Web App');
+        }
 
         return () => {
             tg.offEvent('sendMainData', onSendData);

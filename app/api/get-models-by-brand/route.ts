@@ -10,8 +10,10 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Brand parameter is required' }, { status: 400 });
         }
 
-        // Разделение на массив и удаление пробелов
-        const brands = brandParam.split(',').map((b) => b.trim().toLowerCase());
+        const brands = brandParam
+            .split(',')
+            .map((b) => b.trim().toLowerCase())
+            .filter(Boolean);
 
         if (brands.length === 0) {
             return NextResponse.json({ error: 'At least one brand must be provided' }, { status: 400 });
@@ -21,16 +23,18 @@ export async function GET(request: NextRequest) {
 
         const query = `
             SELECT
-                brand,
-                string_agg(DISTINCT model, ', ') AS models
+                b.brand AS brand,
+                array_agg(DISTINCT m.model) AS models
             FROM
-                cars
+                brands_list b
+                    JOIN
+                models_list m ON m.brand_id = b.id
             WHERE
-                LOWER(brand) = ANY($1)
+                LOWER(b.brand) = ANY($1)
             GROUP BY
-                brand
+                b.brand
             ORDER BY
-                brand;
+                b.brand;
         `;
 
         const res = await client.query(query, [brands]);
@@ -40,7 +44,8 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'No models found for the given brands' }, { status: 404 });
         }
 
-        return NextResponse.json(res.rows); // вернём массив объектов с brand и models
+        console.log(res.rows)
+        return NextResponse.json(res.rows);
     } catch (error) {
         console.error('Database query error:', error);
         return NextResponse.json({ error: 'Failed to fetch models' }, { status: 500 });

@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
     try {
         const client = await pool.connect();
-        const res = await client.query('SELECT DISTINCT brand FROM public.cars');
+        const res = await client.query('SELECT DISTINCT brand FROM public.brands_list');
         client.release();
 
         return NextResponse.json(res.rows);

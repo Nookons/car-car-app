@@ -22,13 +22,13 @@ const Header = () => {
 
     return (
         <div
-            className="w-full relative items-center pt-15 grad h-full top-0 left-0 bg-gradient-to-b from-primary via-background to-background animate-gradient-shift"
+            className="w-full relative items-center pt-15 grad h-full top-0 left-0 bg-gradient-to-b from-primary/65 via-background to-background "
         >
             <div className={`grid grid-cols-2`}>
                 <div className={`col-span-2 text-center`}>
                     <h1 className="font-bold text-xl text-primary">CarCar</h1>
                 </div>
-                <div className={`px-6 w-full pt-6 col-span-2 flex justify-between`}>
+                <div className={`px-4 w-full pt-6 col-span-2 flex justify-between`}>
                     <div className="flex items-center gap-4">
                         <ModeToggle/>
                     </div>
