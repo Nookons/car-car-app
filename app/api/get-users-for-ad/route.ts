@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
             SELECT
                 uss.*,
                 u.language_code,
+                u.username,
                 ST_Distance(
                         ST_SetSRID(ST_MakePoint(uss.lng, uss.lat), 4326)::geography,
                         ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
