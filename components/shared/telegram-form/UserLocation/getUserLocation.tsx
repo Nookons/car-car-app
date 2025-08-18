@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { CircleGauge } from 'lucide-react'
+import {t} from "i18next";
 
 interface Props {
     location: { lat: number; lng: number } | null;
@@ -57,10 +58,10 @@ const GetUserLocation: React.FC<Props> = ({ location, setLocation, locationStrin
         <div className="pb-4">
             {locationString ? (
                 <div className="flex gap-4 items-center">
-                    <p className="text-xs font-light text-neutral-500">
-                        Your Address:{' '}
+                    <div className="text-xs font-light space-x-1 text-neutral-500">
+                        <span>{t("telegram_form.address_label")}: </span>
                         <span className="text-primary font-bold">{locationString}</span>
-                    </p>
+                    </div>
                 </div>
             ) : error ? (
                 <p className="text-red-500">{error}</p>

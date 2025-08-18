@@ -1,54 +1,81 @@
-import React from 'react';
+'use client'
+import React from 'react'
+import Link from "next/link";
+import {Button} from "@/components/ComponentsProvider";
+import {HandHelping, MoveLeft} from "lucide-react";
+import {useRouter} from "next/navigation";
 
 const Page = () => {
+    const router = useRouter();
+
     return (
-        <div>
-            <h1>1. Введение</h1>
-            <p>
-                Добро пожаловать в политику конфиденциальности «[CarCar]» (далее — «Бот», «мы», «наш»).
+        <div className="max-w-3xl mx-auto px-4 py-10 leading-relaxed">
+            <h1 className="text-2xl font-bold mb-6">1. Introduction</h1>
 
-                Этот Бот предназначен исключительно для пользователей в Польше и работает в соответствии с польским и европейским законодательством, включая GDPR (Общий регламент по защите данных ЕС).
-
-                <div className={`my-40`}>
-                    <article>Что делает этот бот</article>
-                    <ul>
-                        <li>Использует веб-приложение для обработки данных.</li>
-                        <li>Получает от вас данные Telegram (ID пользователя, имя, никнейм) и геолокацию (если вы её
-                            предоставляете).
-                        </li>
-                        <li>Собирает данные об автомобилях из открытых источников (без хранения личных данных
-                            владельцев).
-                        </li>
-                        <li>Собирает данные об автомобилях из открытых источников (без хранения личных данных
-                            владельцев).
-                        </li>
-                    </ul>
-                </div>
-
-
-                🔹 Как мы используем ваши данные?
-                Только для работы Бота — ваши данные не передаются третьим лицам и не используются для рекламы.
-
-                Геолокация помогает предоставлять локализованные услуги (например, поиск автомобилей рядом с вами).
-
-                Данные Telegram (ID, имя) нужны для идентификации и персонализации.
-
-                🔹 Где хранятся данные?
-                Серверы расположены в Европе (Amazon, Vercel), что соответствует требованиям GDPR.
-
-                Мы не переносим данные за пределы ЕС.
-
-                🔹 Важные гарантии:
-                ✅ Никакой продажи данных — ваша информация остается только в нашем приложении.
-                ✅ Минимальный сбор — мы запрашиваем только то, что необходимо для работы Бота.
-                ✅ Право на удаление — вы можете запросить удаление своих данных (см. раздел «Ваши права»).
-
-                Продолжая использовать Бота, вы соглашаетесь с этой политикой.
-
-                Если у вас есть вопросы: [контакт, например, @support_bot или email].
+            <p className="mb-4">
+                Welcome to the Privacy Policy of <span className="font-semibold">«CarCar»</span>
             </p>
-        </div>
-    );
-};
 
-export default Page;
+            <p className="mb-6">
+                This Bot is intended exclusively for users in Poland and operates in accordance with Polish
+                and European laws, including the <span className="font-medium">GDPR</span>
+                (General Data Protection Regulation).
+            </p>
+
+            <section className="mb-10">
+                <h2 className="text-xl font-semibold mb-3">What does this bot do?</h2>
+                <ul className="list-disc list-inside space-y-2">
+                    <li>Uses a web application to process data.</li>
+                    <li>Receives your Telegram data (user ID, name, username) and location (if you provide it).</li>
+                    <li>Collects data about cars from public sources (without storing personal data of owners).</li>
+                </ul>
+            </section>
+
+            <section className="mb-10">
+                <h2 className="text-xl font-semibold mb-3">How do we use your data?</h2>
+                <p className="mb-3">
+                    Only for the operation of the Bot — your data is not shared with third parties and not used for
+                    advertising.
+                </p>
+                <p className="mb-2">Location helps provide localized services (e.g., finding cars near you).</p>
+                <p className="mb-2">Telegram data (ID, name) is required for identification and personalization.</p>
+            </section>
+
+            <section className="mb-10">
+                <h2 className="text-xl font-semibold mb-3">Where is the data stored?</h2>
+                <p className="mb-2">Servers are located in Europe (Amazon, Vercel), in compliance with GDPR
+                    requirements.</p>
+                <p>We do not transfer data outside the EU.</p>
+            </section>
+
+            <section className="mb-10">
+                <h2 className="text-xl font-semibold mb-3">Important guarantees</h2>
+                <ul className="list-disc list-inside space-y-2">
+                    <li>✅ No selling of data — your information remains only in our application.</li>
+                    <li>✅ Minimal collection — we request only what is necessary for the Bot to work.</li>
+                    <li>✅ Right to deletion — you can request the deletion of your data.</li>
+                </ul>
+            </section>
+
+            <section className="mb-10">
+                <h2 className="text-xl font-semibold mb-3">Conclusion</h2>
+                <p className="mb-4">
+                    By continuing to use the Bot, you agree to this policy.
+                </p>
+                <div className={``}>
+                    <p>If you have any questions: </p>
+                    <div className={`grid grid-cols-2 gap-2 mt-2`}>
+                        <Button variant={`default`}>
+                            <Link className={`font-bold flex items-center gap-2`} href={`https://t.me/nookon`}> <HandHelping /> Support</Link>
+                        </Button>
+                        <Button onClick={() => router.back()} variant={`default`}>
+                            <MoveLeft /> Back
+                        </Button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    )
+}
+
+export default Page

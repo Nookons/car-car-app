@@ -109,11 +109,16 @@ const BrandSelect = () => {
             </PopoverTrigger>
             <PopoverContent
                 className="p-0"
-                style={{width: popoverWidth}}
+                style={{ width: popoverWidth }}
                 align="start"
+                side="bottom"
+                sideOffset={4}
             >
                 <Command>
-                    <CommandInput placeholder={`${t('telegram_form.search_brands')}`}/>
+                    <CommandInput
+                        autoFocus={false}
+                        placeholder={`${t('telegram_form.search_brands')}`}
+                    />
                     <CommandList>
                         <CommandEmpty>{t('telegram_form.no_brands_find')}</CommandEmpty>
                         <CommandGroup>

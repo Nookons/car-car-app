@@ -9,16 +9,16 @@ import Script from "next/script";
 
 
 const Header = () => {
-    const {i18n} = useTranslation();
-    const [locale, setLocale] = useState("en");
+   /* const {i18n} = useTranslation();
+    const [locale, setLocale] = useState("en");*/
 
-    useEffect(() => {
+   /* useEffect(() => {
         const saved = localStorage.getItem('language');
         if (saved) {
             i18n.changeLanguage(saved);
             setLocale(saved);
         }
-    }, [i18n]);
+    }, [i18n]);*/
 
     return (
         <div

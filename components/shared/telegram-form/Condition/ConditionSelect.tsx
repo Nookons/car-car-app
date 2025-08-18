@@ -2,6 +2,7 @@ import React, { Dispatch, SetStateAction } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
+import {t} from "i18next";
 
 const conditionTypesInit = [
     { value: 'used', label: 'Używany' },
@@ -30,7 +31,7 @@ const ConditionSelect = () => {
                 <AccordionItem value="item-1">
                     <AccordionTrigger>
                         <div className="flex justify-start gap-2 items-center pb-2">
-                            <article>Condition</article>
+                            <article>{t("telegram_form.conditions_label")}</article>
                         </div>
                     </AccordionTrigger>
                     <AccordionContent className="flex flex-col gap-4 text-balance">
@@ -44,7 +45,7 @@ const ConditionSelect = () => {
                                         variant={isSelected ? 'default' : 'secondary'}
                                         onClick={() => onSellerHandler(type.value)}
                                     >
-                                        <article className="font-bold text-md">{type.label}</article>
+                                        <article className="font-bold text-md">{t(`${type.value}`)}</article>
                                     </Badge>
                                 );
                             })}

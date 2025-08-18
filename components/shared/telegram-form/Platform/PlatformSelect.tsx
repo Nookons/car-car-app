@@ -2,6 +2,7 @@ import React, { useCallback, useMemo } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { useTelegramFormStore } from "@/store/telegram-form/TelegramForm";
+import {t} from "i18next";
 
 interface PlatformType {
     value: string;
@@ -10,8 +11,8 @@ interface PlatformType {
 }
 
 const platformTypesInit: PlatformType[] = [
-    { value: 'oto_moto', label: 'Oto Moto', disabled: false },
-    { value: 'olx', label: 'Olx', disabled: true },
+    { value: 'oto_moto', label: 'OTO MOTO', disabled: false },
+    { value: 'olx', label: 'OLX', disabled: true },
     { value: 'facebook', label: 'Facebook', disabled: true },
     { value: 'sprzedajemy', label: 'Sprzedajemy Pl', disabled: true },
 ];
@@ -37,7 +38,7 @@ const PlatformSelect = () => {
                 <AccordionItem value="item-1">
                     <AccordionTrigger>
                         <div className="flex justify-start gap-2 items-center pb-2">
-                            <article>Platform</article>
+                            <article>{t("telegram_form.platforms_label")}</article>
                         </div>
                     </AccordionTrigger>
                     <AccordionContent className="flex flex-col gap-4 text-balance">

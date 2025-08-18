@@ -95,22 +95,31 @@
   },
 
   "telegram_form": {
-    "title_brand": "Wybierz poniżej marki i modele, w razie potrzeby możesz to zostawić puste",
+    "title_brand": "Wybierz poniżej marki i modele, jeśli nie potrzebujesz możesz zostawić puste",
     "select_brand": "Wybierz marki...",
-    "search_brands": "Wpisz markę, którą Cię interesuje",
+    "search_brands": "Wpisz markę, która Cię interesuje",
     "no_brands_find": "Nie znaleziono żadnych marek",
 
     "select_models": "Wybierz modele...",
-    "search_models": "Wpisz model, który Cię interesuje",
+    "search_models": "Wpisz modele, które Cię interesują",
     "no_models_find": "Nie znaleziono żadnych modeli",
 
-    "price_range": "Przedział cenowy",
+    "price_range": "Zakres cen",
     "years_range": "Zakres roczników",
 
-    "range_to_car": "Odległość od Ciebie do auta",
+    "range_to_car": "Odległość od Ciebie do samochodu",
     "mileage": "Maksymalny przebieg",
-    "mileage_placeholder": "Wpisz maksymalny przebieg"
+    "mileage_placeholder": "Wprowadź maksymalny przebieg",
+
+    "seller_label": "Typy sprzedawców",
+    "platforms_label": "Typy platform",
+    "conditions_label": "Typy stanów",
+    "address_label": "Twój adres",
+    "start_button": "Rozpocznij wyszukiwanie",
+    "privacy_label": "Klikając to pole wyboru, zgadzasz się z",
+    "privacy_button": "Regulaminem."
   },
+
 
   "change_setting_not_available": "Zmiana ustawień jest obecnie możliwa tylko przez Telegram. W następnej aktualizacji będzie to możliwe także tutaj :)"
 }

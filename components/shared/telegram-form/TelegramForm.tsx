@@ -15,6 +15,7 @@ import ConditionSelect from './Condition/ConditionSelect';
 import ConditionCheckBox from './Conditions/ConditionCheckBox';
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 import RangeFromUser from "@/components/shared/telegram-form/RangeFromUser/RangeFromUser";
+import {t} from "i18next";
 
 const TelegramForm = () => {
     const [tg, setTg] = useState<any>(null);
@@ -107,7 +108,7 @@ const TelegramForm = () => {
                             onClick={onSendData}
                         >
                             <Power/>
-                            <span>Start</span>
+                            <span>{t(`telegram_form.start_button`)}</span>
                         </Button>
 
                         <div className={`mt-4`}>

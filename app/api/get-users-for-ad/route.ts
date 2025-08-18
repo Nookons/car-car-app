@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
         const car = await request.json();
         const {
             lat, lng, price, year, mileage, brand, model,
-            seller_type, platform_type, condition_type
+            seller_type, platform, new_used
         } = car;
 
         // Parse and validate input parameters
@@ -19,8 +19,8 @@ export async function POST(request: NextRequest) {
         const parsedBrand = brand ? brand.toLowerCase() : null;
         const parsedModel = model ? model.toLowerCase() : null;
         const parsedSellerType = seller_type ? seller_type.toLowerCase() : null;
-        const parsedPlatformType = platform_type ? platform_type.toLowerCase() : null;
-        const parsedConditionType = condition_type ? condition_type.toLowerCase() : null;
+        const parsedPlatformType = platform ? platform.toLowerCase() : null;
+        const parsedConditionType = new_used ? new_used.toLowerCase() : null;
 
         // Validate coordinates
         if (isNaN(parsedLat) || isNaN(parsedLng)) {
@@ -41,28 +41,27 @@ export async function POST(request: NextRequest) {
                 ) AS distance_meters
             FROM
                 user_search_settings uss
-            JOIN
+                    JOIN
                 users u ON u.id = uss.user_id
             WHERE
-                (uss.brand IS NULL OR $3::text IS NULL OR $3 = ANY(LOWER(uss.brand::text)::text[]))
+                (uss.brand IS NULL OR LOWER($3) = ANY(SELECT LOWER(b) FROM unnest(uss.brand) b))
               AND
-                (uss.model IS NULL OR $4::text IS NULL OR $4 = ANY(LOWER(uss.model::text)::text[]))
+                (uss.model IS NULL OR LOWER($4) = ANY(SELECT LOWER(m) FROM unnest(uss.model) m))
               AND
-                (uss.min_price IS NULL OR $5::numeric IS NULL OR $5 >= uss.min_price)
+                (uss.min_price IS NULL OR $5 >= uss.min_price)
               AND
-                (uss.max_price IS NULL OR $5::numeric IS NULL OR $5 <= uss.max_price)
+                (uss.max_price IS NULL OR $5 <= uss.max_price)
               AND
-                (uss.min_year IS NULL OR $6::integer IS NULL OR $6 >= uss.min_year)
+                (uss.min_year IS NULL OR $6 >= uss.min_year)
               AND
-                (uss.max_year IS NULL OR $6::integer IS NULL OR $6 <= uss.max_year)
+                (uss.max_year IS NULL OR $6 <= uss.max_year)
               AND
-                (uss.max_mileage IS NULL OR $7::numeric IS NULL OR $7 <= uss.max_mileage)
-              AND
-                (uss.seller_types IS NULL OR $8::text IS NULL OR $8 = ANY(LOWER(uss.seller_types::text)::text[]))
-              AND
-                (uss.platform_types IS NULL OR $9::text IS NULL OR $9 = ANY(LOWER(uss.platform_types::text)::text[]))
-              AND
-                (uss.condition_types IS NULL OR $10::text IS NULL OR $10 = ANY(LOWER(uss.condition_types::text)::text[]))
+                (uss.max_mileage IS NULL OR $7 <= uss.max_mileage)
+              
+              AND (uss.seller_types IS NULL OR $8::text IS NULL OR LOWER($8::text) = ANY(SELECT LOWER(s) FROM unnest(uss.seller_types) s))
+              AND (uss.platform_types IS NULL OR $9::text IS NULL OR LOWER($9::text) = ANY(SELECT LOWER(p) FROM unnest(uss.platform_types) p))
+              AND (uss.condition_types IS NULL OR $10::text IS NULL OR LOWER($10::text) = ANY(SELECT LOWER(c) FROM unnest(uss.condition_types) c))
+
               AND ST_DWithin(
                     uss.location::geography,
                     ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
@@ -73,18 +72,19 @@ export async function POST(request: NextRequest) {
         `;
 
         const values = [
-            parsedLng, parsedLat,              // $1, $2 - coordinates
-            parsedBrand, parsedModel,          // $3, $4 - brand/model
-            parsedPrice,                       // $5 - price
-            parsedYear,                        // $6 - year
-            parsedMileage,                     // $7 - mileage
-            parsedSellerType,                  // $8 - seller type
-            parsedPlatformType,                // $9 - platform type
-            parsedConditionType                // $10 - condition type
+            parsedLng, parsedLat,       // $1, $2 - coordinates
+            parsedBrand, parsedModel,   // $3, $4 - brand/model
+            parsedPrice,                // $5 - price
+            parsedYear,                 // $6 - year
+            parsedMileage,              // $7 - mileage
+            parsedSellerType,           // $8 - seller type
+            parsedPlatformType,         // $9 - platform type
+            parsedConditionType         // $10 - condition type
         ];
 
-        const result = await pool.query(query, values);
+        console.log(values);
 
+        const result = await pool.query(query, values);
         console.log(result.rows);
 
         return NextResponse.json(

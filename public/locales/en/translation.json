@@ -118,7 +118,15 @@
 
     "range_to_car": "Range from you to car",
     "mileage": "Max mileage value",
-    "mileage_placeholder": "Input max mileage value"
+    "mileage_placeholder": "Input max mileage value",
+
+    "seller_label": "Seller types",
+    "platforms_label": "Platforms types",
+    "conditions_label": "Conditions types",
+    "address_label": "Your address",
+    "start_button": "Start search",
+    "privacy_label": "By clicking this checkbox, you agree to the",
+    "privacy_button": "Terms and conditions."
   },
 
   "change_setting_not_available": "Change your setting available only from telegram right now. In next update you will be able to do this here )"
