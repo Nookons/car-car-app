@@ -1,5 +1,6 @@
 'use client'
-import {useEffect, useState} from "react";
+import React, {useEffect, useState} from "react";
+import Script from "next/script";
 
 export default function Home() {
   const [tg, setTg] = useState<any>(null);
@@ -25,7 +26,10 @@ export default function Home() {
 
   return (
     <div className="p-2">
-
+      <Script
+          src="https://telegram.org/js/telegram-web-app.js?57"
+          strategy="beforeInteractive"
+      />
     </div>
   );
 }

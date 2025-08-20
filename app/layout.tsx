@@ -6,6 +6,8 @@ import Providers from "@/app/Providers";
 import { ThemeProvider } from "next-themes";
 import HeaderWrapper from "@/components/shared/Header/HeaderWrapper";
 import { Toaster } from 'sonner'
+import Script from "next/script";
+import React from "react";
 
 const nunito = Nunito({
     variable: '--font-nunito',
@@ -38,6 +40,10 @@ export default function RootLayout({
                 />
                 <HeaderWrapper />
                 {children}
+                <Script
+                    src="https://telegram.org/js/telegram-web-app.js?57"
+                    strategy="beforeInteractive"
+                />
             </Providers>
         </ThemeProvider>
         </body>
