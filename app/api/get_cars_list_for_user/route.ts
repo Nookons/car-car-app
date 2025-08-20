@@ -5,15 +5,15 @@ export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const uid = searchParams.get("uid");
-        const page = parseInt(searchParams.get("page") || "1"); // номер страницы
-        const pageSize = 20; // размер страницы
+        const page = parseInt(searchParams.get("page") || "1", 10);
+        const pageSize = 250;
         const offset = (page - 1) * pageSize;
 
         if (!uid) {
             return NextResponse.json({ error: "Invalid uid parameter" }, { status: 400 });
         }
 
-        // Получаем данные юзера по id
+        // Получаем данные юзера
         const userRes = await fetch(`https://car-car-app.vercel.app/api/get-user-data?uid=${uid}`);
         const user = await userRes.json();
 
@@ -23,7 +23,6 @@ export async function GET(request: NextRequest) {
 
         const client = await pool.connect();
 
-        // Запрос машин по фильтрам юзера с пагинацией
         const query = `
             SELECT
                 c.*,
@@ -58,31 +57,29 @@ export async function GET(request: NextRequest) {
                         ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
                         COALESCE(c.from_user_range, 250) * 1000
                 )
-            ORDER BY distance_meters ASC;
+            ORDER BY distance_meters ASC
+                LIMIT $11 OFFSET $12;
         `;
 
         const values = [
-            user.min_price,
-            user.max_price,
-            user.brand,
-            user.model,
-            user.min_year,
-            user.max_year,
-            user.max_mileage,
-            user.seller_types,
-            user.platform_types,
-            user.condition_types,
-            user.lng,
-            user.lat,
-            user.from_user_range,
-            pageSize,
-            offset
+            user.lng,                 // $1
+            user.lat,                 // $2
+            user.brand,               // $3
+            user.model,               // $4
+            user.min_price,           // $5
+            user.max_price,           // $6
+            user.max_mileage,         // $7
+            user.seller_types,        // $8
+            user.platform_types,      // $9
+            user.condition_types,     // $10
+            pageSize,                 // $11
+            offset                    // $12
         ];
 
         const res = await client.query(query, values);
-
         client.release();
 
+        // Возвращаем массив объектов
         return NextResponse.json(res.rows);
     } catch (error) {
         console.error("Database query error:", error);
