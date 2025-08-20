@@ -39,6 +39,15 @@ const CarList = ({ uid }: { uid: string }) => {
         console.log(cars);
     }, [cars]);
 
+    if (!Array.isArray(cars)) {
+        console.error("API did not return array:", cars);
+        return (
+            <div>
+                <p>Error: API did not return an array of cars.</p>
+            </div>
+        )
+    }
+
     const handleNext = () => setPage((prev) => prev + 1);
     const handlePrev = () => setPage((prev) => (prev > 1 ? prev - 1 : 1));
 
