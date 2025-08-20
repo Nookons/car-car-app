@@ -1,85 +1,43 @@
 'use client'
-import React from 'react';
-import {useQuery} from "@tanstack/react-query";
-import {ICarAdd} from "@/types/Car";
-import {
-    Badge,
-    Card,
-    CardContent,
-    CardDescription, CardFooter,
-    CardHeader,
-} from '@/components/ComponentsProvider';
-import Image from "next/image";
-import {getConditionLabel, getSellerTypeLabel} from "@/features/getTypesLabels";
-import MainParams from "@/components/shared/ad/MainParams";
-import Link from "next/link";
-import {fetchCarData} from "@/features/getCarData";
+import {useEffect, useState} from "react";
 
+export default function Page() {
+    const [tg, setTg] = useState<any>(null);
+    const [user, setUser] = useState<any>(null); // 👈 сюда положим юзера
 
-const Page = () => {
-    const {data, isLoading, isError, error} = useQuery<ICarAdd[], Error>({
-        queryKey: ['cars_data'],
-        queryFn: fetchCarData,
-        staleTime: 5 * 60 * 1000,
-    });
+    useEffect(() => {
+        if (typeof window === 'undefined' || !window.Telegram?.WebApp) return;
 
-    if (isLoading) return <div>Loading...</div>;
-    if (isError) return <div>Error: {error.message}</div>;
+        const tg: any = window.Telegram.WebApp;
+        setTg(tg);
+
+        // получаем данные юзера
+        setUser(tg.initDataUnsafe?.user || null);
+
+        if (Number(tg.version) > 6) {
+            tg.requestFullscreen();
+        } else {
+            console.log('Fullscreen is not available for this version of Telegram Web App');
+        }
+    }, []);
+
+    useEffect(() => {
+        console.log("Telegram WebApp:", tg);
+        console.log("Telegram User:", user); // 👈 тут юзер будет виден в консоли
+    }, [tg, user]);
 
     return (
-        <div className="px-4">
-            <h1 className="text-xl font-bold mb-4">Cars list</h1>
-            <div className={`flex flex-wrap justify-center gap-4`}>
-                {data?.slice(0, 20).map((car, idx) => (
-                    <Card key={idx} className="w-full m-0 max-w-[600px]">
-                        <Link href={`/en/car/${car.id}`}>
-                            <CardHeader>
-                                <CardDescription className={`grid`}>
-                                    <Image
-                                        className={`rounded`}
-                                        width={600}
-                                        height={600}
-                                        src={car.images[0] !== 'unknown' ? car.images[0] : "https://dtprodvehicleimages.blob.core.windows.net/assets/marketplace/no-car-img.png"}
-                                        alt={car.title}
-                                    />
-                                </CardDescription>
-                            </CardHeader>
-
-                            <CardContent>
-                                <div className="flex my-2 justify-between items-center gap-4 pb-2 px-4">
-                                    <div>
-                                        <h2 className={`line-clamp-1`}>{car.title}</h2>
-                                        <div className={`flex items-center gap-1 flex-wrap`}>
-                                            <p className={`text-xs text-neutral-500`}>
-                                                {getConditionLabel(car.new_used)} •
-                                            </p>
-                                            <p className={`text-xs text-neutral-500`}>
-                                                {getSellerTypeLabel(car.seller_type)} •
-                                            </p>
-                                            <p className={`text-xs text-neutral-500`}>
-                                                {car.year}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <Badge variant={`outline`} className={`font-bold text-lg`}>{car.price.toLocaleString()} zl</Badge>
-                                </div>
-                                <div className="flex pb-2 px-4 flex-col gap-6 ">
-                                    <div className="grid gap-2">
-                                    </div>
-                                </div>
-                            </CardContent>
-                            <CardFooter className={`flex-col px-4 pb-2`}>
-                                <div className={`w-full pb-4`}>
-                                    <MainParams icon_size={1.3} data={car} isLoading={false} />
-                                </div>
-                                <p className={`text-xs text-neutral-500 line-clamp-1`}>{car.city}</p>
-                            </CardFooter>
-                        </Link>
-                    </Card>
-                ))}
-            </div>
+        <div className="p-2">
+            {user ? (
+                <div>
+                    <p><b>ID:</b> {user.id}</p>
+                    <p><b>Username:</b> @{user.username}</p>
+                    <p><b>Name:</b> {user.first_name} {user.last_name}</p>
+                    <p><b>Language:</b> {user.language_code}</p>
+                </div>
+            ) : (
+                <p>No user data</p>
+            )}
         </div>
     );
-};
-
-export default Page;
+}
