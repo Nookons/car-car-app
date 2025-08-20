@@ -24,7 +24,7 @@ const CarList = ({ uid }: { uid: string }) => {
     const fetchCars = async (pageNumber: number) => {
         setLoading(true);
         const res = await fetch(
-            `http://localhost:3000/api/get_cars_list_for_user?uid=${uid}&page=${pageNumber}`
+            `https://car-car-app.vercel.app/api/get_cars_list_for_user?uid=${uid}&page=${pageNumber}`
         );
         const data = await res.json();
         setCars(data || []);

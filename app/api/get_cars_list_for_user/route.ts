@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Получаем данные юзера по id
-        const userRes = await fetch(`http://localhost:3000/api/get-user-data?uid=${uid}`);
+        const userRes = await fetch(`https://car-car-app.vercel.app/api/get-user-data?uid=${uid}`);
         const user = await userRes.json();
 
         if (!user || !user.user_id) {

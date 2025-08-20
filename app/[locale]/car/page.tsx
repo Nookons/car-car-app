@@ -9,7 +9,7 @@ export default function Page() {
     useEffect(() => {
         if (user_data.id) {
             const fetchUserSettings = async (uid: string) => {
-                fetch(`http://localhost:3000/api/get-user-data?uid=${uid}`)
+                fetch(`https://car-car-app.vercel.app/api/get-user-data?uid=${uid}`)
                     .then(res => res.json())
                     .then(data => {
                         console.log(data)
