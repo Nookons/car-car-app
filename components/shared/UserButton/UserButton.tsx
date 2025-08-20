@@ -42,9 +42,11 @@ const UserButton = () => {
         console.log("Telegram WebApp:", tg);
         console.log("Telegram User:", user); // 👈 тут юзер будет виден в консоли
 
-        if (user) {
+        if (user !== null && user.id) {
             setUserToStore(user)
         } else {
+            console.log("User not found, using test user data");
+            console.log(test_user);
             setUserToStore(test_user); // 👈 если юзер не получен, используем тестового
         }
 
