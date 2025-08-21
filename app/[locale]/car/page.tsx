@@ -1,35 +1,30 @@
 'use client';
 import {useUserStore} from "@/store/user/userStore";
 import {useEffect} from "react";
-import CarList from "@/components/shared/CarList/CarList";
+import {useQuery} from "@tanstack/react-query";
+import {getListForUser} from "@/features/cars/getListForUser";
 
 export default function Page() {
     const user_data = useUserStore(state => state.user_data)
 
-    useEffect(() => {
-        if (user_data.id) {
-            const fetchUserSettings = async (uid: string) => {
-                fetch(`https://car-car-app.vercel.app/api/get-user-data?uid=${uid}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        console.log(data)
-                    })
-            }
 
-            fetchUserSettings(user_data.id.toString());
-        }
-
-    }, [user_data]);
+    const {data, isLoading, isError, error} = useQuery<Any, Error>({
+        queryKey: ['user', user_data.user_id],
+        queryFn: () => getListForUser({ uid: user_data.user_id, pageNumber }),
+        enabled: !!user_data.user_id !== 0,
+        staleTime: 5 * 60 * 1000,
+    });
 
     useEffect(() => {
-        console.log(user_data.id.toString());
-    }, [user_data]);
+        console.log(user_data.user_id);
+        console.log(data);
+    }, [data]);
 
     if (!user_data.id || user_data.id === 0) return null;
 
     return (
         <div className="p-2">
-            <CarList uid={user_data.id.toString()} />
+            {user_data.user_id}
         </div>
     );
 }

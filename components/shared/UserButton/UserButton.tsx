@@ -1,30 +1,34 @@
 'use client';
 
-import React, {useEffect, useMemo, useState} from 'react';
-import {Avatar, AvatarFallback, AvatarImage} from "@/components/ComponentsProvider";
+import React, {useEffect, useState} from 'react';
+import {Avatar, AvatarFallback, AvatarImage, Skeleton} from "@/components/ComponentsProvider";
 import Link from "next/link";
 import {useSearchParams} from "next/navigation";
 import {useUserStore} from "@/store/user/userStore";
 import {ITelegramUser, IUserFull} from "@/types/User";
 import {useQuery} from "@tanstack/react-query";
-import {ICarAdd} from "@/types/Car";
 import {getUserByUID} from "@/features/getUserByUID";
 import {userPhotoUpdate} from "@/features/user/userPhotoUpdate";
-
 
 
 const UserButton: React.FC = () => {
     const static_uid = useSearchParams().get('uid')
     const setUserToStore = useUserStore((state) => state.setUserData);
 
-    const [user, setUser] = useState<ITelegramUser | undefined>(undefined);
+    const [uid, setUid] = useState<string | null>(null)
 
     const {data, isLoading, isError, error} = useQuery<IUserFull, Error>({
-        queryKey: ['user', static_uid],
-        queryFn: () => getUserByUID(static_uid || ''),
-        enabled: !!static_uid,
+        queryKey: ['user', uid],
+        queryFn: () => getUserByUID(uid || ''),
+        enabled: !!uid,
         staleTime: 5 * 60 * 1000,
     });
+
+    useEffect(() => {
+        if (!uid) {
+            setUid(static_uid)
+        }
+    }, [uid]);
 
 
     useEffect(() => {
@@ -42,6 +46,7 @@ const UserButton: React.FC = () => {
                     uid: tgUser.id.toString(),
                     photo_url: tgUser.photo_url || ""
                 }
+                setUid(tgUser.id.toString())
                 userPhotoUpdate(obj)
             }
 
@@ -53,33 +58,37 @@ const UserButton: React.FC = () => {
         }
     }, [setUserToStore]);
 
-    if (!user && static_uid) {
-        try {
+    useEffect(() => {
+        if (data) {
             console.log(data);
-
-        } catch (e) {
-            console.log(e as Error)
+            setUserToStore(data);
+        } else if (isError) {
+            console.error('Error push user to store:', error);
         }
+    }, [data, isLoading, isError, error, setUserToStore]);
+
+
+    if (isLoading) {
+        return (
+            <Skeleton className={`w-[32px] h-[32px]`}/>
+        )
     }
 
-    useEffect(() => {
-        console.log(user);
-    }, [user])
-
+    if (!data) return null;
 
     return (
         <div>
-            {/*<Link href={`profileHref`}>
+            <Link href={`/${data.language_code}/user/${data.id}`} className="flex items-center gap-2">
                 <Avatar className="size-[32px] rounded">
-                    {user.photo_url ? (
+                    {data.photo_url ? (
                         <AvatarImage
-                            src={user.photo_url}
-                            alt={user.username ? `@${user.username}` : 'User avatar'}
+                            src={data.photo_url}
+                            alt={data.username ? `@${data.username}` : 'User avatar'}
                         />
                     ) : null}
                     <AvatarFallback>ER</AvatarFallback>
                 </Avatar>
-            </Link>*/}
+            </Link>
         </div>
     );
 };
