@@ -1,10 +1,10 @@
-import {Badge, Table, TableBody, TableCaption, TableCell, TableRow } from '@/components/ComponentsProvider';
+import {Badge, Table, TableBody, TableCaption, TableCell, TableRow} from '@/components/ComponentsProvider';
 import React from 'react';
 import {IUserFull} from "@/types/User";
 import dayjs from "dayjs";
 import {t} from "i18next";
 
-const UserSearchSettings = ({data, isLoading}: {data: IUserFull | null | undefined, isLoading: boolean}) => {
+const UserSearchSettings = ({data, isLoading}: { data: IUserFull | null | undefined, isLoading: boolean }) => {
     if (isLoading) return null;
     if (!data) return null;
 
@@ -19,21 +19,39 @@ const UserSearchSettings = ({data, isLoading}: {data: IUserFull | null | undefin
                     <TableRow>
                         <TableCell className="font-medium">{t("brand")}</TableCell>
                         <TableCell className="text-right space-x-1">
-                            {data.brand.map((br_local, index) => (
-                                <Badge variant={'outline'}>
-                                    {br_local}
-                                </Badge>
-                            ))}
+                            {data.brand
+                                ?
+                                <>
+                                    {data.brand.map((br_local, index) => (
+                                        <Badge variant={'outline'}>
+                                            {br_local}
+                                        </Badge>
+                                    ))}
+                                </>
+                                :
+                                <div>
+                                    Null
+                                </div>
+                            }
                         </TableCell>
                     </TableRow>
                     <TableRow>
                         <TableCell className="font-medium">{t("model")}</TableCell>
                         <TableCell className="text-right space-x-1">
-                            {data.model.map((md_local, index) => (
-                                <Badge variant={'outline'}>
-                                    {md_local}
-                                </Badge>
-                            ))}
+                            {data.model
+                                ?
+                                <>
+                                    {data.model.map((md_local, index) => (
+                                        <Badge variant={'outline'}>
+                                            {md_local}
+                                        </Badge>
+                                    ))}
+                                </>
+                                :
+                                <div>
+                                    Null
+                                </div>
+                            }
                         </TableCell>
                     </TableRow>
                     <TableRow>
@@ -71,11 +89,20 @@ const UserSearchSettings = ({data, isLoading}: {data: IUserFull | null | undefin
                     <TableRow>
                         <TableCell className="font-medium">{t("condition")}</TableCell>
                         <TableCell className="text-right space-x-1">
-                            {data.condition_types.map((md_local, index) => (
-                                <Badge variant={"outline"}>
-                                    {md_local}
-                                </Badge>
-                            ))}
+                            {data.condition_types
+                                ?
+                                <>
+                                    {data.condition_types.map((md_local, index) => (
+                                        <Badge variant={"outline"}>
+                                            {md_local}
+                                        </Badge>
+                                    ))}
+                                </>
+                                :
+                                <div>
+
+                                </div>
+                            }
                         </TableCell>
                     </TableRow>
                 </TableBody>
