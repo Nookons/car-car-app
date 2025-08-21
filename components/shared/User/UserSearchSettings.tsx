@@ -5,9 +5,9 @@ import dayjs from "dayjs";
 import {t} from "i18next";
 
 const UserSearchSettings = ({data, isLoading}: {data: IUserFull | null | undefined, isLoading: boolean}) => {
-
     if (isLoading) return null;
     if (!data) return null;
+
 
     return (
         <div className={`mt-4`}>
@@ -18,18 +18,22 @@ const UserSearchSettings = ({data, isLoading}: {data: IUserFull | null | undefin
                 <TableBody>
                     <TableRow>
                         <TableCell className="font-medium">{t("brand")}</TableCell>
-                        <TableCell className="text-right">
-                            <Badge variant={!data.brand ? 'destructive' : 'default'}>
-                                {data.brand ? data.brand.toUpperCase() : "none"}
-                            </Badge>
+                        <TableCell className="text-right space-x-1">
+                            {data.brand.map((br_local, index) => (
+                                <Badge variant={'outline'}>
+                                    {br_local}
+                                </Badge>
+                            ))}
                         </TableCell>
                     </TableRow>
                     <TableRow>
                         <TableCell className="font-medium">{t("model")}</TableCell>
-                        <TableCell className="text-right">
-                            <Badge variant={!data.model ? 'destructive' : 'default'}>
-                                {data.model ? data.model.toUpperCase() : "none"}
-                            </Badge>
+                        <TableCell className="text-right space-x-1">
+                            {data.model.map((md_local, index) => (
+                                <Badge variant={'outline'}>
+                                    {md_local}
+                                </Badge>
+                            ))}
                         </TableCell>
                     </TableRow>
                     <TableRow>
@@ -49,15 +53,6 @@ const UserSearchSettings = ({data, isLoading}: {data: IUserFull | null | undefin
                         <TableCell className="text-right">{data.max_year || dayjs().format('YYYY')}</TableCell>
                     </TableRow>
                     <TableRow>
-                        <TableCell className="font-medium">{t("saved_location")}</TableCell>
-                        <TableCell className="text-right">
-                            {data.locationstring.length > 20
-                                ? `${data.locationstring.slice(0, 20)}...`
-                                : data.locationstring
-                            }
-                        </TableCell>
-                    </TableRow>
-                    <TableRow>
                         <TableCell className="font-medium">{t("search_range")}</TableCell>
                         <TableCell className="text-right">{data.from_user_range} km</TableCell>
                     </TableRow>
@@ -75,7 +70,13 @@ const UserSearchSettings = ({data, isLoading}: {data: IUserFull | null | undefin
                     </TableRow>
                     <TableRow>
                         <TableCell className="font-medium">{t("condition")}</TableCell>
-                        <TableCell className="text-right">{data.condition_types || 'none'}</TableCell>
+                        <TableCell className="text-right space-x-1">
+                            {data.condition_types.map((md_local, index) => (
+                                <Badge variant={"outline"}>
+                                    {md_local}
+                                </Badge>
+                            ))}
+                        </TableCell>
                     </TableRow>
                 </TableBody>
             </Table>

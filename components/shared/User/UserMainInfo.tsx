@@ -1,17 +1,24 @@
-import React from 'react';
+'use client'
+
+import React, {useEffect} from 'react';
 import {IUserFull} from "@/types/User";
 import {Avatar, AvatarFallback, AvatarImage} from "@/components/ComponentsProvider";
+import {useUserStore} from "@/store/user/userStore";
 
 const UserMainInfo = ({data, isLoading}: {data: IUserFull | null | undefined, isLoading: boolean}) => {
+    const user_data = useUserStore((state) => state.user_data);
+
+    useEffect(() => {
+        console.log(user_data);
+    }, [user_data])
 
     if (isLoading) return null;
-
     if (!data) return null;
 
     return (
         <div className={`w-full flex flex-wrap items-center gap-4 py-4`}>
             <Avatar className={`size-[85px]`}>
-                <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
+                <AvatarImage src={user_data.photo_url} alt="@shadcn" />
                 <AvatarFallback>CN</AvatarFallback>
             </Avatar>
             <div>

@@ -1,8 +1,8 @@
 
 export interface IUserFull {
     user_id: number;
-    brand: string;
-    model: string;
+    brand: string[];
+    model: string[];
     min_price: number;
     max_price: number;
     min_year: string | null;
@@ -16,7 +16,7 @@ export interface IUserFull {
     max_mileage: number | null;
     seller_types: string[] | null; // предполагается, что это список
     platform_types: string[] | null;
-    condition_types: string[] | null;
+    condition_types: string[];
     id: string;
     first_name: string;
     last_name: string;
