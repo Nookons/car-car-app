@@ -60,7 +60,6 @@ const UserButton: React.FC = () => {
 
     useEffect(() => {
         if (data) {
-            console.log(data);
             setUserToStore(data);
         } else if (isError) {
             console.error('Error push user to store:', error);

@@ -1,4 +1,3 @@
-import { IBrand } from '@/types/Brand';
 
 export const getListForUser = async ({uid, pageNumber}: {uid: string, pageNumber: number}): Promise<any> => {
     try {

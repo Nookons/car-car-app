@@ -33,21 +33,21 @@ export async function GET(request: NextRequest) {
             SELECT *
             FROM cars c
             WHERE c.price BETWEEN $1 AND $2
-              AND ($3::text IS NULL OR c.brand = $3)
-              AND ($4::text IS NULL OR c.model = $4)
+              AND ($3::text[] IS NULL OR c.brand = ANY($3::text[]))
+              AND ($4::text[] IS NULL OR c.model = ANY($4::text[]))
               AND ($5::int IS NULL OR EXTRACT(YEAR FROM c.year) >= $5::int)
               AND ($6::int IS NULL OR EXTRACT(YEAR FROM c.year) <= $6::int)
               AND ($7::int IS NULL OR c.mileage <= $7::int)
               AND ($8::text[] IS NULL OR c.seller_type = ANY($8::text[]))
               AND ($9::text[] IS NULL OR c.platform = ANY($9::text[]))
               AND ($10::text[] IS NULL OR c.new_used = ANY($10::text[]))
-              AND ($11::int = 0 OR ST_DWithin(
-                c.geom::geography,
-                ST_SetSRID(ST_MakePoint($12, $13), 4326)::geography,
-                $11 * 1000
-              ))
+              AND ($11 = 0 OR ST_DWithin(
+                    c.geom::geography,
+                    ST_SetSRID(ST_MakePoint($12, $13), 4326)::geography,
+                    $11 * 1000
+                              ))
             ORDER BY c.created_at DESC
-                LIMIT $14 OFFSET $15
+                LIMIT $14 OFFSET $15;
         `;
 
         const values = [
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
 
         client.release();
 
-        return NextResponse.json({ settings: user, cars: carsRes.rows }, { status: 200 });
+        return NextResponse.json(carsRes.rows, { status: 200 });
     } catch (error) {
         console.error("Database query error:", error);
         return NextResponse.json({ error: "Failed to fetch cars" }, { status: 500 });
