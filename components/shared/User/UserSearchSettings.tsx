@@ -30,68 +30,59 @@ const UserSearchSettings = ({data, isLoading}: { data: IUserFull | null | undefi
                         <article className={`text-nowrap text-neutral-500`}>{t("brand")}:</article>
                         {data.brand
                             ?
-                            <div className={`flex gap-2 flex-wrap`}>
-                                {data.brand.map((br_local, index) => (
-                                    <Badge variant={'outline'}>
-                                        <span className={`font-bold text-base`}>{br_local}</span>
-                                    </Badge>
-                                ))}
-                            </div>
+                            <>
+                                {data.brand.length < 3
+                                    ?
+                                    <div className={`grid grid-cols-${data.brand.length} items-center gap-2 flex-wrap`}>
+                                        {data.brand.map((br_local, index) => (
+                                            <Badge key={`${br_local}-${index}`} className={`w-full`} variant={'outline'}>
+                                                <span className={`font-bold text-base`}>{br_local}</span>
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                    :
+                                    <div className={`flex items-center gap-2 flex-wrap`}>
+                                        {data.brand.map((br_local, index) => (
+                                            <Badge key={`${br_local}-${index}`} variant={'outline'}>
+                                                <span className={`font-bold text-base`}>{br_local}</span>
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                }
+                            </>
                             :
-                            <div className={`w-full bg-red-500/35 text-white rounded-md text-center`}>
-                                None
-                            </div>
+                            <Badge className={`w-full`} variant={'outline'}>
+                                <span className={`font-bold text-base`}>None</span>
+                            </Badge>
                         }
                     </div>
                     <div className={`flex flex-col gap-2`}>
                         <article className={`text-nowrap text-neutral-500`}>{t("model")}:</article>
                         {data.model
                             ?
-                            <div className={`flex gap-2 flex-wrap`}>
-                                {data.model.map((md_local, index) => (
-                                    <Badge variant={'outline'}>
-                                        <span className={`font-bold text-base`}>{md_local}</span>
-                                    </Badge>
-                                ))}
-                            </div>
+                            <>
+                                {data.model.length < 3
+                                    ?
+                                    <div className={`grid grid-cols-${data.model.length} items-center gap-2 flex-wrap`}>
+                                        {data.model.map((br_local, index) => (
+                                            <Badge key={`${br_local}-${index}`} className={`w-full`} variant={'outline'}>
+                                                <span className={`font-bold text-base`}>{br_local}</span>
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                    :
+                                    <div className={`flex items-center gap-2 flex-wrap`}>
+                                        {data.model.map((br_local, index) => (
+                                            <Badge key={`${br_local}-${index}`} variant={'outline'}>
+                                                <span className={`font-bold text-base`}>{br_local}</span>
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                }
+                            </>
                             :
-                            <div className={`w-full bg-red-500/35 text-white rounded-md text-center`}>
-                                None
-                            </div>
-                        }
-                    </div>
-                </div>
-            </Card>
-
-            <Card className={`mt-2`}>
-                <CardTitle className={`flex justify-between items-center gap-2`}>
-                    <HandCoins />
-                    <p className={`text-xs text-neutral-500`}>Money search settings</p>
-                </CardTitle>
-                <div className={`grid grid-cols-[1fr_21px_1fr] gap-2 mt-2`}>
-                    <div className={`flex gap-2 items-center justify-start`}>
-
-                        {data.min_price === 0
-                            ?
-                            <div className={`w-full bg-red-500/35 text-white rounded-md text-center`}>
-                                None
-                            </div>
-                            :
-                            <Badge variant={`outline`}>
-                                <span className={`font-bold text-xl`}>{data.min_price.toLocaleString()} zl</span>
-                            </Badge>
-                        }
-                    </div>
-                    <ArrowRightLeft />
-                    <div className={`flex gap-2 items-center justify-end`}>
-                        {data.max_price === 99999999
-                            ?
-                            <div className={`w-full bg-red-500/35 text-white rounded-md text-center`}>
-                                None
-                            </div>
-                            :
-                            <Badge variant={`outline`}>
-                                <span className={`font-bold text-xl`}>{data.max_price.toLocaleString()} zl</span>
+                            <Badge className={`w-full`} variant={'outline'}>
+                                <span className={`font-bold text-base`}>None</span>
                             </Badge>
                         }
                     </div>
@@ -99,36 +90,75 @@ const UserSearchSettings = ({data, isLoading}: { data: IUserFull | null | undefi
             </Card>
 
             <Card className={`mt-2`}>
-                <CardTitle className={`flex justify-between items-center gap-2`}>
-                    <CalendarRange />
-                    <p className={`text-xs text-neutral-500`}>Years search settings</p>
-                </CardTitle>
-                <div className={`grid grid-cols-[1fr_21px_1fr] gap-2 mt-2`}>
-                    <div className={`flex gap-2 items-center justify-start`}>
+                <div className={`flex justify-between gap-2`}>
+                    <CardTitle className={`flex items-center gap-2`}>
+                        <HandCoins />
+                        <p className={`text-xs text-neutral-500`}>Money search settings</p>
+                    </CardTitle>
+                    <div className={`flex items-center gap-2`}>
+                        <div className={`flex gap-2 items-center justify-start`}>
 
-                        {!data.min_year
-                            ?
-                            <div className={`w-full bg-red-500/35 text-white rounded-md text-center`}>
-                                None
-                            </div>
-                            :
-                            <Badge variant={`outline`}>
-                                <span className={`font-bold text-xl`}>{data.min_year}</span>
-                            </Badge>
-                        }
+                            {data.min_price === 0
+                                ?
+                                <Badge variant={`outline`}>
+                                    <span className={`font-bold text-base`}>0 zl</span>
+                                </Badge>
+                                :
+                                <Badge variant={`outline`}>
+                                    <span className={`font-bold text-base`}>{data.min_price.toLocaleString()} zl</span>
+                                </Badge>
+                            }
+                        </div>
+                        <MoveRight />
+                        <div className={`flex gap-2 items-center justify-end`}>
+                            {data.max_price === 99999999
+                                ?
+                                <Badge variant={`outline`}>
+                                    <span className={`font-bold text-base`}>None</span>
+                                </Badge>
+                                :
+                                <Badge variant={`outline`}>
+                                    <span className={`font-bold text-base`}>{data.max_price.toLocaleString()} zl</span>
+                                </Badge>
+                            }
+                        </div>
                     </div>
-                    <ArrowRightLeft />
-                    <div className={`flex gap-2 items-center justify-end`}>
-                        {!data.max_year
-                            ?
-                            <div className={`w-full bg-red-500/35 text-white rounded-md text-center`}>
-                                None
-                            </div>
-                            :
-                            <Badge variant={`outline`}>
-                                <span className={`font-bold text-xl`}>{data.max_year}</span>
-                            </Badge>
-                        }
+                </div>
+            </Card>
+
+            <Card className={`mt-2`}>
+                <div className={`flex justify-between gap-2`}>
+                    <CardTitle className={`flex items-center gap-2`}>
+                        <HandCoins />
+                        <p className={`text-xs text-neutral-500`}>Years search settings</p>
+                    </CardTitle>
+                    <div className={`flex items-center gap-2`}>
+                        <div className={`flex gap-2 items-center justify-start`}>
+
+                            {data.min_year
+                                ?
+                                <Badge variant={`outline`}>
+                                    <span className={`font-bold text-base`}>{data.min_year}</span>
+                                </Badge>
+                                :
+                                <Badge variant={`outline`}>
+                                    <span className={`font-bold text-base`}>None</span>
+                                </Badge>
+                            }
+                        </div>
+                        <MoveRight />
+                        <div className={`flex gap-2 items-center justify-end`}>
+                            {data.max_year
+                                ?
+                                <Badge variant={`outline`}>
+                                    <span className={`font-bold text-base`}>{data.max_year}</span>
+                                </Badge>
+                                :
+                                <Badge variant={`outline`}>
+                                    <span className={`font-bold text-base`}>None</span>
+                                </Badge>
+                            }
+                        </div>
                     </div>
                 </div>
             </Card>
@@ -140,7 +170,7 @@ const UserSearchSettings = ({data, isLoading}: { data: IUserFull | null | undefi
                         <p className="text-xs text-neutral-500">{t("search_range")}</p>
                     </div>
                     <Badge variant={"outline"} className={`text-foreground `}>
-                        <span className={`font-bold text-xl flex items-center gap-2`}>0 km <MoveRight /> {data.from_user_range} km</span>
+                        <span className={`font-bold text-base flex items-center gap-2`}>0 km <MoveRight /> {data.from_user_range.toLocaleString()} km</span>
                     </Badge>
                 </CardTitle>
             </Card>

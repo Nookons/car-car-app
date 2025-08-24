@@ -33,6 +33,10 @@ const ModelSelect = () => {
     const triggerRef = useRef<HTMLButtonElement>(null);
     const [popoverWidth, setPopoverWidth] = useState<string | number>('auto');
 
+    const handleEnter = () => {
+        setOpen(false);
+    };
+
     useEffect(() => {
         if (triggerRef.current) {
             setPopoverWidth(triggerRef.current.offsetWidth);
@@ -77,12 +81,24 @@ const ModelSelect = () => {
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="p-0" style={{ width: popoverWidth }} align="start">
+            <PopoverContent
+                className="p-0"
+                style={{ width: popoverWidth }}
+                align="start"
+                side="bottom"
+                sideOffset={4}
+            >
                 <Command>
                     <CommandInput
+                        autoFocus={false}
                         placeholder={t('telegram_form.search_models')}
                         value={search}
                         onValueChange={setSearch}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                handleEnter();
+                            }
+                        }}
                     />
                     <CommandList>
                         <CommandEmpty>{t('telegram_form.no_models_find')}</CommandEmpty>

@@ -71,10 +71,10 @@ const FullParams: React.FC<Props> = ({data, isLoading}) => {
                         <TableCell className="text-right font-semibold">{data.door_count}</TableCell>
                     </TableRow>
                 }
-                {data.seats_count &&
+                {data.nr_seats &&
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("seats_count")}</TableCell>
-                        <TableCell className="text-right font-semibold">{data.seats_count}</TableCell>
+                        <TableCell className="text-right font-semibold">{data.nr_seats}</TableCell>
                     </TableRow>
                 }
                 {data.year &&
@@ -125,7 +125,7 @@ const FullParams: React.FC<Props> = ({data, isLoading}) => {
                 </TableRow>
                 <TableRow>
                     <TableCell className="font-medium text-neutral-500">{t("condition")}</TableCell>
-                    <TableCell className="text-right font-semibold">{getConditionLabel(data.new_used)}</TableCell>
+                    <TableCell className="text-right font-semibold">{getConditionLabel(data.new_used || "")}</TableCell>
                 </TableRow>
             </TableBody>
         </Table>

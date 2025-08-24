@@ -65,6 +65,10 @@ const BrandSelect = () => {
         return () => window.removeEventListener('resize', updateWidth);
     }, []);
 
+    const handleEnter = () => {
+        setOpen(false);
+    };
+
     // Оптимизированный обработчик выбора
     const handleSelect = useCallback((brandValue: string) => {
         setBrands(prev =>
@@ -118,6 +122,11 @@ const BrandSelect = () => {
                     <CommandInput
                         autoFocus={false}
                         placeholder={`${t('telegram_form.search_brands')}`}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                handleEnter();
+                            }
+                        }}
                     />
                     <CommandList>
                         <CommandEmpty>{t('telegram_form.no_brands_find')}</CommandEmpty>

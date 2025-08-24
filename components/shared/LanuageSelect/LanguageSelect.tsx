@@ -9,7 +9,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ComponentsProvider';
-import React from 'react';
+import React, {useEffect} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 
@@ -18,6 +18,13 @@ const LanguageSelect = () => {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
+
+    useEffect(() => {
+        const language_url = pathname.split('/')[1];
+        if (language_url) {
+            i18n.changeLanguage(language_url);
+        }
+    }, [pathname])
 
     const changeLocale = (lng: string) => {
         i18n.changeLanguage(lng);

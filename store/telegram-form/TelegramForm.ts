@@ -25,9 +25,9 @@ export const useTelegramFormStore = create<State>((set) => ({
         maxPrice: 0,
         minYear: '',
         maxYear: '',
-        rangeValue: 10,
+        rangeValue: 100,
         maxMileage: 0,
-        sellerTypes: ["firma", "dealer", "private"],
+        sellerTypes: ["firma", "dealer", "private_person"],
         platformTypes: ["oto_moto"],
         conditionTypes: ["used", "new"]
     },

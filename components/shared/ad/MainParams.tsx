@@ -57,7 +57,7 @@ const MainParams: React.FC<Props> = ({data, isLoading, icon_size}) => {
                           d="M21 4a2 2 0 0 0-4 0c0 .738.405 1.376 1 1.723v4.863l-.414.414H13V5.745A1.991 1.991 0 0 0 14.042 4a2 2 0 0 0-4 0c0 .721.385 1.348.958 1.7V11H6V5.723A1.994 1.994 0 0 0 5 2a1.994 1.994 0 0 0-1 3.723v12.554c-.595.347-1 .984-1 1.723a2 2 0 0 0 4 0c0-.739-.405-1.376-1-1.723V13h5v5.3a1.99 1.99 0 0 0-.958 1.7 2 2 0 0 0 4 0A1.99 1.99 0 0 0 13 18.255V13h5.414L20 11.414V5.723c.595-.347 1-.985 1-1.723Z"
                           clipRule="evenodd"></path>
                 </svg>
-                <span>{getGearBoxLabelType(data.gearbox)}</span>
+                <span>{getGearBoxLabelType(data.gearbox || "")}</span>
             </div>
 
             <div className={`flex flex-col items-center gap-2`}>
@@ -77,7 +77,7 @@ const MainParams: React.FC<Props> = ({data, isLoading, icon_size}) => {
                           d="M17 7h4c.258.194.433.387.632.608.11.121.226.25.368.392v6l-1 1h-3v-1c0-.6-.4-1-1-1s-1 .4-1 1v1H8v-1c0-.6-.4-1-1-1s-1 .4-1 1v1H3l-1-1V7l3.8-5H16l1 5Zm2.8 6h.2V9h-4.7L15 7.3 14.3 4H6.7L4 7.6V13h.2c.4-1.2 1.5-2 2.8-2 1.3 0 2.4.8 2.8 2h4.4c.4-1.2 1.5-2 2.8-2 1.3 0 2.4.8 2.8 2ZM7 16c-1.7 0-3 1.3-3 3s1.3 3 3 3 3-1.3 3-3-1.4-3-3-3Zm0 4c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.5 1-1 1Zm10-4c-1.7 0-3 1.3-3 3s1.3 3 3 3 3-1.3 3-3-1.4-3-3-3Zm0 4c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.5 1-1 1Z"
                           clipRule="evenodd"></path>
                 </svg>
-                <span>{getBodyTypeLabel(data.body_type)}</span>
+                <span>{getBodyTypeLabel(data.body_type || "")}</span>
             </div>
 
             <div className={`flex flex-col items-center gap-2`}>
