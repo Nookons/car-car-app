@@ -1,17 +1,18 @@
 {
-  "greeting": "Hallo",
-  "change_language": "Sprache ändern:",
-  "favorite": "Favorit",
-  "open_original": "Original",
+  "greeting": "Willkommen",
+  "change_language": "Sprache auswählen:",
+  "favorite": "Favoriten",
+  "open_original": "Original öffnen",
   "back": "Zurück",
+
   "brand": "Marke",
   "model": "Modell",
   "price": "Preis",
   "engine": "Motor",
   "version": "Version",
   "color": "Farbe",
-  "door_count": "Anzahl Türen",
-  "seats_count": "Anzahl Sitzplätze",
+  "door_count": "Anzahl der Türen",
+  "seats_count": "Anzahl der Sitze",
   "production_year": "Baujahr",
   "generation": "Generation",
   "fuel_type": "Kraftstoffart",
@@ -23,52 +24,61 @@
   "mileage": "Kilometerstand",
   "condition": "Zustand",
   "from": "Von",
+  "on": "Am",
   "seller_type": "Verkäufertyp",
-  "min_price": "Min. Preis",
-  "max_price": "Max. Preis",
-  "min_year": "Min. Jahr",
-  "max_year": "Max. Jahr",
+  "min_price": "Mindestpreis",
+  "max_price": "Höchstpreis",
+  "min_year": "Mindestjahr",
+  "max_year": "Höchstjahr",
   "saved_location": "Standort",
   "search_range": "Suchradius",
   "picked_platforms": "Ausgewählte Plattformen",
+
   "used": "Gebraucht",
   "new": "Neu",
-  "firma": "Firma",
+
+  "firma": "Unternehmen",
   "dealer": "Händler",
   "private_person": "Privatperson",
+
   "support_contact": "Support-Kontakt",
+
   "transmission_object": {
-    "part_time_4x4": "4x4 (partiell)",
+    "part_time_4x4": "4x4 (part-time)",
     "full_time_4x4": "4x4 (permanent)",
-    "front_wheel_drive": "Vorderradantrieb",
-    "rear_wheel_drive": "Hinterradantrieb",
-    "unknown": "Keine Informationen gefunden."
+    "front_wheel_drive": "Frontantrieb",
+    "rear_wheel_drive": "Heckantrieb",
+    "unknown": "Keine Informationen verfügbar"
   },
+
   "gear_box_object": {
     "automatic": "Automatik",
     "manual": "Manuell",
-    "unknown": "Unbekannt"
+    "unknown": "Nicht angegeben"
   },
+
   "body_type_object": {
     "small_car": "Kleinwagen",
     "city_car": "Stadtwagen",
     "coupe": "Coupé",
-    "convertible": "Cabrio",
+    "convertible": "Cabriolet",
     "station_wagon": "Kombi",
-    "compact": "Kompakt",
+    "compact": "Kompaktwagen",
     "minivan": "Minivan",
     "sedan": "Limousine",
     "suv": "SUV",
-    "unknown": "Unbekannt"
+    "unknown": "Nicht angegeben"
   },
+
   "fuel_type_object": {
     "petrol": "Benzin",
     "petrol_lpg": "Benzin + LPG",
     "diesel": "Diesel",
     "electric": "Elektro",
     "hybrid": "Hybrid",
-    "unknown": "Unbekannt"
+    "unknown": "Nicht angegeben"
   },
+
   "color_object": {
     "beige": "Beige",
     "white": "Weiß",
@@ -77,7 +87,7 @@
     "brown": "Braun",
     "black": "Schwarz",
     "red": "Rot",
-    "purple": "Lila",
+    "purple": "Violett",
     "navy": "Marineblau",
     "other": "Andere Farbe",
     "blue": "Blau",
@@ -87,39 +97,41 @@
     "green": "Grün",
     "gold": "Gold",
     "yellow": "Gelb",
-    "unknown": "Unbekannt"
+    "unknown": "Nicht angegeben"
   },
+
   "bot_buttons": {
     "open_ad": "Anzeige öffnen",
     "open_map": "Karte öffnen"
   },
 
   "telegram_form": {
-    "title_brand": "Wählen Sie unten Marken und Modelle aus. Sie können es leer lassen, wenn nicht nötig",
+    "title_brand": "Wählen Sie unten Marken und Modelle aus. Die Felder können bei Bedarf leer bleiben.",
     "select_brand": "Marken auswählen...",
-    "search_brands": "Geben Sie die Marke ein, die Sie interessiert",
+    "search_brands": "Geben Sie die gewünschte Marke ein",
     "no_brands_find": "Keine Marken gefunden",
 
     "select_models": "Modelle auswählen...",
-    "search_models": "Geben Sie die Modelle ein, die Sie interessieren",
+    "search_models": "Geben Sie das gewünschte Modell ein",
     "no_models_find": "Keine Modelle gefunden",
 
-    "price_range": "Preisspanne",
-    "years_range": "Baujahrsspanne",
+    "price_range": "Preisbereich",
+    "years_range": "Baujahrbereich",
 
-    "range_to_car": "Entfernung von Ihnen zum Auto",
-    "mileage": "Maximale Kilometerleistung",
-    "mileage_placeholder": "Maximale Kilometerleistung eingeben",
+    "range_to_car": "Entfernung von Ihrem Standort zum Fahrzeug",
+    "mileage": "Maximaler Kilometerstand",
+    "mileage_placeholder": "Maximalen Kilometerstand eingeben",
 
     "seller_label": "Verkäufertypen",
     "platforms_label": "Plattformtypen",
     "conditions_label": "Zustandstypen",
     "address_label": "Ihre Adresse",
     "start_button": "Suche starten",
-    "privacy_label": "Indem Sie dieses Kontrollkästchen anklicken, stimmen Sie den",
-    "privacy_button": "Geschäftsbedingungen zu."
+    "privacy_label": "Durch Aktivieren dieses Kontrollkästchens stimmen Sie den",
+    "privacy_button": "Allgemeinen Geschäftsbedingungen zu"
   },
 
+  "None": "Nicht angegeben",
 
-  "change_setting_not_available": "Die Einstellungen können derzeit nur über Telegram geändert werden. Im nächsten Update wird dies auch hier möglich sein :)"
+  "change_setting_not_available": "Das Ändern der Einstellungen ist derzeit nur über Telegram möglich. Diese Funktion wird in einem zukünftigen Update hier verfügbar sein."
 }

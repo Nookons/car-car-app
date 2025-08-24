@@ -1,9 +1,10 @@
 {
-  "greeting": "Привет",
-  "change_language": "Изменить язык:",
+  "greeting": "Добро пожаловать",
+  "change_language": "Выберите язык:",
   "favorite": "Избранное",
-  "open_original": "Оригинал",
+  "open_original": "Открыть оригинал",
   "back": "Назад",
+
   "brand": "Марка",
   "model": "Модель",
   "price": "Цена",
@@ -19,95 +20,105 @@
   "engine_power": "Мощность двигателя",
   "body_type": "Тип кузова",
   "gearbox": "Коробка передач",
-  "transmission": "Трансмиссия",
+  "transmission": "Привод",
   "mileage": "Пробег",
   "condition": "Состояние",
   "from": "От",
+  "on": "На",
   "seller_type": "Тип продавца",
-  "min_price": "Мин. цена",
-  "max_price": "Макс. цена",
-  "min_year": "Мин. год",
-  "max_year": "Макс. год",
+  "min_price": "Минимальная цена",
+  "max_price": "Максимальная цена",
+  "min_year": "Минимальный год",
+  "max_year": "Максимальный год",
   "saved_location": "Местоположение",
   "search_range": "Радиус поиска",
   "picked_platforms": "Выбранные платформы",
+
   "used": "Б/у",
   "new": "Новый",
+
   "firma": "Компания",
   "dealer": "Дилер",
   "private_person": "Частное лицо",
+
   "support_contact": "Контакт поддержки",
+
   "transmission_object": {
-    "part_time_4x4": "4x4 (частичный)",
-    "full_time_4x4": "4x4 (постоянный)",
+    "part_time_4x4": "4x4 (частично)",
+    "full_time_4x4": "4x4 (постоянно)",
     "front_wheel_drive": "Передний привод",
     "rear_wheel_drive": "Задний привод",
-    "unknown": "Информация не найдена."
+    "unknown": "Информация недоступна"
   },
+
   "gear_box_object": {
-    "automatic": "Автоматическая",
-    "manual": "Механическая",
-    "unknown": "Неизвестно"
+    "automatic": "Автомат",
+    "manual": "Механика",
+    "unknown": "Не указано"
   },
+
   "body_type_object": {
-    "small_car": "Маленький автомобиль",
+    "small_car": "Малый автомобиль",
     "city_car": "Городской автомобиль",
     "coupe": "Купе",
     "convertible": "Кабриолет",
     "station_wagon": "Универсал",
-    "compact": "Компактный",
+    "compact": "Компакт",
     "minivan": "Минивэн",
     "sedan": "Седан",
     "suv": "Внедорожник",
-    "unknown": "Неизвестно"
+    "unknown": "Не указано"
   },
+
   "fuel_type_object": {
     "petrol": "Бензин",
-    "petrol_lpg": "Бензин + Газ",
+    "petrol_lpg": "Бензин + LPG",
     "diesel": "Дизель",
     "electric": "Электро",
     "hybrid": "Гибрид",
-    "unknown": "Неизвестно"
+    "unknown": "Не указано"
   },
+
   "color_object": {
     "beige": "Бежевый",
     "white": "Белый",
     "sky_blue": "Голубой",
     "burgundy": "Бордовый",
     "brown": "Коричневый",
-    "black": "Чёрный",
+    "black": "Черный",
     "red": "Красный",
     "purple": "Фиолетовый",
-    "navy": "Тёмно-синий",
-    "other": "Другой цвет",
+    "navy": "Темно-синий",
+    "other": "Другой",
     "blue": "Синий",
     "orange": "Оранжевый",
     "silver": "Серебристый",
     "gray": "Серый",
-    "green": "Зелёный",
+    "green": "Зеленый",
     "gold": "Золотой",
-    "yellow": "Жёлтый",
-    "unknown": "Неизвестно"
+    "yellow": "Желтый",
+    "unknown": "Не указано"
   },
+
   "bot_buttons": {
     "open_ad": "Открыть объявление",
     "open_map": "Открыть карту"
   },
 
   "telegram_form": {
-    "title_brand": "Выберите ниже бренды и модели, при необходимости можно оставить пустым",
-    "select_brand": "Выберите бренды...",
+    "title_brand": "Выберите марки и модели ниже. Поля можно оставить пустыми, если это не требуется.",
+    "select_brand": "Выберите марку...",
     "search_brands": "Введите интересующую вас марку",
-    "no_brands_find": "Бренды не найдены",
+    "no_brands_find": "Марки не найдены",
 
-    "select_models": "Выберите модели...",
-    "search_models": "Введите интересующие вас модели",
+    "select_models": "Выберите модель...",
+    "search_models": "Введите интересующую модель",
     "no_models_find": "Модели не найдены",
 
-    "price_range": "Ценовой диапазон",
-    "years_range": "Диапазон годов выпуска",
+    "price_range": "Диапазон цен",
+    "years_range": "Диапазон годов",
 
-    "range_to_car": "Расстояние от вас до машины",
+    "range_to_car": "Расстояние от вашего местоположения до автомобиля",
     "mileage": "Максимальный пробег",
     "mileage_placeholder": "Введите максимальный пробег",
 
@@ -116,11 +127,11 @@
     "conditions_label": "Типы состояния",
     "address_label": "Ваш адрес",
     "start_button": "Начать поиск",
-    "privacy_label": "Нажимая на этот флажок, вы соглашаетесь с",
-    "privacy_button": "Условиями использования."
+    "privacy_label": "Отметив этот флажок, вы соглашаетесь с",
+    "privacy_button": "Правилами и условиями"
   },
 
+  "None": "Не указано",
 
-
-  "change_setting_not_available": "Изменение настроек сейчас доступно только через Telegram. В следующем обновлении вы сможете сделать это и здесь :)"
+  "change_setting_not_available": "Изменение настроек в данный момент возможно только через Telegram. Эта функция будет доступна здесь в будущем обновлении."
 }

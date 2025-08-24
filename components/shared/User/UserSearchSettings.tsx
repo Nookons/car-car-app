@@ -93,7 +93,7 @@ const UserSearchSettings = ({data, isLoading}: { data: IUserFull | null | undefi
                 <div className={`flex justify-between gap-2`}>
                     <CardTitle className={`flex items-center gap-2`}>
                         <HandCoins />
-                        <p className={`text-xs text-neutral-500`}>Money search settings</p>
+                        <p className={`text-xs text-neutral-500`}>{t(`telegram_form.price_range`)}</p>
                     </CardTitle>
                     <div className={`flex items-center gap-2`}>
                         <div className={`flex gap-2 items-center justify-start`}>
@@ -130,7 +130,7 @@ const UserSearchSettings = ({data, isLoading}: { data: IUserFull | null | undefi
                 <div className={`flex justify-between gap-2`}>
                     <CardTitle className={`flex items-center gap-2`}>
                         <HandCoins />
-                        <p className={`text-xs text-neutral-500`}>Years search settings</p>
+                        <p className={`text-xs text-neutral-500`}>{t(`telegram_form.years_range`)}</p>
                     </CardTitle>
                     <div className={`flex items-center gap-2`}>
                         <div className={`flex gap-2 items-center justify-start`}>

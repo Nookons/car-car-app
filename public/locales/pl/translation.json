@@ -1,9 +1,10 @@
 {
-  "greeting": "Cześć",
-  "change_language": "Zmień język:",
+  "greeting": "Witamy",
+  "change_language": "Wybierz język:",
   "favorite": "Ulubione",
-  "open_original": "Oryginał",
+  "open_original": "Otwórz oryginał",
   "back": "Wstecz",
+
   "brand": "Marka",
   "model": "Model",
   "price": "Cena",
@@ -23,32 +24,39 @@
   "mileage": "Przebieg",
   "condition": "Stan",
   "from": "Od",
+  "on": "Na",
   "seller_type": "Typ sprzedawcy",
-  "min_price": "Min. cena",
-  "max_price": "Maks. cena",
-  "min_year": "Min. rok",
-  "max_year": "Maks. rok",
+  "min_price": "Cena minimalna",
+  "max_price": "Cena maksymalna",
+  "min_year": "Rok minimalny",
+  "max_year": "Rok maksymalny",
   "saved_location": "Lokalizacja",
-  "search_range": "Zasięg wyszukiwania",
+  "search_range": "Promień wyszukiwania",
   "picked_platforms": "Wybrane platformy",
+
   "used": "Używany",
   "new": "Nowy",
+
   "firma": "Firma",
   "dealer": "Dealer",
   "private_person": "Osoba prywatna",
-  "support_contact": "Kontakt wsparcia",
+
+  "support_contact": "Kontakt z obsługą",
+
   "transmission_object": {
     "part_time_4x4": "4x4 (częściowy)",
-    "full_time_4x4": "4x4 (całodobowy)",
+    "full_time_4x4": "4x4 (stały)",
     "front_wheel_drive": "Napęd na przednie koła",
     "rear_wheel_drive": "Napęd na tylne koła",
-    "unknown": "Brak informacji."
+    "unknown": "Brak dostępnych informacji"
   },
+
   "gear_box_object": {
     "automatic": "Automatyczna",
     "manual": "Manualna",
-    "unknown": "Nieznany"
+    "unknown": "Nie określono"
   },
+
   "body_type_object": {
     "small_car": "Mały samochód",
     "city_car": "Samochód miejski",
@@ -59,27 +67,29 @@
     "minivan": "Minivan",
     "sedan": "Sedan",
     "suv": "SUV",
-    "unknown": "Nieznany"
+    "unknown": "Nie określono"
   },
+
   "fuel_type_object": {
     "petrol": "Benzyna",
     "petrol_lpg": "Benzyna + LPG",
     "diesel": "Diesel",
     "electric": "Elektryczny",
     "hybrid": "Hybrydowy",
-    "unknown": "Nieznany"
+    "unknown": "Nie określono"
   },
+
   "color_object": {
     "beige": "Beżowy",
     "white": "Biały",
-    "sky_blue": "Jasnoniebieski",
+    "sky_blue": "Błękitny",
     "burgundy": "Bordowy",
     "brown": "Brązowy",
     "black": "Czarny",
     "red": "Czerwony",
     "purple": "Fioletowy",
     "navy": "Granatowy",
-    "other": "Inny kolor",
+    "other": "Inny",
     "blue": "Niebieski",
     "orange": "Pomarańczowy",
     "silver": "Srebrny",
@@ -87,39 +97,41 @@
     "green": "Zielony",
     "gold": "Złoty",
     "yellow": "Żółty",
-    "unknown": "Nieznany"
+    "unknown": "Nie określono"
   },
+
   "bot_buttons": {
     "open_ad": "Otwórz ogłoszenie",
     "open_map": "Otwórz mapę"
   },
 
   "telegram_form": {
-    "title_brand": "Wybierz poniżej marki i modele, jeśli nie potrzebujesz możesz zostawić puste",
-    "select_brand": "Wybierz marki...",
-    "search_brands": "Wpisz markę, która Cię interesuje",
+    "title_brand": "Wybierz marki i modele poniżej. Pola mogą pozostać puste, jeśli nie są wymagane.",
+    "select_brand": "Wybierz markę...",
+    "search_brands": "Wprowadź markę, która Cię interesuje",
     "no_brands_find": "Nie znaleziono żadnych marek",
 
-    "select_models": "Wybierz modele...",
-    "search_models": "Wpisz modele, które Cię interesują",
+    "select_models": "Wybierz model...",
+    "search_models": "Wprowadź model, który Cię interesuje",
     "no_models_find": "Nie znaleziono żadnych modeli",
 
     "price_range": "Zakres cen",
-    "years_range": "Zakres roczników",
+    "years_range": "Zakres lat produkcji",
 
-    "range_to_car": "Odległość od Ciebie do samochodu",
+    "range_to_car": "Odległość od Twojej lokalizacji do pojazdu",
     "mileage": "Maksymalny przebieg",
     "mileage_placeholder": "Wprowadź maksymalny przebieg",
 
     "seller_label": "Typy sprzedawców",
     "platforms_label": "Typy platform",
-    "conditions_label": "Typy stanów",
+    "conditions_label": "Typy stanu pojazdu",
     "address_label": "Twój adres",
     "start_button": "Rozpocznij wyszukiwanie",
-    "privacy_label": "Klikając to pole wyboru, zgadzasz się z",
-    "privacy_button": "Regulaminem."
+    "privacy_label": "Zaznaczając to pole, zgadzasz się na",
+    "privacy_button": "Regulamin"
   },
 
+  "None": "Nie określono",
 
-  "change_setting_not_available": "Zmiana ustawień jest obecnie możliwa tylko przez Telegram. W następnej aktualizacji będzie to możliwe także tutaj :)"
+  "change_setting_not_available": "Zmiana ustawień jest obecnie możliwa tylko przez Telegram. Funkcja ta będzie dostępna tutaj w przyszłej aktualizacji."
 }

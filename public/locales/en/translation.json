@@ -1,8 +1,8 @@
 {
-  "greeting": "Hello",
-  "change_language": "Change language:",
-  "favorite": "Favorite",
-  "open_original": "Original",
+  "greeting": "Welcome",
+  "change_language": "Select language:",
+  "favorite": "Favorites",
+  "open_original": "Open original",
   "back": "Back",
 
   "brand": "Brand",
@@ -11,9 +11,9 @@
   "engine": "Engine",
   "version": "Version",
   "color": "Color",
-  "door_count": "Door count",
-  "seats_count": "Seats count",
-  "production_year": "Production year",
+  "door_count": "Number of doors",
+  "seats_count": "Number of seats",
+  "production_year": "Year of manufacture",
   "generation": "Generation",
   "fuel_type": "Fuel type",
   "engine_capacity": "Engine capacity",
@@ -24,36 +24,37 @@
   "mileage": "Mileage",
   "condition": "Condition",
   "from": "From",
+  "on": "On",
   "seller_type": "Seller type",
-  "min_price": "Min price",
-  "max_price": "Max price",
-  "min_year": "Min year",
-  "max_year": "Max year",
+  "min_price": "Minimum price",
+  "max_price": "Maximum price",
+  "min_year": "Minimum year",
+  "max_year": "Maximum year",
   "saved_location": "Location",
-  "search_range": "Search range",
-  "picked_platforms": "Picked platforms",
+  "search_range": "Search radius",
+  "picked_platforms": "Selected platforms",
 
   "used": "Used",
   "new": "New",
 
-  "firma": "Firma",
+  "firma": "Company",
   "dealer": "Dealer",
-  "private_person": "Private person",
+  "private_person": "Private individual",
 
-  "support_contact": "Support Contact",
+  "support_contact": "Support contact",
 
   "transmission_object": {
     "part_time_4x4": "4x4 (part-time)",
     "full_time_4x4": "4x4 (full-time)",
     "front_wheel_drive": "Front-wheel drive",
     "rear_wheel_drive": "Rear-wheel drive",
-    "unknown": "We can't find any information."
+    "unknown": "Information not available"
   },
 
   "gear_box_object": {
     "automatic": "Automatic",
     "manual": "Manual",
-    "unknown": "Unknown"
+    "unknown": "Not specified"
   },
 
   "body_type_object": {
@@ -66,7 +67,7 @@
     "minivan": "Minivan",
     "sedan": "Sedan",
     "suv": "SUV",
-    "unknown": "Unknown"
+    "unknown": "Not specified"
   },
 
   "fuel_type_object": {
@@ -75,7 +76,7 @@
     "diesel": "Diesel",
     "electric": "Electric",
     "hybrid": "Hybrid",
-    "unknown": "Unknown"
+    "unknown": "Not specified"
   },
 
   "color_object": {
@@ -88,7 +89,7 @@
     "red": "Red",
     "purple": "Purple",
     "navy": "Navy",
-    "other": "Other color",
+    "other": "Other",
     "blue": "Blue",
     "orange": "Orange",
     "silver": "Silver",
@@ -96,38 +97,41 @@
     "green": "Green",
     "gold": "Gold",
     "yellow": "Yellow",
-    "unknown": "Unknown"
+    "unknown": "Not specified"
   },
+
   "bot_buttons": {
-    "open_ad": "open_ad",
-    "open_map": "open_map"
+    "open_ad": "Open advertisement",
+    "open_map": "Open map"
   },
 
   "telegram_form": {
-    "title_brand": "Select brands and models below if you need you can left it's empty",
+    "title_brand": "Select brands and models below. You may leave the fields empty if not required.",
     "select_brand": "Select brands...",
-    "search_brands": "Input brand what you interesting",
-    "no_brands_find": "No find any brands",
+    "search_brands": "Enter the brand of interest",
+    "no_brands_find": "No brands found",
 
     "select_models": "Select models...",
-    "search_models": "Input Models what you interesting",
-    "no_models_find": "No find any models",
+    "search_models": "Enter the model of interest",
+    "no_models_find": "No models found",
 
-    "price_range": "Price Range",
-    "years_range": "Years Range",
+    "price_range": "Price range",
+    "years_range": "Year range",
 
-    "range_to_car": "Range from you to car",
-    "mileage": "Max mileage value",
-    "mileage_placeholder": "Input max mileage value",
+    "range_to_car": "Distance from your location to the vehicle",
+    "mileage": "Maximum mileage",
+    "mileage_placeholder": "Enter the maximum mileage",
 
     "seller_label": "Seller types",
-    "platforms_label": "Platforms types",
-    "conditions_label": "Conditions types",
+    "platforms_label": "Platform types",
+    "conditions_label": "Condition types",
     "address_label": "Your address",
     "start_button": "Start search",
-    "privacy_label": "By clicking this checkbox, you agree to the",
-    "privacy_button": "Terms and conditions."
+    "privacy_label": "By selecting this checkbox, you agree to the",
+    "privacy_button": "Terms and Conditions"
   },
 
-  "change_setting_not_available": "Change your setting available only from telegram right now. In next update you will be able to do this here )"
+  "None": "Not specified",
+
+  "change_setting_not_available": "Changing settings is currently only available via Telegram. This feature will be available here in a future update."
 }

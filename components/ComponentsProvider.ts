@@ -82,3 +82,5 @@ export {DrawerFooter} from "@/components/ui/drawer";
 export {DrawerTitle} from "@/components/ui/drawer";
 export {DrawerDescription} from "@/components/ui/drawer";
 
+export {Separator} from "@/components/ui/separator";
+

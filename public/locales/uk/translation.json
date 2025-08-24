@@ -1,9 +1,10 @@
 {
-  "greeting": "Привіт",
-  "change_language": "Змінити мову:",
-  "favorite": "Обране",
-  "open_original": "Оригінал",
+  "greeting": "Ласкаво просимо",
+  "change_language": "Виберіть мову:",
+  "favorite": "Улюблене",
+  "open_original": "Відкрити оригінал",
   "back": "Назад",
+
   "brand": "Марка",
   "model": "Модель",
   "price": "Ціна",
@@ -12,43 +13,50 @@
   "color": "Колір",
   "door_count": "Кількість дверей",
   "seats_count": "Кількість місць",
-  "production_year": "Рік виробництва",
+  "production_year": "Рік випуску",
   "generation": "Покоління",
   "fuel_type": "Тип палива",
-  "engine_capacity": "Об’єм двигуна",
+  "engine_capacity": "Об'єм двигуна",
   "engine_power": "Потужність двигуна",
   "body_type": "Тип кузова",
   "gearbox": "Коробка передач",
-  "transmission": "Трансмісія",
+  "transmission": "Привід",
   "mileage": "Пробіг",
   "condition": "Стан",
   "from": "Від",
+  "on": "На",
   "seller_type": "Тип продавця",
-  "min_price": "Мін. ціна",
-  "max_price": "Макс. ціна",
-  "min_year": "Мін. рік",
-  "max_year": "Макс. рік",
+  "min_price": "Мінімальна ціна",
+  "max_price": "Максимальна ціна",
+  "min_year": "Мінімальний рік",
+  "max_year": "Максимальний рік",
   "saved_location": "Місцезнаходження",
   "search_range": "Радіус пошуку",
-  "picked_platforms": "Обрані платформи",
-  "used": "Вживане",
-  "new": "Нове",
+  "picked_platforms": "Вибрані платформи",
+
+  "used": "Вживаний",
+  "new": "Новий",
+
   "firma": "Компанія",
   "dealer": "Дилер",
   "private_person": "Приватна особа",
+
   "support_contact": "Контакт підтримки",
+
   "transmission_object": {
     "part_time_4x4": "4x4 (частковий)",
     "full_time_4x4": "4x4 (постійний)",
     "front_wheel_drive": "Передній привід",
     "rear_wheel_drive": "Задній привід",
-    "unknown": "Інформацію не знайдено."
+    "unknown": "Інформація недоступна"
   },
+
   "gear_box_object": {
-    "automatic": "Автоматична",
-    "manual": "Механічна",
-    "unknown": "Невідомо"
+    "automatic": "Автомат",
+    "manual": "Механіка",
+    "unknown": "Не вказано"
   },
+
   "body_type_object": {
     "small_car": "Малий автомобіль",
     "city_car": "Міський автомобіль",
@@ -59,16 +67,18 @@
     "minivan": "Мінівен",
     "sedan": "Седан",
     "suv": "Позашляховик",
-    "unknown": "Невідомо"
+    "unknown": "Не вказано"
   },
+
   "fuel_type_object": {
     "petrol": "Бензин",
-    "petrol_lpg": "Бензин + Газ",
+    "petrol_lpg": "Бензин + LPG",
     "diesel": "Дизель",
     "electric": "Електро",
     "hybrid": "Гібрид",
-    "unknown": "Невідомо"
+    "unknown": "Не вказано"
   },
+
   "color_object": {
     "beige": "Бежевий",
     "white": "Білий",
@@ -79,7 +89,7 @@
     "red": "Червоний",
     "purple": "Фіолетовий",
     "navy": "Темно-синій",
-    "other": "Інший колір",
+    "other": "Інший",
     "blue": "Синій",
     "orange": "Оранжевий",
     "silver": "Сріблястий",
@@ -87,27 +97,28 @@
     "green": "Зелений",
     "gold": "Золотий",
     "yellow": "Жовтий",
-    "unknown": "Невідомо"
+    "unknown": "Не вказано"
   },
+
   "bot_buttons": {
     "open_ad": "Відкрити оголошення",
     "open_map": "Відкрити карту"
   },
 
   "telegram_form": {
-    "title_brand": "Виберіть нижче бренди та моделі, якщо потрібно, можна залишити порожнім",
-    "select_brand": "Виберіть бренди...",
+    "title_brand": "Виберіть марки та моделі нижче. Поля можна залишити порожніми, якщо це не обов'язково.",
+    "select_brand": "Виберіть марку...",
     "search_brands": "Введіть марку, яка вас цікавить",
-    "no_brands_find": "Бренди не знайдено",
+    "no_brands_find": "Марки не знайдено",
 
-    "select_models": "Виберіть моделі...",
-    "search_models": "Введіть моделі, які вас цікавлять",
+    "select_models": "Виберіть модель...",
+    "search_models": "Введіть модель, яка вас цікавить",
     "no_models_find": "Моделі не знайдено",
 
-    "price_range": "Ціновий діапазон",
+    "price_range": "Діапазон цін",
     "years_range": "Діапазон років",
 
-    "range_to_car": "Відстань від вас до авто",
+    "range_to_car": "Відстань від вашого місцезнаходження до автомобіля",
     "mileage": "Максимальний пробіг",
     "mileage_placeholder": "Введіть максимальний пробіг",
 
@@ -116,9 +127,11 @@
     "conditions_label": "Типи стану",
     "address_label": "Ваша адреса",
     "start_button": "Почати пошук",
-    "privacy_label": "Натискаючи цей прапорець, ви погоджуєтесь з",
-    "privacy_button": "Умовами та правилами."
+    "privacy_label": "Відмічаючи це поле, ви погоджуєтесь з",
+    "privacy_button": "Правилами та умовами"
   },
 
-  "change_setting_not_available": "Змінювати налаштування наразі можна лише через Telegram. У наступному оновленні ви зможете зробити це й тут :)"
+  "None": "Не вказано",
+
+  "change_setting_not_available": "Зміна налаштувань наразі можлива лише через Telegram. Ця функція буде доступна тут у майбутньому оновленні."
 }

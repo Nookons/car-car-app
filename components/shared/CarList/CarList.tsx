@@ -69,6 +69,14 @@ const CarList = () => {
         return pages;
     };
 
+    const setNewPage = ({e, newPage}: { e: React.MouseEvent<HTMLAnchorElement>, newPage: number }) => {
+        e.preventDefault(); // чтобы избежать стандартного поведения ссылки (если нужно)
+        setPageNumber(newPage);
+        // Прокручиваем страницу вверх
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    };
+
+
     if (data.items.length === 0) {
         return (
             <Card className="max-w-md w-full text-center p-6 shadow-lg rounded-2xl border ">
@@ -103,7 +111,7 @@ const CarList = () => {
             ))}
 
             {data.totalPages > 1 ? (
-                    <Pagination>
+                    <Pagination className={`pb-12`}>
                         <PaginationContent>
                             <PaginationItem>
                                 <PaginationPrevious
@@ -123,10 +131,7 @@ const CarList = () => {
                                         <PaginationLink
                                             href="#"
                                             isActive={pageNumber === p}
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                setPageNumber(p);
-                                            }}
+                                            onClick={(e) => setNewPage({e, newPage: p as number})}
                                         >
                                             {p}
                                         </PaginationLink>
@@ -147,7 +152,7 @@ const CarList = () => {
                     </Pagination>
                 )
                 :
-                <div>This is all what we have right now for you</div>
+                <div className={`pb-12 text-neutral-500 text-xs`}>This is all what we have right now for you</div>
             }
         </div>
     );

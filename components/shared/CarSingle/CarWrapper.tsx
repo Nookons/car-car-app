@@ -23,6 +23,10 @@ const CarWrapper = ({id}: {id: string}) => {
     });
 
     useEffect(() => {
+        console.log(data);
+    }, [data]);
+
+    useEffect(() => {
         if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
             const tg: any = window.Telegram.WebApp;
             console.log(tg);
@@ -33,10 +37,14 @@ const CarWrapper = ({id}: {id: string}) => {
     useEffect(() => {
         if (typeof window === 'undefined' || !window.Telegram?.WebApp) return;
 
-        if (tg) {
-            console.log('TG version:', Number(tg.version), 'Platform:', tg.platform);
-            console.log('Fullscreen available:', tg.viewport?.requestFullscreen?.isAvailable?.());
+        const tg: any = window.Telegram.WebApp;
+        setTg(tg);
+
+        if (Number(tg.version) > 6) {
             tg.requestFullscreen();
+            tg.disableVerticalSwipes()
+        } else {
+            console.log('Fullscreen is not available for this version of Telegram Web App');
         }
     }, [tg]);
 
@@ -79,26 +87,26 @@ const CarWrapper = ({id}: {id: string}) => {
 
 
             <Drawer>
-                <DrawerTrigger
-                    className=""
-                >
-                    <Badge variant={'outline'} className={`w-full py-2`}>Read Description</Badge>
+                <DrawerTrigger asChild>
+                    <Badge variant="outline" className="w-full py-2 cursor-pointer">
+                        Read Description
+                    </Badge>
                 </DrawerTrigger>
-                <DrawerContent
-                    className=" flex flex-col rounded-t-[10px] mt-24 h-[100%] lg:h-[100%] fixed bottom-0 left-0 right-0 outline-none"
-                >
-                    <div className="p-4 rounded-t-[10px] flex-1 overflow-y-auto">
-                        <div className="max-w-md mx-auto space-y-4">
-                            <div
-                                aria-hidden
-                                className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mb-8"
-                            />
-                            <DrawerTitle className="font-bold text-xl mb-4 line-clamp-1">{data?.title}</DrawerTitle>
-                            <p>{data?.description}</p>
-                        </div>
+
+                <DrawerContent className="rounded-t-[10px] mt-auto h-[90vh] lg:h-[80vh] flex flex-col p-4">
+                    <div className="w-full flex flex-col overflow-y-auto">
+                        <div className="mx-auto w-12 h-1.5 rounded-full bg-gray-300 mb-4" aria-hidden />
+                        <DrawerTitle className="font-bold text-xl mb-4 line-clamp-1">
+                            {data?.title}
+                        </DrawerTitle>
+                        <div
+                            className=""
+                            dangerouslySetInnerHTML={{ __html: data?.description || "" }}
+                        />
                     </div>
                 </DrawerContent>
             </Drawer>
+
 
             <AdMap
                 link={data?.map_url}

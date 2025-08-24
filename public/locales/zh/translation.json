@@ -1,9 +1,10 @@
 {
-  "greeting": "你好",
-  "change_language": "更改语言：",
+  "greeting": "欢迎",
+  "change_language": "选择语言：",
   "favorite": "收藏",
-  "open_original": "原文",
+  "open_original": "打开原文",
   "back": "返回",
+
   "brand": "品牌",
   "model": "型号",
   "price": "价格",
@@ -11,64 +12,73 @@
   "version": "版本",
   "color": "颜色",
   "door_count": "车门数量",
-  "seats_count": "座位数",
+  "seats_count": "座位数量",
   "production_year": "生产年份",
-  "generation": "代",
+  "generation": "代数",
   "fuel_type": "燃料类型",
   "engine_capacity": "发动机排量",
   "engine_power": "发动机功率",
   "body_type": "车身类型",
   "gearbox": "变速箱",
-  "transmission": "传动系统",
+  "transmission": "驱动方式",
   "mileage": "里程",
-  "condition": "状况",
+  "condition": "车辆状况",
   "from": "从",
-  "seller_type": "卖家类型",
-  "min_price": "最低价",
-  "max_price": "最高价",
-  "min_year": "最小年份",
-  "max_year": "最大年份",
+  "on": "在",
+  "seller_type": "卖方类型",
+  "min_price": "最低价格",
+  "max_price": "最高价格",
+  "min_year": "最早年份",
+  "max_year": "最晚年份",
   "saved_location": "位置",
   "search_range": "搜索范围",
   "picked_platforms": "选择的平台",
+
   "used": "二手",
-  "new": "全新",
+  "new": "新车",
+
   "firma": "公司",
   "dealer": "经销商",
   "private_person": "私人",
-  "support_contact": "支持联系方式",
+
+  "support_contact": "客服联系方式",
+
   "transmission_object": {
-    "part_time_4x4": "4x4（部分时间）",
-    "full_time_4x4": "4x4（全时）",
+    "part_time_4x4": "四驱（兼职）",
+    "full_time_4x4": "四驱（全时）",
     "front_wheel_drive": "前轮驱动",
     "rear_wheel_drive": "后轮驱动",
-    "unknown": "无法获取信息。"
+    "unknown": "信息不可用"
   },
+
   "gear_box_object": {
     "automatic": "自动",
     "manual": "手动",
     "unknown": "未知"
   },
+
   "body_type_object": {
     "small_car": "小型车",
     "city_car": "城市车",
     "coupe": "双门轿跑",
     "convertible": "敞篷车",
     "station_wagon": "旅行车",
-    "compact": "紧凑型",
-    "minivan": "小型面包车",
+    "compact": "紧凑型车",
+    "minivan": "多功能车",
     "sedan": "轿车",
     "suv": "SUV",
     "unknown": "未知"
   },
+
   "fuel_type_object": {
     "petrol": "汽油",
-    "petrol_lpg": "汽油+液化气",
+    "petrol_lpg": "汽油 + 液化气",
     "diesel": "柴油",
     "electric": "电动",
     "hybrid": "混合动力",
     "unknown": "未知"
   },
+
   "color_object": {
     "beige": "米色",
     "white": "白色",
@@ -89,37 +99,39 @@
     "yellow": "黄色",
     "unknown": "未知"
   },
+
   "bot_buttons": {
     "open_ad": "打开广告",
     "open_map": "打开地图"
   },
 
   "telegram_form": {
-    "title_brand": "如果需要，请在下方选择品牌和型号，也可以留空",
+    "title_brand": "请选择下方品牌和型号。如不需要，可留空。",
     "select_brand": "选择品牌...",
-    "search_brands": "输入您感兴趣的品牌",
+    "search_brands": "输入感兴趣的品牌",
     "no_brands_find": "未找到品牌",
 
     "select_models": "选择型号...",
-    "search_models": "输入您感兴趣的型号",
+    "search_models": "输入感兴趣的型号",
     "no_models_find": "未找到型号",
 
     "price_range": "价格范围",
     "years_range": "年份范围",
 
-    "range_to_car": "您到车辆的距离",
+    "range_to_car": "您与车辆的距离",
     "mileage": "最高里程",
-    "mileage_placeholder": "输入最高里程",
+    "mileage_placeholder": "输入最大里程",
 
-    "seller_label": "卖家类型",
+    "seller_label": "卖方类型",
     "platforms_label": "平台类型",
-    "conditions_label": "车辆状态类型",
+    "conditions_label": "车辆状况类型",
     "address_label": "您的地址",
     "start_button": "开始搜索",
-    "privacy_label": "点击此复选框，即表示您同意",
-    "privacy_button": "条款和条件。"
+    "privacy_label": "勾选此框即表示您同意",
+    "privacy_button": "条款和条件"
   },
 
+  "None": "未指定",
 
-  "change_setting_not_available": "目前仅能通过 Telegram 更改设置。下次更新后，您也可以在这里操作 :)"
+  "change_setting_not_available": "目前仅可通过Telegram更改设置。此功能将在未来更新中提供。"
 }
