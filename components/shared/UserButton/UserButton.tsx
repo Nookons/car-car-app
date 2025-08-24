@@ -9,11 +9,13 @@ import {ITelegramUser, IUserFull} from "@/types/User";
 import {useQuery} from "@tanstack/react-query";
 import {getUserByUID} from "@/features/getUserByUID";
 import {userPhotoUpdate} from "@/features/user/userPhotoUpdate";
+import {getUserFavoriteList} from "@/features/user/getUserFavoriteList";
 
 
 const UserButton: React.FC = () => {
     const static_uid = useSearchParams().get('uid')
     const setUserToStore = useUserStore((state) => state.setUserData);
+    const addToFavorite = useUserStore((state) => state.addToFavorite);
 
     const [uid, setUid] = useState<string | null>(null)
 
@@ -58,9 +60,28 @@ const UserButton: React.FC = () => {
         }
     }, [setUserToStore]);
 
+    const setUserFavoriteStore = async () => {
+        if (data) {
+            try {
+                const user_id = data?.user_id.toString() || '';
+                const result = await getUserFavoriteList({user_id})
+
+                if (result && result.data.length > 0) {
+                    result.data.forEach(el => {
+                        addToFavorite(Number(el.car_id))
+                    })
+                }
+            } catch (error) {
+                console.log(error);
+            }
+        }
+    }
+
     useEffect(() => {
         if (data) {
             setUserToStore(data);
+            setUserFavoriteStore();
+
         } else if (isError) {
             console.error('Error push user to store:', error);
         }

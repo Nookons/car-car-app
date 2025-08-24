@@ -29,8 +29,8 @@ const Page =  ({ params }: PageProps) => {
     return (
         <div className={`px-4`}>
             <UserMainInfo data={data} isLoading={isLoading}/>
-            <UserButtons/>
             <UserSearchSettings data={data} isLoading={isLoading}/>
+            <UserButtons/>
         </div>
     );
 };

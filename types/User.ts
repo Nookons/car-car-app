@@ -51,6 +51,19 @@ export interface ITelegramUser {
     photo_url?: string;
 }
 
+interface IUserFavorite {
+    id: string;          // или number, если хотите хранить как число
+    created_at: string;  // ISO дата; можно использовать Date при парсинге
+    updated_at: string;  // ISO дата; можно использовать Date при парсинге
+    user_id: string;     // или number
+    car_id: string;
+}
+
+export interface IUserFavoriteResponse {
+    data: IUserFavorite[];
+    success: boolean;
+}
+
 export interface IUserStore {
     favorite: number[]
 }

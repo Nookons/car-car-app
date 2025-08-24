@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect} from 'react';
 import {Button, Skeleton} from "@/components/ComponentsProvider";
 import {ICarAdd} from "@/types/Car";
 import {useTranslation} from "react-i18next";
@@ -8,6 +8,8 @@ import {toast} from "sonner";
 import dayjs from "dayjs";
 import {useSearchParams} from "next/navigation";
 import {useUserStore} from "@/store/user/userStore";
+import {addToFavorite} from "@/features/user/addToFavorite";
+import {removeFromFavorite} from "@/features/user/removeFromFavorite";
 
 interface Props {
     data: ICarAdd | undefined;
@@ -15,51 +17,65 @@ interface Props {
 }
 
 const AdButtons: React.FC<Props> = ({data, isLoading}) => {
-    const searchParams = useSearchParams();
-    const uid = searchParams.get('uid');
     const { t } = useTranslation();
+
+    const user_store = useUserStore(state => state.user_data)
 
     const userData = useUserStore(state => state.data)
     const addToFavoriteStore = useUserStore(state => state.addToFavorite)
     const removeFromFavoriteStore = useUserStore(state => state.removeFromFavorite)
 
-    const favoriteHandler = (type: 'add' | 'remove') => {
-        if (!uid) {
-            toast.error(`${data?.title}`, {
-                description: `
-                 Can't find the user, you must been logged in.
-            `,
-            })
-            return
-        }
 
-        if (!data) {
-            toast.error(`Error`, {
-                description: `
-                 Can't find the user, you must been logged in.
-            `,
-            })
-            return
-        }
+    const onAddToFavorite = async () => {
+        if (!data) return
 
-        if (type === "add") {
-            addToFavoriteStore(data.id)
+        addToFavoriteStore(Number(data.id)); // обновляем локальный стор
+
+        const adIdStr = data.id.toString();
+        const userIdStr = user_store.user_id.toString();
+
+        try {
+            await addToFavorite({ user_id: userIdStr, ad_id: adIdStr });
 
             toast.success(`${data?.title}`, {
-                description: `
-                 Success Add ${dayjs().format("dddd, MMMM DD, YYYY [at] HH:mm")}
-            `,
-            })
-        } else {
-            removeFromFavoriteStore(data.id)
-
-            toast.message(`${data?.title}`, {
-                description: `
-                 Success Remove ${dayjs().format("dddd, MMMM DD, YYYY [at] HH:mm")}
-            `,
-            })
+                description: `Successfully added on ${dayjs().format(
+                    'dddd, MMMM DD, YYYY [at] HH:mm'
+                )}`,
+            });
+        } catch (error: any) {
+            removeFromFavoriteStore(Number(data.id))
+            toast.error(`${data?.title}`, {
+                description: `Failed to add to favorite. Please try again. ${
+                    error?.message || error?.toString()
+                }`,
+            });
         }
     }
+
+    const onRemoveFromFavorite = async () => {
+        if (!data) return
+
+        removeFromFavoriteStore(Number(data.id)); // обновляем локальный стор
+
+        const adIdStr = data.id.toString();
+        const userIdStr = user_store.user_id.toString();
+
+        try {
+            await removeFromFavorite({ user_id: userIdStr, ad_id: adIdStr });
+
+            toast.success(`${data?.title}`, {
+                description: `Successfully removed on ${dayjs().format(
+                    'dddd, MMMM DD, YYYY [at] HH:mm'
+                )}`,
+            });
+        } catch (error: any) {
+            addToFavoriteStore(Number(data.id))
+            toast.error(`${data?.title}`, {
+                description: `${error?.message || error?.toString()}`,
+            });
+        }
+    }
+
 
     if (isLoading) {
         return (
@@ -73,9 +89,10 @@ const AdButtons: React.FC<Props> = ({data, isLoading}) => {
         <div className={`grid grid-cols-[1fr_125px] gap-2`}>
             <Link href={data.ad_link}><Button className={`w-full`}><ExternalLink /> {t('open_original')}</Button></Link>
 
-            {!userData.favorite.includes(data.id)
-                ? (<Button onClick={() => favoriteHandler('add')} variant={`outline`} className={`w-full`}><HeartPlus /> {t('favorite')}</Button>)
-                : (<Button onClick={() => favoriteHandler('remove')} className={`w-full`}><HeartMinus /> {t('favorite')}</Button>)
+
+            {!userData.favorite.includes(Number(data.id))
+                ? (<Button disabled={!userData && true} onClick={onAddToFavorite} variant={`outline`} className={`w-full`}><HeartPlus /> {t('favorite')}</Button>)
+                : (<Button disabled={!userData && true} onClick={onRemoveFromFavorite} className={`w-full`}><HeartMinus /> {t('favorite')}</Button>)
             }
         </div>
     );
