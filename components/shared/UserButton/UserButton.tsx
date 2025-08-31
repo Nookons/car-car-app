@@ -62,10 +62,7 @@ const UserButton: React.FC = () => {
                 };
                 setUid(tgUser.id.toString());
                 userPhotoUpdate(obj);
-            } else {
-                setUid("630519320"); // Тестовый пользователь, если нет Telegram
             }
-
 
             if (Number(tg.version) > 6) tg.requestFullscreen?.();
         } catch {
