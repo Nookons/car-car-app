@@ -1,115 +1,124 @@
 'use client';
 
-import React, {useEffect, useState} from 'react';
-import {Avatar, AvatarFallback, AvatarImage, Skeleton} from "@/components/ComponentsProvider";
+import React, { useEffect, useCallback, useState } from 'react';
 import Link from "next/link";
-import {useSearchParams} from "next/navigation";
-import {useUserStore} from "@/store/user/userStore";
-import {ITelegramUser, IUserFull} from "@/types/User";
-import {useQuery} from "@tanstack/react-query";
-import {getUserByUID} from "@/features/getUserByUID";
-import {userPhotoUpdate} from "@/features/user/userPhotoUpdate";
-import {getUserFavoriteList} from "@/features/user/getUserFavoriteList";
+import { useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+
+import {
+    Avatar,
+    AvatarFallback,
+    AvatarImage,
+    Skeleton
+} from "@/components/ComponentsProvider";
+
+import { useUserStore } from "@/store/user/userStore";
+import { ITelegramUser, IUserFull } from "@/types/User";
+import { getUserByUID } from "@/features/getUserByUID";
+import { userPhotoUpdate } from "@/features/user/userPhotoUpdate";
+import { getUserFavoriteList } from "@/features/user/getUserFavoriteList";
 
 
 const UserButton: React.FC = () => {
-    const static_uid = useSearchParams().get('uid')
+    const searchParams = useSearchParams();
     const setUserToStore = useUserStore((state) => state.setUserData);
     const addToFavorite = useUserStore((state) => state.addToFavorite);
 
-    const [uid, setUid] = useState<string | null>(null)
-
-    const {data, isLoading, isError, error} = useQuery<IUserFull, Error>({
-        queryKey: ['user', uid],
-        queryFn: () => getUserByUID(uid || ''),
-        enabled: !!uid,
-        staleTime: 5 * 60 * 1000,
+    // Инициализация uid сразу из query или Telegram
+    const [uid, setUid] = useState<string | null>(() => {
+        const queryUid = searchParams.get('uid');
+        const tgUid = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user?.id?.toString();
+        return queryUid || tgUid || null;
     });
 
-    useEffect(() => {
-        if (!uid) {
-            setUid(static_uid)
-        }
-    }, [uid]);
+    const {
+        data: userData,
+        isLoading,
+        isError,
+        error
+    } = useQuery<IUserFull, Error>({
+        queryKey: ['user', uid],
+        queryFn: () => getUserByUID(uid!),
+        enabled: !!uid,
+        staleTime: 5 * 60 * 1000
+    });
 
-
+    // Telegram WebApp готовность и photoUpdate
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
-        const tg = (window as any).Telegram?.WebApp;
+        const tg = (window as any)?.Telegram?.WebApp;
         if (!tg) return;
 
         try {
             tg.ready?.();
+
             const tgUser = tg.initDataUnsafe?.user as ITelegramUser | undefined;
 
-            if (tgUser !== undefined) {
+            if (tgUser) {
                 const obj = {
                     uid: tgUser.id.toString(),
                     photo_url: tgUser.photo_url || ""
-                }
-                setUid(tgUser.id.toString())
-                userPhotoUpdate(obj)
+                };
+                setUid(tgUser.id.toString());
+                userPhotoUpdate(obj);
+            } else {
+                setUid("630519320"); // Тестовый пользователь, если нет Telegram
             }
 
-            if (Number(tg.version) > 6) {
-                tg.requestFullscreen?.();
-            }
-        } catch (_) {
-            // ignore
+
+            if (Number(tg.version) > 6) tg.requestFullscreen?.();
+        } catch {
+            // игнор ошибок Telegram SDK
         }
-    }, [setUserToStore]);
+    }, []);
 
-    const setUserFavoriteStore = async () => {
-        if (data) {
-            try {
-                const user_id = data?.user_id.toString() || '';
-                const result = await getUserFavoriteList({user_id})
-
-                if (result && result.data.length > 0) {
-                    result.data.forEach(el => {
-                        addToFavorite(Number(el.car_id))
-                    })
-                }
-            } catch (error) {
-                console.log(error);
+    // Загрузка избранного
+    const setUserFavoriteStore = useCallback(async () => {
+        if (!userData) return;
+        try {
+            const user_id = userData.user_id.toString();
+            const result = await getUserFavoriteList({ user_id });
+            if (result?.data?.length) {
+                result.data.forEach((el) => addToFavorite(Number(el.car_id)));
             }
+        } catch (err) {
+            console.error("Error loading favorites:", err);
         }
-    }
+    }, [userData, addToFavorite]);
 
+    // Сохраняем пользователя в store
     useEffect(() => {
-        if (data) {
-            setUserToStore(data);
+        if (userData) {
+            setUserToStore(userData);
             setUserFavoriteStore();
-
         } else if (isError) {
-            console.error('Error push user to store:', error);
+            console.error("Error pushing user to store:", error);
         }
-    }, [data, isLoading, isError, error, setUserToStore]);
+    }, [userData, isError, error, setUserToStore, setUserFavoriteStore]);
 
-
-    if (isLoading) {
-        return (
-            <Skeleton className={`w-[32px] h-[32px]`}/>
-        )
-    }
-
-    if (!data) return null;
+    // --- UI ---
+    if (isLoading) return <Skeleton className="w-[32px] h-[32px]" />;
+    if (!userData) return null;
 
     return (
-        <div>
-            <Link href={`/${data.language_code}/user/${data.id}`} className="flex items-center gap-2">
-                <Avatar className="size-[32px] rounded">
-                    {data.photo_url ? (
-                        <AvatarImage
-                            src={data.photo_url}
-                            alt={data.username ? `@${data.username}` : 'User avatar'}
-                        />
-                    ) : null}
-                    <AvatarFallback>ER</AvatarFallback>
-                </Avatar>
-            </Link>
-        </div>
+        <Link
+            href={`/${userData.language_code}/user/${userData.id}`}
+            className="flex items-center gap-2"
+        >
+            <Avatar className="size-[32px] rounded">
+                {userData.photo_url ? (
+                    <AvatarImage
+                        src={userData.photo_url}
+                        alt={userData.username ? `@${userData.username}` : "User avatar"}
+                    />
+                ) : (
+                    <AvatarFallback>
+                        {userData.username?.[0]?.toUpperCase() || "U"}
+                    </AvatarFallback>
+                )}
+            </Avatar>
+        </Link>
     );
 };
 
