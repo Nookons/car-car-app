@@ -1,8 +1,9 @@
-import React, { Dispatch, SetStateAction } from 'react';
+import React, {Dispatch, SetStateAction, useEffect} from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 import {t} from "i18next";
+import {useUserStore} from "@/store/user/userStore";
 
 const sellerTypesInit = [
     { value: 'dealer', label: 'Autoryzowany Dealer', disabled: false },
@@ -14,6 +15,14 @@ const sellerTypesInit = [
 const SellerSelect = () => {
     const telegramData = useTelegramFormStore(state => state.data)
     const setSellerTypes = useTelegramFormStore(state => state.setSellerTypes)
+
+    const user_store_seller_types = useUserStore(state => state.user_data.seller_types)
+
+    useEffect(() => {
+        if (user_store_seller_types) {
+            setSellerTypes(user_store_seller_types)
+        }
+    }, [user_store_seller_types]);
 
     const onSellerHandler = (type: string) => {
         if (telegramData.sellerTypes.includes(type)) {

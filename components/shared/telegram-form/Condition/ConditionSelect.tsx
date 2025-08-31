@@ -1,8 +1,9 @@
-import React, { Dispatch, SetStateAction } from 'react';
+import React, {Dispatch, SetStateAction, useEffect} from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 import {t} from "i18next";
+import {useUserStore} from "@/store/user/userStore";
 
 const conditionTypesInit = [
     { value: 'used', label: 'Używany' },
@@ -12,6 +13,14 @@ const conditionTypesInit = [
 const ConditionSelect = () => {
     const telegramData = useTelegramFormStore(state => state.data)
     const setConditionTypes = useTelegramFormStore(state => state.setConditionTypes)
+
+    const user_store_condition = useUserStore(state => state.user_data.condition_types)
+
+    useEffect(() => {
+        if (user_store_condition) {
+            setConditionTypes(user_store_condition);
+        }
+    }, [user_store_condition]);
 
     const onSellerHandler = (type: string) => {
         if (telegramData.conditionTypes.includes(type)) {

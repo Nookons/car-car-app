@@ -9,63 +9,47 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ComponentsProvider';
-import React, { useEffect, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useUserStore } from "@/store/user/userStore";
+import React, {useEffect, useState} from 'react';
+import {useUserStore} from "@/store/user/userStore";
+import i18n from "i18next";
+import {usePathname, useRouter, useSearchParams} from "next/navigation";
 
 const LanguageSelect = () => {
-    const { i18n } = useTranslation();
+    const user = useUserStore(state => state.user_data)
+    const [selectedLang, setSelectedLang] = useState(user.language_code || "en");
+
     const router = useRouter();
     const pathname = usePathname();
-    const searchParams = useSearchParams();
-
-    const user_store = useUserStore((state) => state.user_data);
-
-    // Нормализуем код языка (чтобы en-US → en)
-    const normalizeLang = (lng: string) => lng.split('-')[0];
-
-    const changeLocale = useCallback(
-        (lng: string) => {
-            const normalizedLng = normalizeLang(lng);
-            if (i18n.language !== normalizedLng) {
-                i18n.changeLanguage(normalizedLng);
-                if (typeof window !== 'undefined') {
-                    localStorage.setItem('language', normalizedLng);
-                }
-
-                const segments = pathname.split('/').filter(Boolean);
-                if (segments.length > 0) {
-                    segments[0] = normalizedLng;
-                } else {
-                    segments.unshift(normalizedLng);
-                }
-
-                const newPath = '/' + segments.join('/');
-                const search = searchParams.toString();
-                const fullPath = search ? `${newPath}?${search}` : newPath;
-
-                router.replace(fullPath);
-            }
-        },
-        [i18n, pathname, searchParams, router]
-    );
+    const searchParams = useSearchParams(); // это хук, доступен только внутри компонента
 
     useEffect(() => {
-        const languageFromUrl = normalizeLang(pathname.split('/')[1] || 'en');
-
-        if (
-            user_store?.language_code &&
-            languageFromUrl !== user_store.language_code &&
-            normalizeLang(i18n.language) !== user_store.language_code
-        ) {
-            console.log('Change language to user setting:', user_store.language_code);
-            changeLocale(user_store.language_code);
+        if (user.language_code) {
+            handleLanguageChange(user.language_code);
         }
-    }, [user_store, pathname, i18n.language, changeLocale]);
+    }, [user]);
+
+    const handleLanguageChange = (value: string) => {
+        setSelectedLang(value);
+        i18n.changeLanguage(value);
+
+        // заменяем префикс языка в пути
+        const segments = pathname.split('/');
+        if (segments[1] && segments[1].length === 2) {
+            segments[1] = value;
+        } else {
+            segments.splice(1, 0, value);
+        }
+
+        // копируем searchParams в новый объект, чтобы собрать строку
+        const queryString = searchParams ? new URLSearchParams(searchParams).toString() : "";
+        const newPath = segments.join('/') || '/';
+        const finalUrl = queryString ? `${newPath}?${queryString}` : newPath;
+
+        router.push(finalUrl);
+    };
 
     return (
-        <Select onValueChange={changeLocale} value={normalizeLang(i18n.language)}>
+        <Select value={selectedLang} onValueChange={handleLanguageChange}>
             <SelectTrigger className="w-auto">
                 <SelectValue placeholder="Language" />
             </SelectTrigger>

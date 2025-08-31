@@ -8,6 +8,7 @@ import {IPriceResponse} from "@/types/Price";
 import {Input} from "@/components/ui/input";
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 import {t} from "i18next";
+import {useUserStore} from "@/store/user/userStore";
 
 
 
@@ -15,6 +16,19 @@ const PriceSelect = () => {
     const telegramData = useTelegramFormStore(state => state.data)
     const setMinPrice = useTelegramFormStore(state => state.setMinPrice)
     const setMaxPrice = useTelegramFormStore(state => state.setMaxPrice)
+
+    const user_store = useUserStore(state => state.user_data)
+
+    useEffect(() => {
+        if (user_store) {
+            if (user_store.min_price) {
+                setMinPrice(user_store.min_price)
+            }
+            if (user_store.max_price) {
+                setMaxPrice(user_store.max_price)
+            }
+        }
+    }, [user_store.min_price, user_store.max_price])
 
     const {data: IPriceResponse = {min_price: 0, max_price: 0}, isLoading, isError} = useQuery<IPriceResponse>({
         queryKey: ['prices'],
@@ -47,11 +61,11 @@ const PriceSelect = () => {
                             </div>
                         )
                     }
-                    {telegramData.minPrice > 0 && (
+                   {/* {telegramData.minPrice > 0 && (
                         <p className="text-neutral-500 text-x absolute top-13 right-3 -translate-y-1/2">
                             {Math.round(telegramData.minPrice / 4).toLocaleString()} $
                         </p>
-                    )}
+                    )}*/}
                 </div>
                 <div>
                     <ArrowLeftRight size={14} />
@@ -82,11 +96,11 @@ const PriceSelect = () => {
                             </div>
                         )
                     }
-                    {telegramData.maxPrice > 0 && (
+                    {/*{telegramData.maxPrice > 0 && (
                         <p className="text-neutral-500 text-x absolute top-13 right-3 -translate-y-1/2">
                             {Math.round(telegramData.maxPrice / 4).toLocaleString()} $
                         </p>
-                    )}
+                    )}*/}
                 </div>
             </div>
         </div>

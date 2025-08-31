@@ -1,13 +1,22 @@
-import React from 'react';
+import React, {useEffect} from 'react';
 import {CircleMinus, CirclePlus} from "lucide-react";
 import {Slider} from "@/components/ui/slider";
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 import {t} from "i18next";
 import { Badge } from '@/components/ComponentsProvider';
+import {useUserStore} from "@/store/user/userStore";
 
 const RangeFromUser = () => {
     const telegramData = useTelegramFormStore(state => state.data)
     const setRangeValue = useTelegramFormStore(state => state.setRangeValue)
+
+    const user_store_range = useUserStore(state => state.user_data.from_user_range)
+
+    useEffect(() => {
+        if (user_store_range) {
+            setRangeValue([user_store_range])
+        }
+    }, [user_store_range]);
 
     return (
         <div className={`relative`}>

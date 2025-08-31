@@ -1,8 +1,9 @@
-import React, { useCallback, useMemo } from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { useTelegramFormStore } from "@/store/telegram-form/TelegramForm";
 import {t} from "i18next";
+import {useUserStore} from "@/store/user/userStore";
 
 interface PlatformType {
     value: string;
@@ -21,7 +22,15 @@ const PlatformSelect = () => {
     const platformTypes = useTelegramFormStore(state => state.data.platformTypes);
     const setPlatformTypes = useTelegramFormStore(state => state.setPlatformTypes);
 
-    const onSellerHandler = (type: string) => {
+    const user_store_platforms = useUserStore(state => state.user_data.platform_types);
+
+    useEffect(() => {
+        if (user_store_platforms) {
+            setPlatformTypes(user_store_platforms);
+        }
+    }, [user_store_platforms]);
+
+    const onPlatformsPick = (type: string) => {
         if (platformTypes.includes(type)) {
             setPlatformTypes(platformTypes.filter(item => item !== type));
         } else {
@@ -63,7 +72,7 @@ const PlatformSelect = () => {
                                         key={type.value}
                                         className="px-2 text-foreground transition cursor-pointer select-none"
                                         variant={isSelected ? 'default' : 'secondary'}
-                                        onClick={() => onSellerHandler(type.value)}
+                                        onClick={() => onPlatformsPick(type.value)}
                                     >
                                         <article className="font-bold text-md">{type.label}</article>
                                     </Badge>

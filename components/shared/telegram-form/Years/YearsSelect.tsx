@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, {useEffect} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {ArrowLeftRight, LoaderCircle} from "lucide-react";
 import {Input} from "@/components/ui/input";
@@ -9,12 +9,27 @@ import {IYearResponse} from "@/types/Year";
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 import dayjs from "dayjs";
 import {t} from "i18next";
+import {useUserStore} from "@/store/user/userStore";
 
 
 const YearsSelect = () => {
     const telegramData = useTelegramFormStore(state => state.data)
     const setMinYear = useTelegramFormStore(state => state.setMinYear)
     const setMaxYear = useTelegramFormStore(state => state.setMaxYear)
+
+    const user_store = useUserStore(state => state.user_data)
+
+    useEffect(() => {
+        console.log(user_store);
+        if (user_store) {
+            if (user_store?.min_year) {
+                setMinYear(user_store.min_year.toString())
+            }
+            if (user_store?.max_year) {
+                setMaxYear(user_store.max_year.toString())
+            }
+        }
+    }, [user_store.min_year, user_store.max_year]);
 
     const {data: IYearResponse = {model: '', min_year: 0, max_year: 0}, isLoading, isError} = useQuery<IYearResponse>({
         queryKey: ['years_range'],
