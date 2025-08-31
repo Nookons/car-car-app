@@ -49,7 +49,7 @@ const LanguageSelect = () => {
     };
 
     return (
-        <Select value={selectedLang} onValueChange={handleLanguageChange}>
+        <Select  value={selectedLang} onValueChange={handleLanguageChange}>
             <SelectTrigger className="w-auto">
                 <SelectValue placeholder="Language" />
             </SelectTrigger>

@@ -84,3 +84,13 @@ export {DrawerDescription} from "@/components/ui/drawer";
 
 export {Separator} from "@/components/ui/separator";
 
+export {Dialog} from "@/components/ui/dialog";
+export {DialogClose} from "@/components/ui/dialog";
+export {DialogContent} from "@/components/ui/dialog";
+export {DialogDescription} from "@/components/ui/dialog";
+export {DialogFooter} from "@/components/ui/dialog";
+export {DialogHeader} from "@/components/ui/dialog";
+export {DialogOverlay} from "@/components/ui/dialog";
+export {DialogPortal} from "@/components/ui/dialog";
+export {DialogTitle} from "@/components/ui/dialog";
+export {DialogTrigger} from "@/components/ui/dialog";

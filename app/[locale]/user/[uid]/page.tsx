@@ -32,7 +32,6 @@ const Page =  ({ params }: PageProps) => {
             <UserMainInfo data={data} isLoading={isLoading}/>
             <FavoriteList data={data} isLoadingUser={isLoading} />
             <UserSearchSettings data={data} isLoading={isLoading}/>
-            <UserButtons/>
         </div>
     );
 };
