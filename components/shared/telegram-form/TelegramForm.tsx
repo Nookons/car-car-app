@@ -16,6 +16,7 @@ import ConditionCheckBox from './Conditions/ConditionCheckBox';
 import {useTelegramFormStore} from "@/store/telegram-form/TelegramForm";
 import RangeFromUser from "@/components/shared/telegram-form/RangeFromUser/RangeFromUser";
 import {t} from "i18next";
+import {ITelegramUser} from "@/types/User";
 
 const TelegramForm = () => {
     const [tg, setTg] = useState<any>(null);
@@ -56,6 +57,10 @@ const TelegramForm = () => {
         setTg(tg);
 
         tg.onEvent('sendMainData', onSendData);
+
+        const tgUser = tg.initDataUnsafe?.user as ITelegramUser | undefined;
+
+        console.log(tgUser)
 
         if (Number(tg.version) > 6) {
             tg.requestFullscreen();
