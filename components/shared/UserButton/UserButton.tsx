@@ -70,29 +70,15 @@ const UserButton: React.FC = () => {
         }
     }, []);
 
-    // Загрузка избранного
-    const setUserFavoriteStore = useCallback(async () => {
-        if (!userData) return;
-        try {
-            const user_id = userData.user_id.toString();
-            const result = await getUserFavoriteList({ user_id });
-            if (result?.data?.length) {
-                result.data.forEach((el) => addToFavorite(Number(el.car_id)));
-            }
-        } catch (err) {
-            console.error("Error loading favorites:", err);
-        }
-    }, [userData, addToFavorite]);
 
     // Сохраняем пользователя в store
     useEffect(() => {
         if (userData) {
             setUserToStore(userData);
-            setUserFavoriteStore();
         } else if (isError) {
             console.error("Error pushing user to store:", error);
         }
-    }, [userData, isError, error, setUserToStore, setUserFavoriteStore]);
+    }, [userData, isError, error, setUserToStore]);
 
     // --- UI ---
     if (isLoading) return <Skeleton className="w-[32px] h-[32px]" />;

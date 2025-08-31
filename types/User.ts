@@ -1,4 +1,3 @@
-
 export interface IUserFull {
     user_id: number;
     brand: string[] | null;
@@ -59,10 +58,6 @@ interface IUserFavorite {
     car_id: string;
 }
 
-export interface IUserFavoriteResponse {
-    data: IUserFavorite[];
-    success: boolean;
-}
 
 export interface IUserStore {
     favorite: number[]

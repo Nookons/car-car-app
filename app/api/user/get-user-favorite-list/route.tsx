@@ -1,36 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 
-export async function POST(request: NextRequest) {
-    const client = await pool.connect();
-
+export async function GET(request: NextRequest) {
     try {
-        const body = await request.json();
-        const { user_id } = body;
+        const { searchParams } = new URL(request.url);
+        const uid = searchParams.get('uid');
 
-        if (!user_id) {
-            return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
+        if (!uid) {
+            return NextResponse.json({ error: 'Invalid uid parameter' }, { status: 400 });
         }
 
-        const userId = Number(user_id);
-        if (isNaN(userId)) {
-            return NextResponse.json({ error: "Invalid user_id" }, { status: 400 });
-        }
+        const client = await pool.connect();
 
-        // Простой запрос к таблице без функции
-        const query = `
-            SELECT *
-            FROM users_favorite
-            WHERE user_id = $1
-            ORDER BY created_at DESC;
-        `;
-        const res = await client.query(query, [userId]);
+        const res = await client.query(`
+            SELECT a.*
+            FROM users_favorite uf
+                     JOIN cars a ON uf.car_id = a.id
+            WHERE uf.user_id = $1
+            ORDER BY uf.created_at DESC;
+        `, [uid]);
 
-        return NextResponse.json({ success: true, data: res.rows }, { status: 200 });
-    } catch (error) {
-        console.error("Unexpected error:", error);
-        return NextResponse.json({ error: "Failed to fetch favorites" }, { status: 500 });
-    } finally {
         client.release();
+
+        return NextResponse.json(res.rows);
+    } catch (error) {
+        console.error('Database query error:', error);
+        return NextResponse.json({ error: 'Failed to fetch cars' }, { status: 500 });
     }
 }

@@ -6,6 +6,7 @@ import UserMainInfo from "@/components/shared/User/UserMainInfo";
 import UserButtons from "@/components/shared/User/UserButtons";
 import UserSearchSettings from "@/components/shared/User/UserSearchSettings";
 import {getUserByUID} from "@/features/getUserByUID";
+import FavoriteList from "@/components/shared/User/FavoriteList";
 
 
 type PageProps = {
@@ -29,6 +30,7 @@ const Page =  ({ params }: PageProps) => {
     return (
         <div className={`px-4`}>
             <UserMainInfo data={data} isLoading={isLoading}/>
+            <FavoriteList data={data} isLoadingUser={isLoading} />
             <UserSearchSettings data={data} isLoading={isLoading}/>
             <UserButtons/>
         </div>

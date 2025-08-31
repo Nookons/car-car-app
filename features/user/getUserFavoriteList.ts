@@ -1,14 +1,16 @@
-import {IUserFavoriteResponse} from "@/types/User";
+import {ICarAdd} from "@/types/Car";
 
-export const getUserFavoriteList = async ({user_id,}: { user_id: string }): Promise<IUserFavoriteResponse> => {
+export const getUserFavoriteList = async (user_id: string): Promise<ICarAdd[]> => {
     const base_url = process.env.NEXT_PUBLIC_BASE_URL;
 
-    const res = await fetch(`${base_url}api/user/get-user-favorite-list`, {
-        method: 'POST',
+    console.log(user_id)
+
+    const res = await fetch(`${base_url}api/user/get-user-favorite-list?uid=${user_id}`, {
+        method: 'GET',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id }),
         cache: 'no-store',
     });
+
 
     if (!res.ok) {
         throw new Error(`Failed to get user favorite list: ${res.status} ${res.statusText}`);
