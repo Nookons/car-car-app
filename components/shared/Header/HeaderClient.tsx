@@ -7,6 +7,7 @@ import UserButton from "@/components/shared/UserButton/UserButton";
 import {useRouter} from "next/navigation";
 import {ChevronLeft, CircleChevronLeft, MoveLeft} from "lucide-react";
 import {Button} from "@/components/ComponentsProvider";
+import UserLogic from "@/components/shared/Header/userLogic";
 
 
 const Header = () => {
@@ -16,6 +17,7 @@ const Header = () => {
         <div
             className="w-full relative items-center pt-15 grad h-full top-0 left-0 bg-gradient-to-b from-primary/65 via-background to-background "
         >
+            <UserLogic />
             <div className={`grid grid-cols-2`}>
                 <div className={`col-span-2 text-center`}>
                     <h1 className="font-bold text-xl text-primary">CarCar</h1>

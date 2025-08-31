@@ -37,6 +37,9 @@ export default function RootLayout({children}: Readonly<{ children: React.ReactN
                     closeButton
                     richColors
                     position="bottom-center"
+                    toastOptions={{
+                        style: { marginBottom: '20px' } // отступ от низа
+                    }}
                 />
                 <HeaderWrapper />
                 {children}

@@ -8,17 +8,18 @@ import {t} from 'i18next';
 import {Avatar, AvatarImage, Separator} from "@/components/ComponentsProvider";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
+import {useUserStore} from "@/store/user/userStore";
 dayjs.extend(utc);
 
 const CarListAd = ({carAd}: { carAd: ICarAdd }) => {
-
+    const favorite_data = useUserStore(state => state.data.favorite)
     const time = carAd.post_date;
     const ts = dayjs.utc(time).unix();
 
     return (
         <>
             <Link href={`/en/car/${carAd.id}`} key={carAd.id} className="block w-full">
-                <Card>
+                <Card className={`${favorite_data.includes(carAd.id) && "bg-primary/25"}`}>
                     <CardTitle>
                         <div className={`flex items-center justify-between gap-2`}>
                             <div className={`flex items-center gap-2`}>

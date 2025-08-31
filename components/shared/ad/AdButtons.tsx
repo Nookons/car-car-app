@@ -2,7 +2,7 @@ import React, {useEffect} from 'react';
 import {Button, Skeleton} from "@/components/ComponentsProvider";
 import {ICarAdd} from "@/types/Car";
 import {useTranslation} from "react-i18next";
-import {ExternalLink, HeartMinus, HeartPlus} from "lucide-react";
+import {ExternalLink, HeartMinus, HeartPlus, Share2} from "lucide-react";
 import Link from "next/link";
 import {toast} from "sonner";
 import dayjs from "dayjs";
@@ -29,7 +29,7 @@ const AdButtons: React.FC<Props> = ({data, isLoading}) => {
     const onAddToFavorite = async () => {
         if (!data) return
 
-        addToFavoriteStore(Number(data.id)); // обновляем локальный стор
+        addToFavoriteStore(data.id); // обновляем локальный стор
 
         const adIdStr = data.id.toString();
         const userIdStr = user_store.user_id.toString();
@@ -55,7 +55,7 @@ const AdButtons: React.FC<Props> = ({data, isLoading}) => {
     const onRemoveFromFavorite = async () => {
         if (!data) return
 
-        removeFromFavoriteStore(Number(data.id)); // обновляем локальный стор
+        removeFromFavoriteStore(data.id); // обновляем локальный стор
 
         const adIdStr = data.id.toString();
         const userIdStr = user_store.user_id.toString();
@@ -69,12 +69,27 @@ const AdButtons: React.FC<Props> = ({data, isLoading}) => {
                 )}`,
             });
         } catch (error: any) {
-            addToFavoriteStore(Number(data.id))
+            addToFavoriteStore(data.id)
             toast.error(`${data?.title}`, {
                 description: `${error?.message || error?.toString()}`,
             });
         }
     }
+
+    const handleShare = () => {
+        if (typeof navigator !== 'undefined' && navigator.share) {
+            navigator.share({
+                title: data?.title,
+                text: 'Check out this car! On CarCar 🙈',
+                url: window.location.href
+            })
+                .then(() => console.log('Shared successfully!'))
+                .catch((err) => console.error('Sharing error:', err))
+        } else {
+            alert('Sharing is not supported on this device')
+        }
+    }
+
 
 
     if (isLoading) {
@@ -86,14 +101,20 @@ const AdButtons: React.FC<Props> = ({data, isLoading}) => {
     if (!data) return null;
 
     return (
-        <div className={`grid grid-cols-[1fr_125px] gap-2`}>
+        <div className={`grid grid-cols-[1fr_45px_45px] gap-2`}>
             <Link href={data.ad_link}><Button className={`w-full`}><ExternalLink /> {t('open_original')}</Button></Link>
 
 
-            {!userData.favorite.includes(Number(data.id))
-                ? (<Button disabled={!userData && true} onClick={onAddToFavorite} variant={`outline`} className={`w-full`}><HeartPlus /> {t('favorite')}</Button>)
-                : (<Button disabled={!userData && true} onClick={onRemoveFromFavorite} className={`w-full`}><HeartMinus /> {t('favorite')}</Button>)
+            {!userData.favorite.includes(data.id)
+                ? (<Button disabled={!userData && true} onClick={onAddToFavorite} variant={`outline`} className={`w-full`}><HeartPlus /> </Button>)
+                : (<Button disabled={!userData && true} onClick={onRemoveFromFavorite} className={`w-full`}><HeartMinus /> </Button>)
             }
+            <Button
+                variant={`outline`}
+                onClick={handleShare} // Web Share API или кастомная логика
+            >
+                <Share2 className="w-5 h-5" />
+            </Button>
         </div>
     );
 };

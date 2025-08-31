@@ -1,5 +1,5 @@
 'use client';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {useUserStore} from '@/store/user/userStore';
 import {Skeleton} from '@/components/ui/skeleton';
@@ -69,11 +69,16 @@ const CarList = () => {
         return pages;
     };
 
+
     const setNewPage = ({e, newPage}: { e: React.MouseEvent<HTMLAnchorElement>, newPage: number }) => {
         e.preventDefault(); // чтобы избежать стандартного поведения ссылки (если нужно)
         setPageNumber(newPage);
-        // Прокручиваем страницу вверх
-        window.scrollTo({top: 0, behavior: 'smooth'});
+
+        if (document.scrollingElement) {
+            document.scrollingElement.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     };
 
 

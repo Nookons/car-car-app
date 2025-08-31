@@ -74,6 +74,7 @@ const UserButton: React.FC = () => {
     // Сохраняем пользователя в store
     useEffect(() => {
         if (userData) {
+            console.log(userData);
             setUserToStore(userData);
         } else if (isError) {
             console.error("Error pushing user to store:", error);

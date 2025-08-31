@@ -11,11 +11,13 @@ import {
     CarouselPrevious,
     Skeleton,
     Dialog,
-    DialogContent, DialogTitle,
+    DialogContent, DialogTitle, DialogClose, Button, DialogDescription,
 } from "@/components/ComponentsProvider"
 import Image from "next/image"
 import { CarouselApi } from "@/components/ui/carousel"
 import Autoplay from "embla-carousel-autoplay"
+import {VisuallyHidden} from "@radix-ui/react-visually-hidden";
+import {X} from "lucide-react";
 
 interface Props {
     data: ICarAdd | undefined;
@@ -93,16 +95,23 @@ const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
                 Slide {current} of {count}
             </div>
 
-            {/* FULLSCREEN DIALOG */}
+
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
-                <DialogTitle>
-                    test
-                </DialogTitle>
                 <DialogContent className="max-w-full w-full h-full p-0 bg-black">
-                    <Carousel
-                        className="w-full h-full"
-                        opts={{ startIndex: selectedIndex }}
-                    >
+                    <VisuallyHidden>
+                        <DialogTitle>Car images</DialogTitle>
+                    </VisuallyHidden>
+
+                    {/* Кастомная кнопка закрытия */}
+                    <DialogClose asChild>
+                        <Button
+                            className="absolute bottom-4 right-4 z-50 text-white bg-black/50 rounded-full p-2 hover:bg-black/70"
+                        >
+                            <X className="w-12 h-12" />
+                        </Button>
+                    </DialogClose>
+
+                    <Carousel className="w-full h-full" opts={{ startIndex: selectedIndex }}>
                         <CarouselContent>
                             {ready_data.map((img, index) => (
                                 <CarouselItem key={index} className="flex items-center justify-center">
@@ -112,7 +121,7 @@ const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
                                         width={1920}
                                         height={1080}
                                         src={
-                                            img !== 'unknown'
+                                            img !== "unknown"
                                                 ? img.replace(/;s=\d+x\d+/, ";s=1920x1080")
                                                 : "https://dtprodvehicleimages.blob.core.windows.net/assets/marketplace/no-car-img.png"
                                         }
@@ -121,6 +130,7 @@ const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
                                 </CarouselItem>
                             ))}
                         </CarouselContent>
+                        <DialogDescription className={`absolute bottom-4 left-1/2 -translate-x-1/2`}>Slides ( {count} )</DialogDescription>
                         <CarouselPrevious className="text-white" />
                         <CarouselNext className="text-white" />
                     </Carousel>
