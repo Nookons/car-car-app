@@ -58,7 +58,7 @@ const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
     if (!data) return null;
 
     return (
-        <>
+        <div className={`relative mask-b-from-50% `}>
             <Carousel
                 plugins={[Autoplay({ delay: 5000 })]}
                 setApi={setApi}
@@ -91,24 +91,25 @@ const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
                     ))}
                 </CarouselContent>
             </Carousel>
-            <div className="text-muted-foreground py-2 text-center text-sm">
-                Slide {current} of {count}
+            <div className="absolute text-xs bg-background/50 px-4 py-2 rounded-2xl top-2 right-2 text-center">
+                {current} / {count}
             </div>
 
 
+
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
-                <DialogContent className="max-w-full w-full h-full p-0 bg-black">
+                <DialogContent className="max-w-full rounded-none w-full h-full p-0 bg-background">
                     <VisuallyHidden>
                         <DialogTitle>Car images</DialogTitle>
                     </VisuallyHidden>
 
                     {/* Кастомная кнопка закрытия */}
                     <DialogClose asChild>
-                        <Button
-                            className="absolute bottom-4 right-4 z-50 text-white bg-black/50 rounded-full p-2 hover:bg-black/70"
+                        <div
+                            className="absolute bottom-5 right-5 z-50 "
                         >
-                            <X className="w-12 h-12" />
-                        </Button>
+                            <X className="w-12 h-12 bg-primary/25 rounded-full p-2 cursor-pointer" />
+                        </div>
                     </DialogClose>
 
                     <Carousel className="w-full h-full" opts={{ startIndex: selectedIndex }}>
@@ -130,13 +131,13 @@ const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
                                 </CarouselItem>
                             ))}
                         </CarouselContent>
-                        <DialogDescription className={`absolute bottom-4 left-1/2 -translate-x-1/2`}>Slides ( {count} )</DialogDescription>
+                        {/*<DialogDescription className={`absolute bottom-4 left-1/2 -translate-x-1/2`}>Slides ( {count} )</DialogDescription>*/}
                         <CarouselPrevious className="text-white" />
                         <CarouselNext className="text-white" />
                     </Carousel>
                 </DialogContent>
             </Dialog>
-        </>
+        </div>
     )
 }
 

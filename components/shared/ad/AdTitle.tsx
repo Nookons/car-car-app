@@ -17,7 +17,7 @@ const AdTitle: React.FC<Props> = ({ data, isLoading }) => {
 
     if (isLoading) {
         return (
-            <div className="grid grid-cols-[1fr_125px] gap-2 mb-4 w-full">
+            <div className="grid grid-cols-[1fr_125px] gap-2 my-4 w-full">
                 <Skeleton className="w-full h-16" />
                 <Skeleton className="w-full h-8" />
             </div>

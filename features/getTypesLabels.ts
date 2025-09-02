@@ -58,6 +58,8 @@ export function getBodyTypeLabel(type: string) {
     switch (type.toLowerCase()) {
         case "small_car":
             return t("body_type_object.small_car")
+        case "hatchback":
+            return t("body_type_object.hatchback")
         case "city_car":
             return t("body_type_object.city_car")
         case "coupe":

@@ -67,6 +67,7 @@
     "minivan": "Minivan",
     "sedan": "Sedan",
     "suv": "SUV",
+    "hatchback": "Hatchback",
     "unknown": "Not specified"
   },
 

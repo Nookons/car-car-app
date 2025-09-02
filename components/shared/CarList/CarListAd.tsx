@@ -23,9 +23,19 @@ const CarListAd = ({carAd}: { carAd: ICarAdd }) => {
                     <CardTitle>
                         <div className={`flex items-center justify-between gap-2`}>
                             <div className={`flex items-center gap-2`}>
-                                <Avatar className={`w-14 h-6`}>
-                                    <AvatarImage src={`https://prowly-prod.s3.eu-west-1.amazonaws.com/uploads/landing_page_image/image/375764/37a4c1624960366798b450b042305934.png`} />
-                                </Avatar>
+                                {
+                                    carAd.platform === "olx"
+                                        ?
+                                        <Avatar className={`w-9 h-6`}>
+                                            <AvatarImage src={`https://upload.wikimedia.org/wikipedia/commons/4/42/OLX_New_Logo.png`} />
+                                        </Avatar>
+                                        :
+                                        <Avatar className={`w-14 h-6`}>
+                                            <AvatarImage src={`https://prowly-prod.s3.eu-west-1.amazonaws.com/uploads/landing_page_image/image/375764/37a4c1624960366798b450b042305934.png`} />
+                                        </Avatar>
+
+                                }
+
                                 <span className={`line-clamp-1`}>{carAd.title}</span>
                             </div>
                             <div className={`flex items-center gap-2`}>
