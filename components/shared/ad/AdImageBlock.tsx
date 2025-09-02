@@ -76,6 +76,7 @@ const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
                             >
                                 <Image
                                     priority
+                                    unoptimized
                                     className="rounded h-[280px] w-full object-cover"
                                     width={1200}
                                     height={270}
@@ -97,17 +98,15 @@ const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
 
 
 
-            <Dialog open={isOpen} onOpenChange={setIsOpen}>
-                <DialogContent className="max-w-full rounded-none w-full h-full p-0 bg-background">
+            <Dialog  open={isOpen} onOpenChange={setIsOpen}>
+                <DialogContent showCloseButton={false} className="max-w-full rounded-none w-full h-full p-0 bg-background [&>button[data-radix-dialog-close]]:hidden">
                     <VisuallyHidden>
                         <DialogTitle>Car images</DialogTitle>
                     </VisuallyHidden>
 
-                    {/* Кастомная кнопка закрытия */}
+                    {/* Твой кастомный крестик */}
                     <DialogClose asChild>
-                        <div
-                            className="absolute bottom-5 right-5 z-50 "
-                        >
+                        <div className="absolute bottom-5 right-5 z-50">
                             <X className="w-12 h-12 bg-primary/25 rounded-full p-2 cursor-pointer" />
                         </div>
                     </DialogClose>
@@ -118,6 +117,7 @@ const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
                                 <CarouselItem key={index} className="flex items-center justify-center">
                                     <Image
                                         priority
+                                        unoptimized
                                         className="object-contain w-full h-screen"
                                         width={1920}
                                         height={1080}

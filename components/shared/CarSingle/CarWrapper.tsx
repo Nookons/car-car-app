@@ -13,6 +13,7 @@ import {ICarAdd} from "@/types/Car";
 import {getCarById} from "@/features/getCarById";
 import {MousePointerClick} from "lucide-react";
 import {VisuallyHidden} from "@radix-ui/react-visually-hidden";
+import { Button } from '@/components/ComponentsProvider';
 
 const CarWrapper = ({id}: {id: string}) => {
     const [tg, setTg] = useState<any>(null);
@@ -77,18 +78,20 @@ const CarWrapper = ({id}: {id: string}) => {
 
             <Drawer>
                 <DrawerTrigger asChild>
-                    <div className="w-full px-2 cursor-pointer mt-12">
-                        <div className={`flex justify-start text-xs items-center gap-2 mb-4 `}>
-                            <MousePointerClick className={`text-primary`} />
-                            <p className={`text-neutral-500`}>Click to read full</p>
+                    <div
+                        className="w-full px-2 cursor-pointer mt-12"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex justify-start text-xs items-center gap-2 mb-4">
+                            <MousePointerClick className="text-primary" />
+                            <p className="text-neutral-500">Click to read full</p>
                         </div>
-                        <h4 className={`font-semibold text-xl mb-4`}>{data?.title}</h4>
-                        <p className={`line-clamp-3 mask-b-from-35%`}>
-                            {data?.description ? data.description + '...' : 'Описание отсутствует'}
+                        <h4 className="font-semibold text-xl mb-4">{data?.title}</h4>
+                        <p className="line-clamp-3 mask-b-from-35%">
+                            {data?.description ? data.description + "..." : "Описание отсутствует"}
                         </p>
                     </div>
                 </DrawerTrigger>
-
 
                 <DrawerContent className="fixed bottom-0 left-0 right-0 rounded-t-[10px] h-[90vh] lg:h-[80vh] flex flex-col p-4 shadow-lg">
                     <DrawerTitle>
