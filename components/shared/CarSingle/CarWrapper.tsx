@@ -93,7 +93,7 @@ const CarWrapper = ({id}: {id: string}) => {
                     </div>
                 </DrawerTrigger>
 
-                <DrawerContent className="fixed bottom-0 left-0 right-0 rounded-t-[10px] h-[90vh] lg:h-[80vh] flex flex-col p-4 shadow-lg">
+                <DrawerContent onClick={(e) => e.stopPropagation()} className="fixed bottom-0 left-0 right-0 rounded-t-[10px] h-[90vh] lg:h-[80vh] flex flex-col p-4 shadow-lg">
                     <DrawerTitle>
                         <VisuallyHidden>{data?.title}</VisuallyHidden>
                     </DrawerTitle>
