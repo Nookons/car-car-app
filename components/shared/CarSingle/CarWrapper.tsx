@@ -13,10 +13,12 @@ import {ICarAdd} from "@/types/Car";
 import {getCarById} from "@/features/getCarById";
 import {MousePointerClick} from "lucide-react";
 import {VisuallyHidden} from "@radix-ui/react-visually-hidden";
-import { Button } from '@/components/ComponentsProvider';
+import {Button} from '@/components/ComponentsProvider';
 
-const CarWrapper = ({id}: {id: string}) => {
+const CarWrapper = ({id}: { id: string }) => {
     const [tg, setTg] = useState<any>(null);
+
+    const [isFullDescription, setIsFullDescription] = useState<boolean>(false)
 
     const {data, isLoading, isError, error} = useQuery<ICarAdd, Error>({
         queryKey: ['car', id],
@@ -76,36 +78,21 @@ const CarWrapper = ({id}: {id: string}) => {
                 />
             </div>
 
-            <Drawer>
-                <DrawerTrigger asChild>
-                    <div
-                        className="w-full px-2 cursor-pointer mt-12"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex justify-start text-xs items-center gap-2 mb-4">
-                            <MousePointerClick className="text-primary" />
-                            <p className="text-neutral-500">Click to read full</p>
-                        </div>
-                        <h4 className="font-semibold text-xl mb-4">{data?.title}</h4>
-                        <p className="line-clamp-3 mask-b-from-35%">
-                            {data?.description ? data.description + "..." : "Описание отсутствует"}
-                        </p>
-                    </div>
-                </DrawerTrigger>
+            <div
+                className="w-full px-2  cursor-pointer mt-12"
+                onClick={() => setIsFullDescription(!isFullDescription)}
+            >
+                <div className="flex justify-start text-xs items-center gap-2 mb-2">
+                    <MousePointerClick className="text-primary"/>
+                    <p className="text-neutral-500">Click to read full</p>
+                </div>
+                <h4 className="font-semibold text-xl mb-2">{data?.title}</h4>
+                <div
+                    className={`prose overflow-hidden max-w-full ${!isFullDescription && "line-clamp-3 mask-b-from-50%" }`}
+                    dangerouslySetInnerHTML={{__html: data?.description || ""}}
+                />
+            </div>
 
-                <DrawerContent onClick={(e) => e.stopPropagation()} className="fixed bottom-0 left-0 right-0 rounded-t-[10px] h-[90vh] lg:h-[80vh] flex flex-col p-4 shadow-lg">
-                    <DrawerTitle>
-                        <VisuallyHidden>{data?.title}</VisuallyHidden>
-                    </DrawerTitle>
-                    <div className="w-full flex flex-col overflow-y-auto flex-1">
-                        <div className="mx-auto w-12 h-1.5 rounded-full mb-4" aria-hidden />
-                        <div
-                            className="prose max-w-full"
-                            dangerouslySetInnerHTML={{ __html: data?.description || "" }}
-                        />
-                    </div>
-                </DrawerContent>
-            </Drawer>
 
             <FullParams
                 isLoading={isLoading}
