@@ -99,7 +99,7 @@ const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
 
 
             <Dialog  open={isOpen} onOpenChange={setIsOpen}>
-                <DialogContent showCloseButton={false} className="max-w-full rounded-none w-full h-full p-0 bg-background [&>button[data-radix-dialog-close]]:hidden">
+                <DialogContent showCloseButton={false} className="max-w-screen rounded-none w-full h-full p-0 bg-background [&>button[data-radix-dialog-close]]:hidden">
                     <VisuallyHidden>
                         <DialogTitle>Car images</DialogTitle>
                     </VisuallyHidden>

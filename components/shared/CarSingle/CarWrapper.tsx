@@ -110,10 +110,6 @@ const CarWrapper = ({id}: { id: string }) => {
             <AdMap
                 link={data?.map_url}
             />
-
-            <div className={`flex justify-center pt-12`}>
-                <b className={`text-neutral-500 text-x`}>© 2025, CarCar.</b>
-            </div>
         </div>
     );
 };

@@ -15,7 +15,7 @@ const Page = ({params}: PageProps) => {
     const id = resolvedParams.id;
 
     return (
-        <div className={`grid grid-cols-1 gap-2 px-2 py-4 pb-10 max-w-[1200px] m-auto`}>
+        <div className={`grid grid-cols-1 gap-2 px-2 py-4 pb-10 max-w-[800px] m-auto`}>
             <CarWrapper id={id} />
             <Script
                 src="https://telegram.org/js/telegram-web-app.js?57"

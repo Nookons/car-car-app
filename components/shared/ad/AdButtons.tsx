@@ -10,6 +10,7 @@ import {useSearchParams} from "next/navigation";
 import {useUserStore} from "@/store/user/userStore";
 import {addToFavorite} from "@/features/user/addToFavorite";
 import {removeFromFavorite} from "@/features/user/removeFromFavorite";
+import {TelegramShareButton} from "react-share";
 
 interface Props {
     data: ICarAdd | undefined;
@@ -76,21 +77,7 @@ const AdButtons: React.FC<Props> = ({data, isLoading}) => {
         }
     }
 
-    const handleShare = () => {
-        if (typeof navigator !== 'undefined' && navigator.share) {
-            navigator.share({
-                title: data?.title,
-                text: 'Check out this car! On CarCar 🙈',
-                url: window.location.href
-            })
-                .then(() => console.log('Shared successfully!'))
-                .catch((err) => console.error('Sharing error:', err))
-        } else {
-            alert('Sharing is not supported on this device')
-        }
-    }
-
-
+    const message = "Check out CarCar! This platform collects car listings for you.";
 
     if (isLoading) {
         return (
@@ -109,12 +96,14 @@ const AdButtons: React.FC<Props> = ({data, isLoading}) => {
                 ? (<Button disabled={!userData && true} onClick={onAddToFavorite} variant={`outline`} className={`w-full`}><HeartPlus /> </Button>)
                 : (<Button disabled={!userData && true} onClick={onRemoveFromFavorite} className={`w-full`}><HeartMinus /> </Button>)
             }
-            <Button
-                variant={`outline`}
-                onClick={handleShare} // Web Share API или кастомная логика
-            >
-                <Share2 className="w-5 h-5" />
-            </Button>
+            <TelegramShareButton title={message} url={`https://car-car-app.vercel.app/${user_store.language_code || "en"}/car/${data.id}`}>
+                <Button
+                    variant={`outline`}
+                >
+                    <Share2 className="w-5 h-5" />
+                </Button>
+            </TelegramShareButton>
+
         </div>
     );
 };

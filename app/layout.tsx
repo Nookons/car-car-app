@@ -8,6 +8,7 @@ import HeaderWrapper from "@/components/shared/Header/HeaderWrapper";
 import { Toaster } from 'sonner'
 import Script from "next/script";
 import React from "react";
+import Footer from "@/components/shared/Footer/Footer";
 
 const nunito = Nunito({
     variable: '--font-nunito',
@@ -43,6 +44,7 @@ export default function RootLayout({children}: Readonly<{ children: React.ReactN
                 />
                 <HeaderWrapper />
                 {children}
+                <Footer />
                 <Script
                     src="https://telegram.org/js/telegram-web-app.js?57"
                     strategy="beforeInteractive"
