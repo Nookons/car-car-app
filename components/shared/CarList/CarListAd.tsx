@@ -18,7 +18,7 @@ const CarListAd = ({carAd}: { carAd: ICarAdd }) => {
     // Локальная дата с корректировкой для OLX
     const formattedDate = carAd.post_date
         ? dayjs(carAd.post_date)
-            .add(carAd.platform === "olx" ? 2 : 0, "hour")
+            .add(carAd.platform === "oto_moto" ? -2 : 0, "hour")
             .format("YYYY-MM-DD HH:mm")
         : "";
 
