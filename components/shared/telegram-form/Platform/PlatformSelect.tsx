@@ -13,7 +13,7 @@ interface PlatformType {
 
 const platformTypesInit: PlatformType[] = [
     { value: 'oto_moto', label: 'OTO MOTO', disabled: false },
-    { value: 'olx', label: 'OLX', disabled: true },
+    { value: 'olx', label: 'OLX', disabled: false },
     { value: 'facebook', label: 'Facebook', disabled: true },
     { value: 'sprzedajemy', label: 'Sprzedajemy Pl', disabled: true },
 ];

@@ -64,10 +64,11 @@
     "convertible": "敞篷车",
     "station_wagon": "旅行车",
     "compact": "紧凑型车",
-    "minivan": "多功能车",
+    "minivan": "小型面包车",
     "sedan": "轿车",
-    "suv": "SUV",
-    "unknown": "未知"
+    "suv": "运动型多用途车 (SUV)",
+    "hatchback": "掀背车",
+    "unknown": "未指定"
   },
 
   "fuel_type_object": {

@@ -60,13 +60,14 @@
   "body_type_object": {
     "small_car": "Mały samochód",
     "city_car": "Samochód miejski",
-    "coupe": "Coupe",
+    "coupe": "Coupé",
     "convertible": "Kabriolet",
     "station_wagon": "Kombi",
     "compact": "Kompakt",
     "minivan": "Minivan",
     "sedan": "Sedan",
     "suv": "SUV",
+    "hatchback": "Hatchback",
     "unknown": "Nie określono"
   },
 

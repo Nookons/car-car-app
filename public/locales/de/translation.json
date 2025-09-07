@@ -61,12 +61,13 @@
     "small_car": "Kleinwagen",
     "city_car": "Stadtwagen",
     "coupe": "Coupé",
-    "convertible": "Cabriolet",
+    "convertible": "Cabrio",
     "station_wagon": "Kombi",
     "compact": "Kompaktwagen",
     "minivan": "Minivan",
     "sedan": "Limousine",
     "suv": "SUV",
+    "hatchback": "Schrägheck",
     "unknown": "Nicht angegeben"
   },
 

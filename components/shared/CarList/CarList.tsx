@@ -70,16 +70,33 @@ const CarList = () => {
     };
 
 
-    const setNewPage = ({e, newPage}: { e: React.MouseEvent<HTMLAnchorElement>, newPage: number }) => {
-        e.preventDefault(); // чтобы избежать стандартного поведения ссылки (если нужно)
+    const setNewPage = ({ e, newPage }: { e: React.MouseEvent<HTMLAnchorElement>, newPage: number }) => {
+        e.preventDefault();
         setPageNumber(newPage);
 
-        if (document.scrollingElement) {
-            document.scrollingElement.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+        let scrolled = false;
+
+        // 👉 сначала пробуем через Telegram API
+        try {
+            if (window.Telegram?.WebApp?.scrollTo) {
+                window.Telegram.WebApp.scrollTo(0, 0);
+                scrolled = true;
+            }
+        } catch (err) {
+            console.warn("Telegram scrollTo failed:", err);
+        }
+
+        // 👉 если не получилось — fallback
+        if (!scrolled) {
+            if (document.scrollingElement) {
+                document.scrollingElement.scrollTo({ top: 0, behavior: "smooth" });
+            } else {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+            }
         }
     };
+
+
 
 
     if (data.items.length === 0) {
@@ -110,7 +127,7 @@ const CarList = () => {
     }
 
     return (
-        <div className="flex flex-col items-center gap-4">
+        <div className="flex overflow-hidden flex-col items-center gap-4">
             {data.items.map((carAd: any) => (
                 <CarListAd key={carAd.id} carAd={carAd}/>
             ))}

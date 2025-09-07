@@ -1,4 +1,5 @@
 import React from 'react';
+import {MapPin} from "lucide-react";
 
 function getGoogleMapEmbedUrl(originalUrl: string): string | null {
     try {
@@ -17,11 +18,15 @@ function getGoogleMapEmbedUrl(originalUrl: string): string | null {
     }
 }
 
-const AdMap = ({link}: {link: string | undefined}) => {
+const AdMap = ({link, location_text}: {link: string | undefined, location_text: string | undefined}) => {
     const googleMapEmbedUrl = getGoogleMapEmbedUrl(link || "");
 
     return (
         <div className={`mt-10`}>
+            <div className={`flex gap-2 items-center mb-2 text-neutral-500 font-semibold`}>
+                <MapPin />
+                <p>{location_text || ""}</p>
+            </div>
             {googleMapEmbedUrl && (
                 <div className={`rounded overflow-hidden`} style={{width: '100%', height: '350px'}}>
                     <iframe

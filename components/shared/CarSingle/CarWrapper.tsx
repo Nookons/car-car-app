@@ -109,6 +109,7 @@ const CarWrapper = ({id}: { id: string }) => {
 
             <AdMap
                 link={data?.map_url}
+                location_text={data?.location_text}
             />
         </div>
     );
