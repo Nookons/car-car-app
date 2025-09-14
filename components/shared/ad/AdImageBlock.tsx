@@ -11,61 +11,69 @@ import {
     CarouselPrevious,
     Skeleton,
     Dialog,
-    DialogContent, DialogTitle, DialogClose, Button, DialogDescription,
+    DialogContent, DialogTitle, DialogClose,
 } from "@/components/ComponentsProvider"
 import Image from "next/image"
 import { CarouselApi } from "@/components/ui/carousel"
 import Autoplay from "embla-carousel-autoplay"
-import {VisuallyHidden} from "@radix-ui/react-visually-hidden";
-import {X} from "lucide-react";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
+import { X } from "lucide-react"
 
 interface Props {
     data: ICarAdd | undefined;
     isLoading: boolean;
 }
 
+const PLACEHOLDER = "https://dtprodvehicleimages.blob.core.windows.net/assets/marketplace/no-car-img.png"
+
+const getImageOrPlaceholder = (img?: string, size: string = "640x320") =>
+    img && img !== "unknown" ? img.replace(/;s=\d+x\d+/, `;s=${size}`) : PLACEHOLDER
+
 const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
     const [api, setApi] = useState<CarouselApi>()
     const [current, setCurrent] = useState(0)
     const [count, setCount] = useState(0)
-    const [ready_data, setReady_data] = useState<string[]>([])
+    const [readyData, setReadyData] = useState<string[]>([])
 
-    // state для fullscreen
+    // fullscreen
     const [isOpen, setIsOpen] = useState(false)
-    const [selectedIndex, setSelectedIndex] = useState<number>(0)
+    const [selectedIndex, setSelectedIndex] = useState(0)
 
+    // Инициализация api
     useEffect(() => {
-        if (!api) return;
-        setCount(api.scrollSnapList().length)
-        setCurrent(api.selectedScrollSnap() + 1)
+        if (!api) return
 
-        api.on("select", () => {
+        const update = () => {
+            const snaps = api.scrollSnapList()
+            setCount(snaps.length)
             setCurrent(api.selectedScrollSnap() + 1)
-        })
+        }
+
+        update()
+        api.on("select", update)
+        return () => api.destroy() // безопасное отключение
     }, [api])
 
+    // подготовка изображений
     useEffect(() => {
-        if (data?.images) {
-            const new_data = [...new Set(data.images)]
-            setReady_data(new_data)
-        }
+        if (!data?.images || !Array.isArray(data.images)) return
+        const uniqueImages = Array.from(new Set(data.images)).filter(Boolean)
+        setReadyData(uniqueImages)
     }, [data])
 
-    if (isLoading) {
-        return <Skeleton className="w-full h-[200px]" />
-    }
-
-    if (!data) return null;
+    if (isLoading) return <Skeleton className="w-full h-[200px]" />
+    if (!data) return null
 
     return (
-        <div className={`relative mask-b-from-50% `}>
+        <div className="relative mask-b-from-50%">
+            {/* Основной карусель */}
             <Carousel
                 plugins={[Autoplay({ delay: 5000 })]}
                 setApi={setApi}
                 className="w-full"
             >
                 <CarouselContent>
-                    {ready_data.map((img, index) => (
+                    {readyData.length > 0 ? readyData.map((img, index) => (
                         <CarouselItem key={index}>
                             <div
                                 onClick={() => {
@@ -80,40 +88,48 @@ const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
                                     className="rounded h-[280px] w-full object-cover"
                                     width={1200}
                                     height={270}
-                                    src={
-                                        img !== 'unknown'
-                                            ? img.replace(/;s=\d+x\d+/, ";s=640x320")
-                                            : "https://dtprodvehicleimages.blob.core.windows.net/assets/marketplace/no-car-img.png"
-                                    }
+                                    src={getImageOrPlaceholder(img)}
                                     alt={data.title || "Car image"}
                                 />
                             </div>
                         </CarouselItem>
-                    ))}
+                    )) : (
+                        <CarouselItem>
+                            <Image
+                                priority
+                                unoptimized
+                                className="rounded h-[280px] w-full object-cover"
+                                width={1200}
+                                height={270}
+                                src={PLACEHOLDER}
+                                alt="No image"
+                            />
+                        </CarouselItem>
+                    )}
                 </CarouselContent>
             </Carousel>
+
             <div className="absolute text-xs bg-background/50 px-4 py-2 rounded-2xl top-2 right-2 text-center">
                 {current} / {count}
             </div>
 
-
-
-            <Dialog  open={isOpen} onOpenChange={setIsOpen}>
+            {/* Fullscreen Dialog */}
+            <Dialog open={isOpen} onOpenChange={setIsOpen}>
                 <DialogContent showCloseButton={false} className="max-w-screen rounded-none w-full h-full p-0 bg-background [&>button[data-radix-dialog-close]]:hidden">
                     <VisuallyHidden>
                         <DialogTitle>Car images</DialogTitle>
                     </VisuallyHidden>
 
-                    {/* Твой кастомный крестик */}
                     <DialogClose asChild>
-                        <div className="absolute bottom-5 right-5 z-50">
-                            <X className="w-12 h-12 bg-primary/25 rounded-full p-2 cursor-pointer" />
+                        <div className="flex items-center absolute bottom-5 right-5 z-50">
+                            <span className={`text-neutral-500 font-bold`}>Close</span>
+                            <X className="w-12 h-12 rounded-full p-2 cursor-pointer" />
                         </div>
                     </DialogClose>
 
-                    <Carousel className="w-full h-full" opts={{ startIndex: selectedIndex }}>
+                    <Carousel className="w-full h-full" opts={{ startIndex: Math.min(selectedIndex, readyData.length - 1) }}>
                         <CarouselContent>
-                            {ready_data.map((img, index) => (
+                            {readyData.length > 0 ? readyData.map((img, index) => (
                                 <CarouselItem key={index} className="flex items-center justify-center">
                                     <Image
                                         priority
@@ -121,17 +137,24 @@ const AdImageBlock: React.FC<Props> = ({ data, isLoading }) => {
                                         className="object-contain w-full h-screen"
                                         width={1920}
                                         height={1080}
-                                        src={
-                                            img !== "unknown"
-                                                ? img.replace(/;s=\d+x\d+/, ";s=1920x1080")
-                                                : "https://dtprodvehicleimages.blob.core.windows.net/assets/marketplace/no-car-img.png"
-                                        }
+                                        src={getImageOrPlaceholder(img, "1920x1080")}
                                         alt={data.title || "Car image"}
                                     />
                                 </CarouselItem>
-                            ))}
+                            )) : (
+                                <CarouselItem className="flex items-center justify-center">
+                                    <Image
+                                        priority
+                                        unoptimized
+                                        className="object-contain w-full h-screen"
+                                        width={1920}
+                                        height={1080}
+                                        src={PLACEHOLDER}
+                                        alt="No image"
+                                    />
+                                </CarouselItem>
+                            )}
                         </CarouselContent>
-                        {/*<DialogDescription className={`absolute bottom-4 left-1/2 -translate-x-1/2`}>Slides ( {count} )</DialogDescription>*/}
                         <CarouselPrevious className="text-white" />
                         <CarouselNext className="text-white" />
                     </Carousel>

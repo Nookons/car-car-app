@@ -28,7 +28,7 @@ const Page =  ({ params }: PageProps) => {
     });
 
     return (
-        <div className={`px-4`}>
+        <div className={`px-4 max-w-[800px] mx-auto`}>
             <UserMainInfo data={data} isLoading={isLoading}/>
             <FavoriteList data={data} isLoadingUser={isLoading} />
             <UserSearchSettings data={data} isLoading={isLoading}/>

@@ -31,12 +31,7 @@ const UserButton: React.FC = () => {
         return queryUid || tgUid || null;
     });
 
-    const {
-        data: userData,
-        isLoading,
-        isError,
-        error
-    } = useQuery<IUserFull, Error>({
+    const {data: userData, isLoading, isError, error} = useQuery<IUserFull, Error>({
         queryKey: ['user', uid],
         queryFn: () => getUserByUID(uid!),
         enabled: !!uid,

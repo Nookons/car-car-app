@@ -19,7 +19,7 @@ const UserLogic = () => {
 
     useEffect(() => {
         if (user_store.user_id !== 0) {
-            setUid(user_store.user_id.toString())
+            setUid(user_store.user_id?.toString())
         }
     }, [user_store])
 

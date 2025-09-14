@@ -1,111 +1,86 @@
-import React, {useEffect} from 'react';
-import {Button, Skeleton} from "@/components/ComponentsProvider";
-import {ICarAdd} from "@/types/Car";
-import {useTranslation} from "react-i18next";
-import {ExternalLink, HeartMinus, HeartPlus, Share2} from "lucide-react";
+import React, { useState } from 'react';
+import { Button, Skeleton } from "@/components/ComponentsProvider";
+import { ICarAdd } from "@/types/Car";
+import { useTranslation } from "react-i18next";
+import {ExternalLink, HeartMinus, HeartPlus, LoaderCircle, Share2} from "lucide-react";
 import Link from "next/link";
-import {toast} from "sonner";
+import { toast } from "sonner";
 import dayjs from "dayjs";
-import {useSearchParams} from "next/navigation";
-import {useUserStore} from "@/store/user/userStore";
-import {addToFavorite} from "@/features/user/addToFavorite";
-import {removeFromFavorite} from "@/features/user/removeFromFavorite";
-import {TelegramShareButton} from "react-share";
+import { useUserStore } from "@/store/user/userStore";
+import { addToFavorite } from "@/features/user/addToFavorite";
+import { removeFromFavorite } from "@/features/user/removeFromFavorite";
+import { TelegramShareButton } from "react-share";
 
 interface Props {
     data: ICarAdd | undefined;
     isLoading: boolean;
 }
 
-const AdButtons: React.FC<Props> = ({data, isLoading}) => {
+const AdButtons: React.FC<Props> = ({ data, isLoading }) => {
     const { t } = useTranslation();
-
     const user_store = useUserStore(state => state.user_data)
-
     const userData = useUserStore(state => state.data)
     const addToFavoriteStore = useUserStore(state => state.addToFavorite)
     const removeFromFavoriteStore = useUserStore(state => state.removeFromFavorite)
 
+    // состояние загрузки кнопок избранного
+    const [loadingFav, setLoadingFav] = useState(false)
 
-    const onAddToFavorite = async () => {
-        if (!data) return
+    if (isLoading) return <Skeleton className="w-full h-50" />
+    if (!data) return null
 
-        addToFavoriteStore(data.id); // обновляем локальный стор
+    const isFavorite = userData?.favorite?.includes(data.id)
 
-        const adIdStr = data.id.toString();
-        const userIdStr = user_store.user_id.toString();
+    const handleFavorite = async () => {
+        if (!data || !user_store) return
+
+        setLoadingFav(true)
 
         try {
-            await addToFavorite({ user_id: userIdStr, ad_id: adIdStr });
-
-            toast.success(`${data?.title}`, {
-                description: `Successfully added on ${dayjs().format(
-                    'dddd, MMMM DD, YYYY [at] HH:mm'
-                )}`,
-            });
+            if (!isFavorite) {
+                addToFavoriteStore(data.id)
+                await addToFavorite({ user_id: user_store.user_id.toString(), ad_id: data.id.toString() })
+                toast.success(`${data.title}`, { description: `Added on ${dayjs().format('dddd, MMMM DD, YYYY [at] HH:mm')}` })
+            } else {
+                removeFromFavoriteStore(data.id)
+                await removeFromFavorite({ user_id: user_store.user_id.toString(), ad_id: data.id.toString() })
+                toast.success(`${data.title}`, { description: `Removed on ${dayjs().format('dddd, MMMM DD, YYYY [at] HH:mm')}` })
+            }
         } catch (error: any) {
-            removeFromFavoriteStore(Number(data.id))
-            toast.error(`${data?.title}`, {
-                description: `Failed to add to favorite. Please try again. ${
-                    error?.message || error?.toString()
-                }`,
-            });
+            // откат действий в сторе при ошибке
+            if (!isFavorite) removeFromFavoriteStore(data.id)
+            else addToFavoriteStore(data.id)
+            toast.error(`${data.title}`, { description: `${error?.message || error?.toString()}` })
+        } finally {
+            setLoadingFav(false)
         }
     }
 
-    const onRemoveFromFavorite = async () => {
-        if (!data) return
-
-        removeFromFavoriteStore(data.id); // обновляем локальный стор
-
-        const adIdStr = data.id.toString();
-        const userIdStr = user_store.user_id.toString();
-
-        try {
-            await removeFromFavorite({ user_id: userIdStr, ad_id: adIdStr });
-
-            toast.success(`${data?.title}`, {
-                description: `Successfully removed on ${dayjs().format(
-                    'dddd, MMMM DD, YYYY [at] HH:mm'
-                )}`,
-            });
-        } catch (error: any) {
-            addToFavoriteStore(data.id)
-            toast.error(`${data?.title}`, {
-                description: `${error?.message || error?.toString()}`,
-            });
-        }
-    }
-
-    const message = "Check out CarCar! This platform collects car listings for you.";
-
-    if (isLoading) {
-        return (
-            <Skeleton className={`w-full h-50`}/>
-        )
-    }
-
-    if (!data) return null;
+    const message = "Check out CarCar! This platform collects car listings for you."
+    const carUrl = `https://car-car-app.vercel.app/${user_store?.language_code || "en"}/car/${data.id ?? ''}`
 
     return (
-        <div className={`grid grid-cols-[1fr_45px_45px] gap-2`}>
-            <Link href={data.ad_link}><Button className={`w-full`}><ExternalLink /> {t('open_original')}</Button></Link>
+        <div className="grid grid-cols-[1fr_45px_45px] gap-2">
+            <Link href={data.ad_link || "#"}>
+                <Button className="w-full"><ExternalLink /> {t('open_original')}</Button>
+            </Link>
 
+            <Button
+                disabled={!userData || loadingFav}
+                onClick={handleFavorite}
+                variant={isFavorite ? undefined : "outline"}
+                className="w-full flex items-center justify-center"
+            >
+                {loadingFav ? <LoaderCircle className={`animate-spin`} /> : isFavorite ? <HeartMinus /> : <HeartPlus />}
+            </Button>
 
-            {!userData.favorite.includes(data.id)
-                ? (<Button disabled={!userData && true} onClick={onAddToFavorite} variant={`outline`} className={`w-full`}><HeartPlus /> </Button>)
-                : (<Button disabled={!userData && true} onClick={onRemoveFromFavorite} className={`w-full`}><HeartMinus /> </Button>)
-            }
-            <TelegramShareButton title={message} url={`https://car-car-app.vercel.app/${user_store.language_code || "en"}/car/${data.id}`}>
-                <Button
-                    variant={`outline`}
-                >
+            <TelegramShareButton title={message} url={carUrl}>
+                <Button variant="outline">
                     <Share2 className="w-5 h-5" />
                 </Button>
             </TelegramShareButton>
-
         </div>
-    );
-};
+    )
+}
 
 export default AdButtons;

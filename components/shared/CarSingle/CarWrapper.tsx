@@ -3,17 +3,13 @@ import AdImageBlock from "@/components/shared/ad/AdImageBlock";
 import AdTitle from "@/components/shared/ad/AdTitle";
 import AdButtons from "@/components/shared/ad/AdButtons";
 import MainParams from "@/components/shared/ad/MainParams";
-import FullParams from "@/components/shared/ad/FullParams";
-import Attribute from "@/components/shared/ad/attribute";
-import {Drawer, DrawerContent, DrawerTitle, DrawerTrigger} from "@/components/ui/drawer";
-import {Badge} from "@/components/ui/badge";
-import AdMap from "@/components/shared/ad/AdMap";
 import {useQuery} from "@tanstack/react-query";
 import {ICarAdd} from "@/types/Car";
 import {getCarById} from "@/features/getCarById";
-import {MousePointerClick} from "lucide-react";
-import {VisuallyHidden} from "@radix-ui/react-visually-hidden";
-import {Button} from '@/components/ComponentsProvider';
+import AdDescription from "@/components/shared/ad/AdDescription";
+import FullParams from "@/components/shared/ad/FullParams";
+import Attribute from "@/components/shared/ad/attribute";
+import AdMap from "@/components/shared/ad/AdMap";
 
 const CarWrapper = ({id}: { id: string }) => {
     const [tg, setTg] = useState<any>(null);
@@ -78,18 +74,9 @@ const CarWrapper = ({id}: { id: string }) => {
                 />
             </div>
 
-            <div
-                className="w-full px-2  cursor-pointer mt-12"
-                onClick={() => setIsFullDescription(!isFullDescription)}
-            >
-                <div className="flex justify-start text-xs items-center gap-2 mb-2">
-                    <MousePointerClick className="text-primary"/>
-                    <p className="text-neutral-500">Click to read full</p>
-                </div>
-                <h4 className="font-semibold text-xl mb-2">{data?.title}</h4>
-                <div
-                    className={`prose overflow-hidden max-w-full ${!isFullDescription && "line-clamp-3 mask-b-from-50%" }`}
-                    dangerouslySetInnerHTML={{__html: data?.description || ""}}
+            <div>
+                <AdDescription
+                    data={data}
                 />
             </div>
 

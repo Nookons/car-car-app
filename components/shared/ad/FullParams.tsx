@@ -1,12 +1,11 @@
-import {Skeleton, Table, TableBody, TableCell, TableRow} from '@/components/ComponentsProvider';
+import { Skeleton, Table, TableBody, TableCell, TableRow } from '@/components/ComponentsProvider';
 import React from 'react';
-import {ICarAdd} from "@/types/Car";
-import {useTranslation} from "react-i18next";
+import { ICarAdd } from "@/types/Car";
+import { useTranslation } from "react-i18next";
 import {
     getBodyTypeLabel, getColorLabel,
     getConditionLabel, getFuelTypeLabel,
     getGearBoxLabelType,
-    getSellerTypeLabel,
     getTransmissionTypeLabel
 } from "@/features/getTypesLabels";
 import dayjs from "dayjs";
@@ -16,112 +15,111 @@ interface Props {
     isLoading: boolean;
 }
 
-const FullParams: React.FC<Props> = ({data, isLoading}) => {
+const FullParams: React.FC<Props> = ({ data, isLoading }) => {
     const { t } = useTranslation();
 
     if (isLoading) {
         return (
-            <div className={`grid grid-cols-3 gap-2 mt-4 text-sm text-center`}>
-                <Skeleton className={`w-full h-20`}/>
-                <Skeleton className={`w-full h-20`}/>
-                <Skeleton className={`w-full h-20`}/>
-                <Skeleton className={`w-full h-20`}/>
-                <Skeleton className={`w-full h-20`}/>
-                <Skeleton className={`w-full h-20`}/>
+            <div className="grid grid-cols-3 gap-2 mt-4 text-sm text-center">
+                {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="w-full h-20"/>
+                ))}
             </div>
-        )
+        );
     }
 
     if (!data) return null;
 
+    const safeLower = (value?: string) => value?.toLowerCase() || "";
+
+    const safeFormatYear = (year?: string | number) =>
+        year ? dayjs(year).format("YYYY") : "-";
+
+    const safeNumber = (num?: number | null) =>
+        num ? Number(num).toLocaleString() : "-";
+
     return (
-        <Table className={`mt-8`}>
+        <Table className="mt-8">
             <TableBody>
-                {data.brand &&
+                {data.brand && (
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("brand")}</TableCell>
                         <TableCell className="text-right font-semibold">
-                            {data.brand.length > 20
-                                ? `${data.brand.substring(0, 20)}...`
-                                : data.brand
-                            }
+                            {data.brand.length > 20 ? `${data.brand.substring(0, 20)}...` : data.brand}
                         </TableCell>
                     </TableRow>
-                }
-                {data.model &&
+                )}
+                {data.model && (
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("model")}</TableCell>
                         <TableCell className="text-right font-semibold">
-                            {data.model.length > 20
-                                ? `${data.model.substring(0, 20)}...`
-                                : data.model
-                            }
+                            {data.model.length > 20 ? `${data.model.substring(0, 20)}...` : data.model}
                         </TableCell>
                     </TableRow>
-                }
-                {data.color &&
+                )}
+                {data.color && (
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("color")}</TableCell>
                         <TableCell className="text-right font-semibold">{getColorLabel(data.color)}</TableCell>
                     </TableRow>
-                }
-                {data.door_count &&
+                )}
+                {data.door_count != null && (
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("door_count")}</TableCell>
                         <TableCell className="text-right font-semibold">{data.door_count}</TableCell>
                     </TableRow>
-                }
-                {data.nr_seats &&
+                )}
+                {data.nr_seats != null && (
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("seats_count")}</TableCell>
                         <TableCell className="text-right font-semibold">{data.nr_seats}</TableCell>
                     </TableRow>
-                }
-                {data.year &&
+                )}
+                {data.year && (
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("production_year")}</TableCell>
-                        <TableCell className="text-right font-semibold">{dayjs(data.year).format("YYYY")}</TableCell>
+                        <TableCell className="text-right font-semibold">{safeFormatYear(data.year)}</TableCell>
                     </TableRow>
-                }
-                {data.fuel_type !== null &&
+                )}
+                {data.fuel_type != null && (
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("fuel_type")}</TableCell>
                         <TableCell className="text-right font-semibold">{getFuelTypeLabel(data.fuel_type)}</TableCell>
                     </TableRow>
-                }
-                {data.engine_capacity &&
+                )}
+                {data.engine_capacity && (
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("engine_capacity")}</TableCell>
                         <TableCell className="text-right font-semibold">{data.engine_capacity}</TableCell>
                     </TableRow>
-                }
-                {data.engine_power &&
+                )}
+                {data.engine_power && (
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("engine_power")}</TableCell>
                         <TableCell className="text-right font-semibold">{data.engine_power}</TableCell>
                     </TableRow>
-                }
-                {data.body_type &&
+                )}
+                {data.body_type && (
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("body_type")}</TableCell>
                         <TableCell className="text-right font-semibold">{getBodyTypeLabel(data.body_type)}</TableCell>
                     </TableRow>
-                }
-                {data.gearbox &&
+                )}
+                {data.gearbox && (
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("gearbox")}</TableCell>
-                        <TableCell className="text-right font-semibold">{getGearBoxLabelType(data.gearbox.toLowerCase())}</TableCell>
+                        <TableCell className="text-right font-semibold">{getGearBoxLabelType(safeLower(data.gearbox))}</TableCell>
                     </TableRow>
-                }
-                {data.transmission &&
+                )}
+                {data.transmission && (
                     <TableRow>
                         <TableCell className="font-medium text-neutral-500">{t("transmission")}</TableCell>
-                        <TableCell className="text-right font-semibold">{getTransmissionTypeLabel(data.transmission.toLowerCase())}</TableCell>
+                        <TableCell className="text-right font-semibold">{getTransmissionTypeLabel(safeLower(data.transmission))}</TableCell>
                     </TableRow>
-                }
+                )}
                 <TableRow>
                     <TableCell className="font-medium text-neutral-500">{t("mileage")}</TableCell>
-                    <TableCell className="text-right font-semibold">{Number(data.mileage).toLocaleString()} km</TableCell>
+                    <TableCell className="text-right font-semibold">{safeNumber(data.mileage)} km</TableCell>
                 </TableRow>
                 <TableRow>
                     <TableCell className="font-medium text-neutral-500">{t("condition")}</TableCell>

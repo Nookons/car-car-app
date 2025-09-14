@@ -23,10 +23,6 @@ const AdMap = ({link, location_text}: {link: string | undefined, location_text: 
 
     return (
         <div className={`mt-10`}>
-            <div className={`flex gap-2 items-center mb-2 text-neutral-500 font-semibold`}>
-                <MapPin />
-                <p>{location_text || ""}</p>
-            </div>
             {googleMapEmbedUrl && (
                 <div className={`rounded overflow-hidden`} style={{width: '100%', height: '350px'}}>
                     <iframe
@@ -41,6 +37,10 @@ const AdMap = ({link, location_text}: {link: string | undefined, location_text: 
                     ></iframe>
                 </div>
             )}
+            <div className={`flex gap-2 items-center mt-2 text-neutral-500 font-semibold`}>
+                <MapPin />
+                <p className={`text-xs line-clamp-1`}>{location_text || ""}</p>
+            </div>
         </div>
     );
 };
