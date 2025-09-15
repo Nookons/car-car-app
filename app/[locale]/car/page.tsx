@@ -5,7 +5,7 @@ export default function Page() {
 
 
     return (
-        <div className="p-2 flex flex-col gap-2">
+        <div className="p-2 max-w-full flex flex-col gap-2">
             <CarList />
         </div>
     );

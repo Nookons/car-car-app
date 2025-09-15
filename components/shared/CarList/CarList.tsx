@@ -14,13 +14,58 @@ import {
     PaginationEllipsis
 } from '@/components/ui/pagination';
 import {getListForUser} from '@/features/cars/getListForUser';
-import {Button, Card, CardContent, CardFooter, CardHeader, CardTitle} from "@/components/ComponentsProvider";
-import {SearchX} from "lucide-react";
+import {Button, Card, CardContent, CardFooter, CardHeader, CardTitle, Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput, CommandItem, CommandList, Popover, PopoverContent, PopoverTrigger} from "@/components/ComponentsProvider";
+import {
+    ArrowDownAZ,
+    ArrowDownNarrowWide,
+    ArrowDownWideNarrow,
+    CalendarArrowDown,
+    CalendarArrowUp,
+    Check,
+    ChevronsUpDown,
+    SearchX, Settings2
+} from "lucide-react";
 import Link from "next/link";
+import { cn } from '@/lib/utils';
+import Cookies from "js-cookie";
+
+const frameworks = [
+    {
+        value: "min_price",
+        label: <span className={`flex items-center gap-2`}><ArrowDownNarrowWide /> Min Price</span>,
+    },
+    {
+        value: "max_price",
+        label: <span className={`flex items-center gap-2`}><ArrowDownWideNarrow /> Max Price</span>,
+    },
+    {
+        value: "new_first",
+        label: <span className={`flex items-center gap-2`}><CalendarArrowDown /> New first</span>,
+    },
+    {
+        value: "old_first",
+        label: <span className={`flex items-center gap-2`}><CalendarArrowUp /> Old first</span>,
+    },
+]
 
 const CarList = () => {
     const [pageNumber, setPageNumber] = useState(1);
     const user_data = useUserStore(state => state.user_data);
+
+    const [open, setOpen] = React.useState(false)
+    const [value, setValue] = React.useState("")
+
+    // 👉 при монтировании читаем из cookie
+    useEffect(() => {
+        const savedPage = Cookies.get("car_page");
+        if (savedPage) {
+            setPageNumber(parseInt(savedPage, 10));
+        }
+    }, []);
+
 
     const {data, isLoading} = useQuery({
         queryKey: ['user_car_list', user_data.user_id, pageNumber],
@@ -73,6 +118,7 @@ const CarList = () => {
     const setNewPage = ({ e, newPage }: { e: React.MouseEvent<HTMLAnchorElement>, newPage: number }) => {
         e.preventDefault();
         setPageNumber(newPage);
+        Cookies.set("car_page", String(newPage), { expires: 1/288 }); // ✅ сохраняем здесь
 
         let scrolled = false;
 
@@ -127,7 +173,57 @@ const CarList = () => {
     }
 
     return (
-        <div className="flex overflow-hidden flex-col items-center gap-4">
+        <div className="flex max-w-full m-auto overflow-hidden flex-col items-center gap-2">
+            <div className={`w-full p-0`}>
+                <span className={`text-xs text-neutral-500`}>Sorting by:</span>
+            </div>
+            <div className={`grid grid-cols-[1fr_50px] gap-2 w-full`}>
+                    <Popover open={open} onOpenChange={setOpen}>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={open}
+                                className="justify-between"
+                            >
+                                {value
+                                    ? frameworks.find((framework) => framework.value === value)?.label
+                                    : "Select sort type..."}
+                                <ArrowDownAZ />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0 w-[calc(100vw-16px)] ml-2">
+                            <Command>
+                                <CommandList>
+                                    <CommandEmpty>No framework found.</CommandEmpty>
+                                    <CommandGroup>
+                                        {frameworks.map((framework) => (
+                                            <CommandItem
+                                                key={framework.value}
+                                                value={framework.value}
+                                                onSelect={(currentValue) => {
+                                                    setValue(currentValue === value ? "" : currentValue)
+                                                    setOpen(false)
+                                                }}
+                                            >
+                                                {framework.label}
+                                                <Check
+                                                    className={cn(
+                                                        "ml-auto",
+                                                        value === framework.value ? "opacity-100" : "opacity-0"
+                                                    )}
+                                                />
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
+                <Button className={`w-full`} >
+                    <Settings2 />
+                </Button>
+            </div>
             {data.items.map((carAd: any) => (
                 <CarListAd key={carAd.id} carAd={carAd}/>
             ))}
