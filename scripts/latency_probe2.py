@@ -102,11 +102,15 @@ def main() -> int:
 
         time.sleep(max(1.0, args.interval - (time.time() - t0)))
 
-    lags = [x["lag"] for x in first_seen.values() if not x["warmup"]]
+    all_lags = [x["lag"] for x in first_seen.values() if not x["warmup"]]
+    # Свежие отдельно от «поднятых»: у поднятых createdAt может быть месячной
+    # давности, и общая медиана по ним ничего не говорит о скорости публикации.
+    lags = [x for x in all_lags if x <= 6 * 3600]
     summary = {
         "interval": args.interval,
         "duration_min": round((time.time() - started) / 60, 1),
-        "new_total": len(lags),
+        "new_total": len(all_lags),
+        "fresh_total": len(lags),
         "lag_p50": round(pct(lags, 0.5), 1),
         "lag_p90": round(pct(lags, 0.9), 1),
         "lag_p95": round(pct(lags, 0.95), 1),
@@ -117,7 +121,8 @@ def main() -> int:
     }
     out_path.write_text(json.dumps(summary, ensure_ascii=False, indent=1))
 
-    print(f"\nвсего новых после прогрева: {summary['new_total']}")
+    print(f"\nвсего новых после прогрева: {summary['new_total']} "
+          f"(свежих ≤6 ч: {summary['fresh_total']})")
     if lags:
         print(f"лаг публикации: p50 {summary['lag_p50']} с | p90 {summary['lag_p90']} с | "
               f"p95 {summary['lag_p95']} с | max {summary['lag_max']} с")
