@@ -332,7 +332,9 @@ class MiniAppRepo:
                 mileage = row.get("mileage_km")
                 cur.execute(
                     """
-                    select percentile_cont(0.5) within group (order by price) as median,
+                    select percentile_cont(0.1) within group (order by price) as p10,
+                           percentile_cont(0.5) within group (order by price) as median,
+                           percentile_cont(0.9) within group (order by price) as p90,
                            count(*) as sample
                     from listing
                     where status = 'active' and price is not null
@@ -353,6 +355,8 @@ class MiniAppRepo:
                     diff = round((row["price"] - median) / median * 100)
                     analysis = {
                         "median": median,
+                        "p10": _num(stat["p10"]),
+                        "p90": _num(stat["p90"]),
                         "sample": sample,
                         "diff_pct": diff,
                         "verdict": "below" if diff <= -5 else ("above" if diff >= 5 else "fair"),

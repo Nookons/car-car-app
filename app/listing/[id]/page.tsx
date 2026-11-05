@@ -26,6 +26,7 @@ import {
 } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
 import { PhotoGallery } from "@/components/photo-gallery";
+import { PriceMarket } from "@/components/price-market";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -111,6 +112,12 @@ export default function ListingPage() {
     },
     { icon: <Clock size={18} />, label: "Добавлено", value: item.created_at ? date(item.created_at) : "" },
   ].filter((row) => row.value) as Array<{ icon: React.ReactNode; label: string; value: string | number }>;
+
+  const mapQuery = item.lat != null && item.lon != null
+    ? `${item.lat},${item.lon}`
+    : `${[item.city, item.region, "Poland"].filter(Boolean).join(", ")}`;
+  const mapEmbed = `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=14&hl=ru&output=embed`;
+  const mapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
 
   const isFav = favorites.has(item.id);
   const analysis = item.price_analysis;
@@ -198,37 +205,29 @@ export default function ListingPage() {
         </div>
 
         <div className="space-y-4 lg:sticky lg:top-20">
-          {analysis ? (
-            <Card className="space-y-2 p-4">
-              <h2 className="flex items-center gap-2 text-base font-semibold">
-                <Tag size={18} /> Цена на рынке
-              </h2>
-              <p className="flex items-baseline gap-2 text-2xl font-semibold">
-                {price(analysis.median, item.currency)}
-                <span
-                  className={`inline-flex items-center gap-1 text-sm font-medium ${
-                    analysis.verdict === "below"
-                      ? "text-emerald-600"
-                      : analysis.verdict === "above"
-                        ? "text-red-600"
-                        : "text-muted-foreground"
-                  }`}
-                >
-                  {analysis.verdict === "below" ? (
-                    <TrendDown size={16} />
-                  ) : analysis.verdict === "above" ? (
-                    <TrendUp size={16} />
-                  ) : null}
-                  {analysis.diff_pct > 0 ? "+" : ""}
-                  {analysis.diff_pct}%
-                </span>
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Средняя цена похожих (та же модель, ±2 года, пробег ±30%) по {num(analysis.sample)}{" "}
-                объявлениям
-              </p>
-            </Card>
-          ) : null}
+          <PriceMarket item={item} />
+
+          <Card className="overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3">
+              <h2 className="text-base font-semibold">Где находится</h2>
+              <a
+                className="text-sm text-muted-foreground hover:text-foreground"
+                href={mapLink}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Открыть в Google Maps ↗
+              </a>
+            </div>
+            <iframe
+              title="Карта"
+              src={mapEmbed}
+              className="h-56 w-full border-0"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allowFullScreen
+            />
+          </Card>
 
           <Card className="p-4">
             <h2 className="mb-2 text-base font-semibold">Характеристики</h2>

@@ -28,10 +28,14 @@ export type ListingCard = Listing & {
   seller: { type: string | null; name: string };
   color: string;
   vin: string;
+  lat: number | null;
+  lon: number | null;
   created_at: string | null;
   description: string;
   price_analysis: {
     median: number;
+    p10: number | null;
+    p90: number | null;
     sample: number;
     diff_pct: number;
     verdict: "below" | "fair" | "above";
