@@ -14,6 +14,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
   themeColor: "#f6f7f9",
 };
 
@@ -34,7 +36,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             </div>
           </header>
-          <main className="mx-auto max-w-md px-4 pb-28 pt-4">{children}</main>
+          <main className="mx-auto min-h-[calc(100dvh-3.5rem)] max-w-md px-4 pb-28 pt-4">
+            {children}
+          </main>
           <BottomNav />
         </AuthProvider>
       </body>

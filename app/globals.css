@@ -26,7 +26,13 @@
 
   * { @apply border-border; }
   html, body { @apply bg-background text-foreground; }
-  body { @apply antialiased; -webkit-tap-highlight-color: transparent; }
+  html { height: 100%; }
+  body {
+    @apply antialiased;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 100dvh;
+    min-height: var(--tg-vh, 100dvh);
+  }
 }
 
 .safe-bottom { padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)); }
