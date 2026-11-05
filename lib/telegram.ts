@@ -39,14 +39,28 @@ export function getInitData(): string {
 
 export type Coords = { lat: number; lon: number };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /** Геолокация: в Telegram — через LocationManager, иначе браузерная. */
 export async function requestLocation(): Promise<Coords> {
   const tg = telegram();
   const manager = tg?.LocationManager;
   if (manager?.init) {
-    await manager.init();
-    const position = await manager.getLocation();
-    return { lat: position.latitude, lon: position.longitude };
+    try {
+      await manager.init();
+    } catch {
+      // менеджер может быть недоступен — пробуем всё равно
+    }
+    // Клиент иногда отвечает NotInitied сразу после init — даём ему время.
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      try {
+        const position = await manager.getLocation();
+        return { lat: position.latitude, lon: position.longitude };
+      } catch (error) {
+        if (!/notinit/i.test(String(error)) || attempt === 3) break;
+        await sleep(400);
+      }
+    }
   }
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -59,6 +73,13 @@ export async function requestLocation(): Promise<Coords> {
       { timeout: 10_000, maximumAge: 60_000 },
     );
   });
+}
+
+export function openLocationSettings(): boolean {
+  const manager = telegram()?.LocationManager;
+  if (!manager?.openSettings) return false;
+  manager.openSettings();
+  return true;
 }
 
 export function initTelegram(): void {

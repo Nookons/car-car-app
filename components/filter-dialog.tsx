@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
 import { bodyLabel, fuelLabel, gearboxLabel, num } from "@/lib/format";
-import { requestLocation } from "@/lib/telegram";
+import { openLocationSettings, requestLocation } from "@/lib/telegram";
 import type { Filters } from "@/lib/types";
 
 const PRICES = [0, 10_000, 20_000, 30_000, 40_000, 50_000, 70_000, 100_000, 150_000, 200_000, 300_000, 500_000];
@@ -41,6 +41,7 @@ export function FilterDialog({
   const [models, setModels] = React.useState<Option[]>([]);
   const [options, setOptions] = React.useState<Options | null>(null);
   const [geoNote, setGeoNote] = React.useState(initial.lat ? "Геолокация включена" : "");
+  const [geoFailed, setGeoFailed] = React.useState(false);
 
   React.useEffect(() => {
     if (open) setDraft(initial);
@@ -81,12 +82,10 @@ export function FilterDialog({
       const { lat, lon } = await requestLocation();
       setDraft((prev) => ({ ...prev, lat, lon, radius_km: prev.radius_km ?? 50 }));
       setGeoNote("Геолокация включена");
-    } catch (error) {
-      setGeoNote(
-        error instanceof Error
-          ? `${error.message} — разреши доступ в настройках Telegram`
-          : "Не удалось получить локацию",
-      );
+      setGeoFailed(false);
+    } catch {
+      setGeoFailed(true);
+      setGeoNote("Геолокация выключена — разреши доступ к ней в настройках Telegram.");
     }
   };
 
@@ -317,6 +316,19 @@ export function FilterDialog({
             </select>
           </div>
           {geoNote ? <p className="text-xs text-muted-foreground">{geoNote}</p> : null}
+          {geoFailed ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (!openLocationSettings()) {
+                  setGeoNote("Открой Telegram → Настройки → Данные и память → Геоданные");
+                }
+              }}
+            >
+              Открыть настройки Telegram
+            </Button>
+          ) : null}
         </div>
 
         {options ? (
