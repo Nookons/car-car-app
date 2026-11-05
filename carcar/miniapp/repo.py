@@ -453,6 +453,7 @@ class MiniAppRepo:
                 from listing
                 where status = 'active' and make is not null and make <> ''
                 group by make
+                having count(*) >= 3
                 order by n desc
                 """
             )
@@ -483,7 +484,7 @@ class MiniAppRepo:
                 from listing
                 where status = 'active' and city is not null and city <> ''
                   and lat is not null and lon is not null
-                  and (%s is null or city ilike %s)
+                  and (%s::text is null or city ilike %s)
                 group by city
                 order by n desc
                 limit %s
