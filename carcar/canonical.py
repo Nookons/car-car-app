@@ -14,7 +14,7 @@ from typing import Any
 
 from .geo import normalize
 
-MAX_PHOTOS = 8
+MAX_PHOTOS = 60
 MAX_TITLE = 300
 MAX_URL = 700
 MAX_PRICE = 100_000_000

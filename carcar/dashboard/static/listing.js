@@ -237,7 +237,7 @@ function renderGallery() {
   };
   show(card.photos[0]);
 
-  card.photos.slice(0, 8).forEach((url) => {
+  card.photos.forEach((url) => {
     const button = document.createElement("button");
     button.className = "thumb";
     button.innerHTML = `<img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer">`;

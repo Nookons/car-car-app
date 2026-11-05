@@ -184,7 +184,7 @@ class DatabaseRepo:
             "title": row["title"],
             "price": _num(row.get("price")),
             "currency": (row.get("currency") or "PLN").strip(),
-            "photos": photos[:8],
+            "photos": photos[:60],
             "description": "",
             "details": {},
             "seller": {

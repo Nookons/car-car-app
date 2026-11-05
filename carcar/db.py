@@ -289,7 +289,7 @@ class DatabaseSink:
         engine_cm3: int | None = None,
         code: str = "otomoto",
     ) -> bool:
-        photos = [p for p in (photos or []) if isinstance(p, str) and p.startswith("https://")][:8]
+        photos = [p for p in (photos or []) if isinstance(p, str) and p.startswith("https://")][:60]
         source_id = self.source_id(code)
         try:
             with self.conn.cursor() as cur:

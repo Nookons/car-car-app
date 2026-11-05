@@ -69,11 +69,11 @@ def test_prepare_rejects_garbage():
 
 
 def test_prepare_truncates_photos_and_drops_bad_urls():
-    photos = [f"https://cdn.example/{i}.jpg" for i in range(20)]
+    photos = [f"https://cdn.example/{i}.jpg" for i in range(80)]
     photos.append("http://bad/1.jpg")
     result = prepare(make_item(photos=photos), source_id=1)
     assert result.ok
-    assert len(result.row["photos"]) == MAX_PHOTOS
+    assert len(result.row["photos"]) == MAX_PHOTOS  # предохранитель 60, не 8
     assert all(p.startswith("https://") for p in result.row["photos"])
 
 
