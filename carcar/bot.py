@@ -56,14 +56,38 @@ class Bot:
         if not self.public_url:
             log.warning("CARCAR_PUBLIC_URL не задан: кнопка меню не настроена")
             return
-        self.call(
-            "setChatMenuButton",
-            menu_button={
-                "type": "web_app",
-                "text": "Открыть CarCar",
-                "web_app": {"url": self.public_url},
-            },
-        )
+
+        menu = {
+            "type": "web_app",
+            "text": "Открыть CarCar",
+            "web_app": {"url": self.public_url},
+        }
+        self.call("setChatMenuButton", menu_button=menu)
+
+        # У старых чатов могла остаться своя кнопка на /en/car — переписываем.
+        for tg_id in self.known_chat_ids():
+            try:
+                self.call("setChatMenuButton", chat_id=tg_id, menu_button=menu)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("меню для чата %s: %s", tg_id, exc)
+
+    def known_chat_ids(self) -> list[int]:
+        try:
+            from .db import database_url
+
+            url = database_url()
+            if not url:
+                return []
+            import psycopg
+
+            with psycopg.connect(url, connect_timeout=10) as conn:
+                rows = conn.execute(
+                    "select tg_id from app_user where tg_id > 1000 order by id"
+                ).fetchall()
+            return [int(row[0]) for row in rows]
+        except Exception as exc:  # noqa: BLE001
+            log.warning("не смог прочитать пользователей: %s", exc)
+            return []
 
     # -- обработка ---------------------------------------------------------
     def reply_start(self, chat_id: int) -> None:
