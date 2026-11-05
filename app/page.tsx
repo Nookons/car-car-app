@@ -66,13 +66,13 @@ export default function HomePage() {
           </Link>
         </div>
         {loading ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, index) => (
               <Skeleton key={index} className="h-56" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
             {items.map((item) => (
               <ListingCard key={item.id} item={item} />
             ))}
@@ -92,7 +92,7 @@ function HomeSkeleton() {
           <Skeleton key={index} className="h-10 w-28 rounded-full" />
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
           <Skeleton key={index} className="h-56" />
         ))}

@@ -88,8 +88,8 @@ export default function AccountPage() {
   const initials = (user?.first_name?.[0] ?? "?") + (user?.last_name?.[0] ?? "");
 
   return (
-    <div className="space-y-4">
-      <Card className="flex items-center gap-3 p-4">
+    <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+      <Card className="flex items-center gap-3 p-4 lg:col-span-2">
         <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-base font-bold text-primary-foreground">
           {initials}
         </div>
@@ -210,7 +210,7 @@ export default function AccountPage() {
         </Button>
       </Card>
 
-      <Card className="space-y-3 p-4">
+      <Card className="space-y-3 p-4 lg:col-span-2">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold">Избранное</h2>
           <span className="text-xs text-muted-foreground">{favorites.size}</span>

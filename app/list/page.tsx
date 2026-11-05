@@ -77,7 +77,7 @@ export default function ListPage() {
       </div>
 
       {loading && items.length === 0 ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 6 }).map((_, index) => (
             <Skeleton key={index} className="h-56" />
           ))}
@@ -87,7 +87,7 @@ export default function ListPage() {
           Ничего не нашлось. Попробуй изменить фильтры.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {items.map((item) => (
             <ListingCard key={item.id} item={item} />
           ))}

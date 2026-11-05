@@ -85,6 +85,7 @@ export default function ListingPage() {
         <ArrowLeft size={16} /> Назад
       </Link>
 
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start">
       <Card className="overflow-hidden">
         <div className="no-scrollbar -mx-px flex snap-x snap-mandatory gap-1 overflow-x-auto">
           {(item.photos.length ? item.photos : [item.thumbnail ?? ""]).slice(0, 12).map((src, index) =>
@@ -136,7 +137,7 @@ export default function ListingPage() {
         </div>
       </Card>
 
-      <Card className="p-4">
+      <Card className="p-4 lg:sticky lg:top-20">
         <h2 className="mb-2 text-base font-semibold">Характеристики</h2>
         <dl className="divide-y">
           {specs.map(([key, value]) => (
@@ -147,6 +148,7 @@ export default function ListingPage() {
           ))}
         </dl>
       </Card>
+      </div>
     </div>
   );
 }
