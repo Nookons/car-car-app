@@ -40,7 +40,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
   }
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -89,7 +89,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
       ) : null}
 
       {count > 1 ? (
-        <div className="no-scrollbar flex gap-2 overflow-x-auto border-t bg-card p-2">
+        <div className="no-scrollbar flex min-w-0 gap-2 overflow-x-auto border-t bg-card p-2">
           {valid.map((src, position) => (
             <button
               key={position}

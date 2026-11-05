@@ -130,7 +130,7 @@ export default function ListingPage() {
       </Link>
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start">
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
           <Card className="overflow-hidden">
             <PhotoGallery
               photos={item.photos.length ? item.photos : [item.thumbnail ?? ""]}
@@ -204,7 +204,7 @@ export default function ListingPage() {
           ) : null}
         </div>
 
-        <div className="space-y-3 lg:sticky lg:top-20">
+        <div className="min-w-0 space-y-3 lg:sticky lg:top-20">
           <PriceMarket item={item} />
 
           <Card className="overflow-hidden">

@@ -30,6 +30,7 @@
   :root { --tg-safe-top: 0px; --tg-safe-bottom: 0px; }
   body {
     @apply antialiased;
+    overflow-x: hidden;
     -webkit-tap-highlight-color: transparent;
     min-height: 100dvh;
     min-height: var(--tg-vh, 100dvh);
