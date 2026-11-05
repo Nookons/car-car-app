@@ -52,16 +52,24 @@ Root Directory на Vercel — корень репозитория (Next.js ле
 | `CARCAR_JWT_SECRET` | случайная строка (≠ токен) |
 | `CARCAR_CORS_ORIGINS` | `https://<проект>.vercel.app` |
 
-### Railway (бот)
+### Бот
+
+Бот работает **через вебхук**, а не поллинг: два поллера с одним токеном
+конфликтуют (`Conflict: terminated by other getUpdates request`), поэтому
+вебхук — единственный надёжный вариант. Отдельный сервис не нужен.
+
+Переменные API:
 
 | Переменная | Значение |
 |---|---|
-| `CARCAR_MODE` | `bot` |
-| `CARCAR_BOT_TOKEN` | токен |
+| `CARCAR_BOT_TOKEN` | токен бота |
 | `CARCAR_PUBLIC_URL` | `https://<проект>.vercel.app` |
+| `CARCAR_API_URL` | `https://<api>.up.railway.app` |
+| `CARCAR_WEBHOOK_SECRET` | случайная строка |
 
-Бот на старте ставит команду `/start` и кнопку меню с `web_app` на этот URL.
-Без публичного https-адреса кнопка не настраивается (в логе предупреждение).
+При старте API сам вызывает `setWebhook` на `/bot/webhook` (с проверкой
+`X-Telegram-Bot-Api-Secret-Token`) и ставит кнопку меню, в том числе для
+уже существующих чатов.
 
 ## Разработка
 

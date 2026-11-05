@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import hmac
 import os
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
@@ -69,7 +71,29 @@ def create_app(
         dev_tg_id = None
 
     repo = MiniAppRepo(url)
-    app = FastAPI(title="CarCar Mini App", docs_url=None, redoc_url=None)
+
+    public_url = os.environ.get("CARCAR_PUBLIC_URL", "").rstrip("/")
+    api_url = os.environ.get("CARCAR_API_URL", "").rstrip("/")
+    webhook_secret = os.environ.get("CARCAR_WEBHOOK_SECRET", "")
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        # Бот работает через вебхук: поллинг с двух машин конфликтует.
+        if bot_token and api_url:
+            from ..bot import Bot
+
+            try:
+                Bot(bot_token, public_url).set_webhook(
+                    f"{api_url}/bot/webhook", webhook_secret or None
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(f"не удалось поставить вебхук: {exc}")
+        yield
+        repo.close()
+
+    app = FastAPI(
+        title="CarCar Mini App", docs_url=None, redoc_url=None, lifespan=lifespan
+    )
 
     # Фронт живёт на Vercel (или localhost:3100) — это другой origin.
     origins = os.environ.get(
@@ -104,6 +128,22 @@ def create_app(
 
     @app.get("/healthz")
     def healthz() -> dict:
+        return {"ok": True}
+
+    @app.post("/bot/webhook")
+    def bot_webhook(
+        update: dict[str, Any],
+        secret: str | None = Header(default=None, alias="X-Telegram-Bot-Api-Secret-Token"),
+    ) -> dict:
+        if webhook_secret and not hmac.compare_digest(secret or "", webhook_secret):
+            raise HTTPException(status_code=403, detail="плохой секрет")
+        message = update.get("message") or {}
+        text = (message.get("text") or "").strip()
+        chat_id = (message.get("chat") or {}).get("id")
+        if chat_id and text.startswith("/start"):
+            from ..bot import Bot
+
+            Bot(bot_token, public_url).reply_start(chat_id)
         return {"ok": True}
 
     # -- авторизация -------------------------------------------------------

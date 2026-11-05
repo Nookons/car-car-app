@@ -47,6 +47,12 @@ class Bot:
     def me(self) -> dict:
         return self.call("getMe")
 
+    def set_webhook(self, url: str, secret: str | None = None) -> dict:
+        params: dict = {"url": url, "allowed_updates": ["message"]}
+        if secret:
+            params["secret_token"] = secret
+        return self.call("setWebhook", **params)
+
     def configure(self) -> None:
         """Команды и кнопка меню — только если есть публичный https-адрес."""
         self.call(
