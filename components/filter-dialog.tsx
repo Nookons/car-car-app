@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
 import { bodyLabel, fuelLabel, gearboxLabel, num } from "@/lib/format";
+import { requestLocation } from "@/lib/telegram";
 import type { Filters } from "@/lib/types";
 
 const PRICES = [0, 10_000, 20_000, 30_000, 40_000, 50_000, 70_000, 100_000, 150_000, 200_000, 300_000, 500_000];
@@ -75,21 +76,18 @@ export function FilterDialog({
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
 
-  const askGeo = () => {
-    if (!navigator.geolocation) return setGeoNote("Геолокация недоступна");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setDraft((prev) => ({
-          ...prev,
-          lat: position.coords.latitude,
-          lon: position.coords.longitude,
-          radius_km: prev.radius_km ?? 50,
-        }));
-        setGeoNote("Геолокация включена");
-      },
-      () => setGeoNote("Не удалось получить локацию"),
-      { timeout: 8000 },
-    );
+  const askGeo = async () => {
+    try {
+      const { lat, lon } = await requestLocation();
+      setDraft((prev) => ({ ...prev, lat, lon, radius_km: prev.radius_km ?? 50 }));
+      setGeoNote("Геолокация включена");
+    } catch (error) {
+      setGeoNote(
+        error instanceof Error
+          ? `${error.message} — разреши доступ в настройках Telegram`
+          : "Не удалось получить локацию",
+      );
+    }
   };
 
   const apply = () => {
@@ -140,22 +138,23 @@ export function FilterDialog({
           </select>
         </label>
 
-        <label className="block space-y-1.5">
-          <span className="text-xs text-muted-foreground">Модель</span>
-          <select
-            className={selectClass}
-            value={draft.model ?? ""}
-            disabled={!draft.make}
-            onChange={(event) => set("model", event.target.value || undefined)}
-          >
-            <option value="">{draft.make ? "Любая модель" : "Сначала выберите марку"}</option>
-            {models.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.value} ({num(m.count)})
-              </option>
-            ))}
-          </select>
-        </label>
+        {draft.make ? (
+          <label className="block space-y-1.5">
+            <span className="text-xs text-muted-foreground">Модель</span>
+            <select
+              className={selectClass}
+              value={draft.model ?? ""}
+              onChange={(event) => set("model", event.target.value || undefined)}
+            >
+              <option value="">Любая модель</option>
+              {models.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.value} ({num(m.count)})
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         <div className="grid grid-cols-2 gap-2">
           <label className="block space-y-1.5">
@@ -239,6 +238,7 @@ export function FilterDialog({
           </select>
         </label>
 
+        {draft.model ? (
         <div className="grid grid-cols-2 gap-2">
           <label className="block space-y-1.5">
             <span className="text-xs text-muted-foreground">Коробка</span>
@@ -272,7 +272,13 @@ export function FilterDialog({
           </label>
         </div>
 
-        {bodyOptions.length > 0 ? (
+        ) : (
+          <p className="rounded-xl bg-secondary px-3 py-2 text-xs text-muted-foreground">
+            Выбери марку и модель — покажем коробки, топливо и кузова, которые для них бывают.
+          </p>
+        )}
+
+        {draft.model && bodyOptions.length > 0 ? (
           <label className="block space-y-1.5">
             <span className="text-xs text-muted-foreground">Кузов</span>
             <select

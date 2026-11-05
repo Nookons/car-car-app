@@ -10,6 +10,12 @@ type TelegramWebApp = {
   onEvent?: (event: string, cb: () => void) => void;
   viewportStableHeight?: number;
   safeAreaInset?: { top: number; bottom: number; left: number; right: number };
+  LocationManager?: {
+    init: () => Promise<void>;
+    getLocation: () => Promise<{ latitude: number; longitude: number }>;
+    isLocationAvailable?: boolean;
+    openSettings?: () => void;
+  };
   contentSafeAreaInset?: { top: number; bottom: number; left: number; right: number };
   BackButton?: { show: () => void; hide: () => void; onClick: (cb: () => void) => void };
   themeParams?: Record<string, string>;
@@ -29,6 +35,30 @@ export function getInitData(): string {
   const tg = telegram();
   if (tg?.initData) return tg.initData;
   return process.env.NEXT_PUBLIC_ALLOW_DEV === "1" ? "dev" : "";
+}
+
+export type Coords = { lat: number; lon: number };
+
+/** Геолокация: в Telegram — через LocationManager, иначе браузерная. */
+export async function requestLocation(): Promise<Coords> {
+  const tg = telegram();
+  const manager = tg?.LocationManager;
+  if (manager?.init) {
+    await manager.init();
+    const position = await manager.getLocation();
+    return { lat: position.latitude, lon: position.longitude };
+  }
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Геолокация недоступна"));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve({ lat: position.coords.latitude, lon: position.coords.longitude }),
+      () => reject(new Error("Доступ к геолокации запрещён")),
+      { timeout: 10_000, maximumAge: 60_000 },
+    );
+  });
 }
 
 export function initTelegram(): void {
