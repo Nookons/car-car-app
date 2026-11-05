@@ -26,3 +26,6 @@ dist/
 # IDE
 .idea/
 .vscode/
+
+# Логи запуска
+logs/

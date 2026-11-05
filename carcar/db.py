@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -82,13 +83,25 @@ def database_url() -> str | None:
 
 class DatabaseSink:
     def __init__(self, url: str) -> None:
-        import psycopg
-
         if "ljkugtpeboomboobodom" in url.lower():
             raise RuntimeError("это складская эко-система — писать сюда нельзя")
-        self.conn = psycopg.connect(url, connect_timeout=15)
-        self.conn.autocommit = False
+        self._url = url
+        self.conn = self._connect()
         self._sources: dict[str, int] = {}
+
+    def _connect(self):  # noqa: ANN202
+        import psycopg
+
+        conn = psycopg.connect(self._url, connect_timeout=15)
+        conn.autocommit = False
+        return conn
+
+    def _reconnect(self) -> None:
+        """Пулер рвёт простаивающие соединения — переподключаемся и пробуем ещё раз."""
+        with contextlib.suppress(Exception):
+            self.conn.close()
+        self.conn = self._connect()
+        self._sources.clear()
 
     # -- источники ---------------------------------------------------------
     def source_id(self, code: str = "otomoto") -> int:
@@ -104,6 +117,15 @@ class DatabaseSink:
 
     # -- запись ------------------------------------------------------------
     def upsert(self, items: list[Any], code: str = "otomoto") -> UpsertResult:
+        try:
+            return self._upsert(items, code)
+        except Exception as exc:  # noqa: BLE001
+            if "connection" not in str(exc).lower() and "server closed" not in str(exc).lower():
+                raise
+            self._reconnect()
+            return self._upsert(items, code)
+
+    def _upsert(self, items: list[Any], code: str) -> UpsertResult:
         source_id = self.source_id(code)
         result = UpsertResult()
 
@@ -204,6 +226,44 @@ class DatabaseSink:
         code: str = "otomoto",
     ) -> bool:
         """Обогащение после загрузки карточки: фото, VIN, точные координаты."""
+        try:
+            return self._update_detail(
+                external_id,
+                photos=photos,
+                vin=vin,
+                lat=lat,
+                lon=lon,
+                seller_name=seller_name,
+                seller_type=seller_type,
+                code=code,
+            )
+        except Exception as exc:  # noqa: BLE001
+            if "connection" not in str(exc).lower():
+                raise
+            self._reconnect()
+            return self._update_detail(
+                external_id,
+                photos=photos,
+                vin=vin,
+                lat=lat,
+                lon=lon,
+                seller_name=seller_name,
+                seller_type=seller_type,
+                code=code,
+            )
+
+    def _update_detail(
+        self,
+        external_id: str,
+        *,
+        photos: list[str] | None = None,
+        vin: str | None = None,
+        lat: float | None = None,
+        lon: float | None = None,
+        seller_name: str | None = None,
+        seller_type: str | None = None,
+        code: str = "otomoto",
+    ) -> bool:
         photos = [p for p in (photos or []) if isinstance(p, str) and p.startswith("https://")][:8]
         source_id = self.source_id(code)
         with self.conn.cursor() as cur:

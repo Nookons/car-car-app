@@ -18,13 +18,16 @@ from typing import Any
 
 from .client import Client, FetchError
 from .config import Settings
-from .control import load_control
+from .control import load_control, save_control
 from .db import DatabaseSink
 from .geo import get_geo
 from .parse import Listing, ParseError, parse_offer, parse_search
 from .store import Store
 
 log = logging.getLogger("carcar")
+
+# После стольких ошибок подряд сборщик сам ставит паузу, чтобы не долбить площадку.
+AUTO_PAUSE_AFTER = 5
 
 
 def utcnow() -> datetime:
@@ -254,6 +257,7 @@ def watch(
     last_new = 0
     zero_streak = 0
     last_wire = 0
+    failures = 0
 
     while time.monotonic() < deadline:
         control = load_control(store.control_path)
@@ -290,9 +294,35 @@ def watch(
             result = discover(
                 client, store, settings, pages=1, stop_after_known=1, sink=sink
             )
-        except (FetchError, ParseError) as exc:
+        except Exception as exc:  # noqa: BLE001 — демон не должен падать из-за одного опроса
             total.errors += 1
-            log.error("опрос не удался: %s", exc)
+            failures += 1
+            log.exception("опрос не удался: %s", exc)
+            backoff = min(interval * (2 ** failures), 600.0)
+
+            if failures >= AUTO_PAUSE_AFTER:
+                save_control(
+                    store.control_path,
+                    paused=True,
+                    reason=f"авто-пауза: {failures} ошибок подряд ({str(exc)[:120]})",
+                    by="collector",
+                )
+                store.write_heartbeat(
+                    {
+                        "status": "paused",
+                        "mode": "watch",
+                        "round": rounds,
+                        "interval": interval,
+                        "paused_reason": "авто-пауза после серии ошибок",
+                        "last_error": str(exc),
+                        "totals": _totals(total),
+                        "client": client.stats.as_dict(),
+                        "storage": "db" if sink else "files",
+                    }
+                )
+                log.error("авто-пауза после %d ошибок подряд", failures)
+                break
+
             store.write_heartbeat(
                 {
                     "status": "error",
@@ -301,14 +331,18 @@ def watch(
                     "interval": interval,
                     "last_error": str(exc),
                     "last_poll_at": last_poll_at,
+                    "next_poll_at": datetime.fromtimestamp(
+                        time.time() + backoff, tz=UTC
+                    ).isoformat(),
                     "totals": _totals(total),
                     "client": client.stats.as_dict(),
                     "storage": "db" if sink else "files",
                 }
             )
-            time.sleep(interval)
+            time.sleep(backoff)
             continue
 
+        failures = 0
         total.pages += result.stats.pages
         total.items += result.stats.items
         total.new_ids += result.stats.new_ids
@@ -332,20 +366,23 @@ def watch(
                     details_round += 1
                 else:
                     total.details_skipped += 1
-            except (FetchError, ParseError) as exc:
+            except Exception as exc:  # noqa: BLE001
                 total.errors += 1
                 log.warning("карточка %s: %s", item.id, exc)
 
         if sink is not None:
-            sink.log_run(
-                code=settings.source,
-                started_at=result.stats.started_at,
-                result=_db_result(result.stats),
-                pages=result.stats.pages,
-                items=result.stats.items,
-                errors=result.stats.errors,
-                notes="watch",
-            )
+            try:
+                sink.log_run(
+                    code=settings.source,
+                    started_at=result.stats.started_at,
+                    result=_db_result(result.stats),
+                    pages=result.stats.pages,
+                    items=result.stats.items,
+                    errors=result.stats.errors,
+                    notes="watch",
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning("не записался crawl_run: %s", exc)
 
         spent = time.monotonic() - round_started
         pause_left = max(0.0, interval - spent)

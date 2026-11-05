@@ -98,12 +98,16 @@ class Client:
             time.sleep(wait)
         self._last_request = time.monotonic()
 
-    def _sleep_backoff(self, attempt: int, retry_after: float | None = None) -> None:
+    def _sleep_backoff(
+        self, attempt: int, retry_after: float | None = None, *, heavy: bool = False
+    ) -> None:
         if retry_after is not None:
-            time.sleep(min(retry_after, 30.0))
+            time.sleep(min(retry_after, 60.0))
             return
         base = self.settings.backoff_base * (2 ** (attempt - 1))
-        time.sleep(base + random.uniform(0, 0.5))
+        if heavy:  # 429/503 — площадка просит притормозить
+            base = max(base, 10.0 * attempt)
+        time.sleep(min(base, 60.0) + random.uniform(0, 0.5))
 
     # -- запрос -----------------------------------------------------------
     def get(self, url: str) -> FetchResult:
@@ -139,7 +143,11 @@ class Client:
                         f"{response.status_code} на {url} после {attempt} попыток"
                     )
                 self.stats.retries += 1
-                self._sleep_backoff(attempt, _retry_after(response))
+                self._sleep_backoff(
+                    attempt,
+                    _retry_after(response),
+                    heavy=response.status_code in (429, 503),
+                )
                 continue
 
             response.raise_for_status()

@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from carcar.client import Client
 from carcar.config import Settings
-from carcar.control import save_control
+from carcar.control import load_control, save_control
 from carcar.dashboard.app import create_app
 from carcar.runner import watch
 from carcar.store import Store
@@ -95,3 +95,26 @@ def test_metrics_available_false_in_file_mode(client):
     data = client.get("/api/metrics").json()
     assert data["available"] is False
     assert data["by_source"] == []
+
+
+def test_watch_survives_unexpected_error(tmp_path, monkeypatch):
+    """Демон не должен падать из-за ошибки БД/сети в одном опросе."""
+    store = Store(root=tmp_path)
+    settings = Settings(data_dir=tmp_path, rps=1000)
+    client = Client(
+        settings, transport=httpx.MockTransport(lambda request: httpx.Response(500))
+    )
+    calls = {"n": 0}
+
+    def boom(*args, **kwargs):
+        calls["n"] += 1
+        raise RuntimeError("server closed the connection unexpectedly")
+
+    monkeypatch.setattr("carcar.runner.discover", boom)
+    summary = watch(client, store, settings, interval=0.05, minutes=0.12, details=0)
+
+    # после серии ошибок сборщик сам ставит паузу, чтобы не долбить площадку
+    assert calls["n"] >= 5
+    assert summary["errors"] >= 5
+    assert load_control(store.control_path).paused is True
+    assert store.read_heartbeat()["status"] == "paused"
