@@ -11,7 +11,12 @@ export function num(value: number | null | undefined) {
   return new Intl.NumberFormat("ru-RU").format(value ?? 0);
 }
 
-const DATE_LOCALE: Record<string, string> = { ru: "ru-RU", pl: "pl-PL", en: "en-GB" };
+const DATE_LOCALE: Record<string, string> = {
+  ru: "ru-RU",
+  pl: "pl-PL",
+  en: "en-GB",
+  uk: "uk-UA",
+};
 
 export function date(iso: string | null | undefined, lang: string = "ru") {
   if (!iso) return "—";
