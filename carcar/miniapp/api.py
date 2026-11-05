@@ -10,12 +10,13 @@ import os
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from ..cache import Cache
 from ..db import database_url
 from .auth import AuthError, issue_token, validate_init_data, verify_token
 from .repo import MiniAppRepo
@@ -71,6 +72,8 @@ def create_app(
         dev_tg_id = None
 
     repo = MiniAppRepo(url)
+    cache = Cache()
+    dev_token = os.environ.get("CARCAR_DEV_TOKEN", "")
 
     public_url = os.environ.get("CARCAR_PUBLIC_URL", "").rstrip("/")
     api_url = os.environ.get("CARCAR_API_URL", "").rstrip("/")
@@ -126,9 +129,28 @@ def create_app(
     def index() -> FileResponse:
         return FileResponse(STATIC / "index.html")
 
+    @app.post("/api/dev/publish")
+    def dev_publish(
+        payload: dict[str, Any],
+        token: str | None = Header(default=None, alias="X-Dev-Token"),
+    ) -> dict:
+        """Служебный вход для проверки шины: публикует событие о объявлении."""
+        if not dev_token or not hmac.compare_digest(token or "", dev_token):
+            raise HTTPException(status_code=403, detail="нет доступа")
+        from ..bus import make_bus
+
+        event = {
+            "type": payload.get("type", "listing.created"),
+            "source": payload.get("source", "otomoto"),
+            "external_id": str(payload.get("external_id", "")),
+        }
+        bus = make_bus()
+        bus.publish(event)
+        return {"ok": True, "event": event, "bus": type(bus).__name__}
+
     @app.get("/healthz")
     def healthz() -> dict:
-        return {"ok": True}
+        return {"ok": True, "cache": "redis" if cache.enabled else "memory"}
 
     @app.post("/bot/webhook")
     def bot_webhook(
@@ -177,6 +199,7 @@ def create_app(
     # -- объявления ---------------------------------------------------------
     @app.get("/api/listings")
     def listings(
+        request: Request,
         limit: int = Query(default=20, ge=1, le=50),
         offset: int = Query(default=0, ge=0, le=10_000),
         q: str | None = None,
@@ -196,6 +219,10 @@ def create_app(
         radius_km: float | None = Query(default=None, ge=0, le=1000),
         sort: str = Query(default="new", pattern="^(new|price_asc|price_desc|distance)$"),
     ) -> dict:
+        key = f"list:{request.url.query}"
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
         items, total = repo.search(
             limit=limit,
             offset=offset,
@@ -216,31 +243,61 @@ def create_app(
             radius_km=radius_km,
             sort=sort,
         )
-        return {"items": items, "total": total, "limit": limit, "offset": offset}
+        payload = {"items": items, "total": total, "limit": limit, "offset": offset}
+        cache.set(key, payload, ttl=30)
+        return payload
 
     @app.get("/api/listings/{listing_id}")
     def listing(listing_id: int) -> dict:
+        key = f"card:{listing_id}"
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
         card = repo.get_listing(listing_id)
         if not card:
             raise HTTPException(status_code=404, detail="объявление не найдено")
+        cache.set(key, card, ttl=600)
         return card
 
     # -- справочник фильтров ------------------------------------------------
     @app.get("/api/filters/makes")
     def filter_makes() -> dict:
-        return {"items": repo.filter_makes()}
+        cached = cache.get("filters:makes")
+        if cached is not None:
+            return cached
+        payload = {"items": repo.filter_makes()}
+        cache.set("filters:makes", payload, ttl=300)
+        return payload
 
     @app.get("/api/filters/models")
     def filter_models(make: str = Query(min_length=1)) -> dict:
-        return {"items": repo.filter_models(make)}
+        key = f"filters:models:{make}"
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+        payload = {"items": repo.filter_models(make)}
+        cache.set(key, payload, ttl=300)
+        return payload
 
     @app.get("/api/filters/cities")
     def filter_cities(q: str | None = None) -> dict:
-        return {"items": repo.filter_cities(q)}
+        key = f"filters:cities:{q or ''}"
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+        payload = {"items": repo.filter_cities(q)}
+        cache.set(key, payload, ttl=300)
+        return payload
 
     @app.get("/api/filters/options")
     def filter_options(make: str | None = None, model: str | None = None) -> dict:
-        return repo.filter_options(make, model)
+        key = f"filters:options:{make or ''}:{model or ''}"
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+        payload = repo.filter_options(make, model)
+        cache.set(key, payload, ttl=300)
+        return payload
 
     # -- подписки ----------------------------------------------------------
     @app.get("/api/subscriptions")

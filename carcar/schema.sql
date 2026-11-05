@@ -285,3 +285,19 @@ alter table listing
     add column if not exists consumption_urban   numeric(4,1),
     add column if not exists consumption_extra   numeric(4,1),
     add column if not exists equipment           text[];
+
+-- уведомления о подходящих объявлениях (дедуп по паре user+listing)
+create table if not exists notification (
+    id         bigint generated always as identity primary key,
+    user_id    bigint not null references app_user(id) on delete cascade,
+    listing_id bigint not null references listing(id) on delete cascade,
+    status     text not null default 'pending'
+               check (status in ('pending', 'sent', 'failed')),
+    attempts   int not null default 0,
+    created_at timestamptz not null default now(),
+    sent_at    timestamptz,
+    unique (user_id, listing_id)
+);
+
+create index if not exists notification_pending_idx
+    on notification (status) where status = 'pending';

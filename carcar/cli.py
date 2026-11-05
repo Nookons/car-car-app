@@ -72,6 +72,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_watch.add_argument("--minutes", type=float, default=10.0, help="сколько работать, мин")
     p_watch.add_argument("--details", type=int, default=5)
 
+    p_pub = sub.add_parser("publish-listing", help="опубликовать событие о новом объявлении")
+    p_pub.add_argument("--external-id", required=True)
+    p_pub.add_argument("--source", default="otomoto")
+
+    p_worker = sub.add_parser("worker", help="воркер уведомлений: шина → Telegram")
+    p_worker.add_argument("--consumer", default="worker-1")
+    p_worker.add_argument("--minutes", type=float, default=0)
+
     p_bot = sub.add_parser("bot", help="Telegram-бот: кнопка запуска Mini App")
     p_bot.add_argument("--public-url", default=None, help="https-адрес Mini App")
 
@@ -218,6 +226,20 @@ def main(argv: list[str] | None = None) -> int:
         public_url = args.public_url or os.environ.get("CARCAR_PUBLIC_URL")
         Bot(token, public_url).run()
         return 0
+
+    if args.command == "publish-listing":
+        from .bus import make_bus
+
+        make_bus().publish(
+            {"type": "listing.created", "source": args.source, "external_id": args.external_id}
+        )
+        print("событие отправлено:", args.external_id)
+        return 0
+
+    if args.command == "worker":
+        from .worker import run as run_worker
+
+        return run_worker(args.consumer, args.minutes or None)
 
     if args.command == "miniapp":
         import uvicorn

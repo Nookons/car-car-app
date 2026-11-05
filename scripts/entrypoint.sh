@@ -28,6 +28,9 @@ case "$MODE" in
             --rps "${CARCAR_RPS:-0.7}" \
             --minutes 0
         ;;
+    worker)
+        exec python -m carcar worker --consumer "${CARCAR_CONSUMER:-worker-1}"
+        ;;
     bot)
         exec python -m carcar bot
         ;;

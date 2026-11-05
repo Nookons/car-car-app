@@ -71,6 +71,7 @@ def discover(
     stop_after_known: int = 2,
     fetched_at: datetime | None = None,
     sink: DatabaseSink | None = None,
+    bus: object | None = None,
 ) -> DiscoverResult:
     """Читает выдачу и отдаёт новые объявления (в БД или в папку).
 
@@ -99,6 +100,19 @@ def discover(
             stats.updated += result.updated
             stats.unchanged += result.unchanged
             stats.rejected += result.rejected
+            if bus is not None and fresh:
+                # Событие для воркера уведомлений: новое объявление в базе.
+                try:
+                    for item in fresh:
+                        bus.publish(
+                            {
+                                "type": "listing.created",
+                                "source": settings.source,
+                                "external_id": item.id,
+                            }
+                        )
+                except Exception:
+                    pass
             known_ratio = 1 - result.inserted / max(len(parsed.items), 1)
             tail = f" | обновлено {result.updated}" if result.updated else ""
             shown = f"новых {result.inserted:2}{tail}"
@@ -424,6 +438,9 @@ def watch(
 ) -> dict[str, Any]:
     """Цикл «как в проде»: опрос выдачи каждые N секунд + карточки новинок."""
     state = CollectorState(store, settings.source, sink)
+    from .bus import make_bus
+
+    bus = make_bus()
     started = time.monotonic()
     deadline = started + minutes * 60
     total = RunStats()
@@ -468,7 +485,7 @@ def watch(
 
         try:
             result = discover(
-                client, store, settings, pages=2, stop_after_known=2, sink=sink
+                client, store, settings, pages=2, stop_after_known=2, sink=sink, bus=bus
             )
         except Exception as exc:  # noqa: BLE001 — демон не должен падать из-за одного опроса
             total.errors += 1

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ArrowsOut, CaretLeft, CaretRight, X } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
+import { SmartImage } from "@/components/smart-image";
 import { useI18n } from "@/lib/i18n";
 
 export function PhotoGallery({ photos, title }: { photos: string[]; title: string }) {
@@ -21,6 +22,18 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
     },
     [count],
   );
+
+  // Предзагружаем соседние кадры: листание становится мгновенным.
+  React.useEffect(() => {
+    if (count < 2) return;
+    [1, -1].forEach((delta) => {
+      const next = valid[(index + delta + count) % count];
+      if (next) {
+        const image = new window.Image();
+        image.src = next;
+      }
+    });
+  }, [index, count, valid]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -53,11 +66,11 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
         className="group relative block w-full cursor-zoom-in bg-muted"
         aria-label={t("listing.openMap")}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <SmartImage
           src={valid[index]}
           alt={title}
-          className="aspect-[4/3] w-full object-cover md:aspect-[16/10]"
+          priority
+          className="aspect-[4/3] w-full md:aspect-[16/10]"
         />
         <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-1 text-[11px] font-medium text-white">
           {index + 1} / {count}
@@ -107,8 +120,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
               )}
               aria-label={`${position + 1}`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt="" className="h-full w-full object-cover" loading="lazy" />
+              <SmartImage src={src} className="h-full w-full" />
             </button>
           ))}
         </div>
