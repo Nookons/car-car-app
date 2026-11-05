@@ -147,7 +147,6 @@ class Notifier:
             "inline_keyboard": [
                 [{"text": "🚗 Открыть в CarCar", "web_app": {"url": url}}],
                 [
-                    {"text": "На otomoto", "url": item.get("url") or url},
                     {"text": "Мои фильтры", "web_app": {"url": f"{self.public_url}/account"}},
                 ],
             ]
