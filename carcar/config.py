@@ -30,7 +30,8 @@ class Settings:
     data_dir: Path = field(
         default_factory=lambda: Path(os.environ.get("CARCAR_DATA_DIR", "data"))
     )
-    source: str = "otomoto"
+    # каждая площадка — отдельный сервис: CARCAR_SOURCE=otomoto|olx|...
+    source: str = field(default_factory=lambda: os.environ.get("CARCAR_SOURCE", "otomoto"))
 
     def search_url(self, page: int = 1) -> str:
         order = SEARCH_ORDER.replace(":", "%3A")

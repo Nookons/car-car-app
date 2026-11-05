@@ -162,6 +162,37 @@ create table if not exists ingest_reject (
 create index if not exists ingest_reject_created_idx on ingest_reject (created_at desc);
 
 -- ---------------------------------------------------------------------------
+-- Состояние коллекторов (на Railway у каждого свой контейнер и нет общего диска)
+-- ---------------------------------------------------------------------------
+
+create table if not exists collector (
+    source_id        smallint primary key references source(id) on delete cascade,
+    status           text not null default 'unknown',
+    heartbeat_at     timestamptz,
+    interval_seconds integer not null default 60,
+    round            integer not null default 0,
+    last_poll_at     timestamptz,
+    last_error       text,
+    stats            jsonb not null default '{}'::jsonb,
+    paused           boolean not null default false,
+    paused_reason    text,
+    paused_at        timestamptz,
+    updated_at       timestamptz not null default now()
+);
+
+create table if not exists sweep_state (
+    source_id   smallint primary key references source(id) on delete cascade,
+    next_page   integer not null default 1,
+    total_pages integer,
+    inserted    integer not null default 0,
+    updated     integer not null default 0,
+    updated_at  timestamptz not null default now()
+);
+
+alter table collector    enable row level security;
+alter table sweep_state  enable row level security;
+
+-- ---------------------------------------------------------------------------
 -- Очистка: чтобы база не росла бесконечно
 -- ---------------------------------------------------------------------------
 

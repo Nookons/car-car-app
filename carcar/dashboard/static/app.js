@@ -24,6 +24,13 @@ const I18N = {
     dailyChart: "Новые объявления по дням",
     monthlyChart: "По месяцам",
     platforms: "Платформы",
+    collectors: "Коллекторы",
+    status: "Статус",
+    lastPoll: "Последний опрос",
+    errorsShort: "Ошибок",
+    actions: "Действия",
+    pauseBtn: "Пауза",
+    resumeBtn: "Продолжить",
     source: "Площадка",
     active: "Активных",
     total: "Всего",
@@ -92,6 +99,13 @@ const I18N = {
     dailyChart: "New listings per day",
     monthlyChart: "Per month",
     platforms: "Platforms",
+    collectors: "Collectors",
+    status: "Status",
+    lastPoll: "Last poll",
+    errorsShort: "Errors",
+    actions: "Actions",
+    pauseBtn: "Pause",
+    resumeBtn: "Resume",
     source: "Platform",
     active: "Active",
     total: "Total",
@@ -639,6 +653,50 @@ async function loadMetrics() {
   }
 }
 
+function renderCollectors(status) {
+  const tbody = $("collectors");
+  if (!tbody) return;
+  const rows = status.collectors || [];
+  tbody.innerHTML = "";
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="muted">${t("noData")}</td></tr>`;
+    return;
+  }
+  rows.forEach((row) => {
+    const stats = row.stats || {};
+    const paused = Boolean(row.paused);
+    const state = paused ? "paused" : (row.status || "never");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(row.source)}</td>
+      <td><span class="pill" data-state="${state}"><span class="dot"></span>${t("states")[state] || state}</span></td>
+      <td>${fmtTime(row.last_poll_at)}</td>
+      <td class="num">${fmtInt(stats.new_ids)}</td>
+      <td class="num">${fmtInt(stats.errors)}</td>
+      <td></td>`;
+    const cell = tr.lastElementChild;
+    const button = document.createElement("button");
+    button.className = "ghost";
+    button.textContent = paused ? t("resumeBtn") : t("pauseBtn");
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      await fetch("/api/control", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: row.source,
+          paused: !paused,
+          reason: !paused ? "пауза из дашборда" : null,
+          by: "dashboard",
+        }),
+      });
+      await load();
+    });
+    cell.appendChild(button);
+    tbody.appendChild(tr);
+  });
+}
+
 function render(status) {
   current = status;
   renderState(status);
@@ -647,6 +705,7 @@ function render(status) {
   renderPolls(status.polls || []);
   renderRuns(status.runs || []);
   renderControl(status);
+  renderCollectors(status);
   loadListings();
 }
 

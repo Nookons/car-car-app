@@ -220,6 +220,37 @@ class DatabaseRepo:
             "last_seen_at": _iso(row.get("last_seen_at")),
         }
 
+    # -- коллекторы --------------------------------------------------------
+    def collectors(self) -> list[dict[str, Any]]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select s.code as source, c.status, c.heartbeat_at, c.interval_seconds,
+                       c.round, c.last_poll_at, c.last_error, c.stats, c.paused,
+                       c.paused_reason, c.paused_at
+                from source s left join collector c on c.source_id = s.id
+                order by s.code
+                """
+            )
+            return [dict(r) for r in cur.fetchall()]
+
+    def set_paused(self, source: str, paused: bool, reason: str | None, by: str) -> None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into collector (source_id, paused, paused_reason, paused_at, updated_at)
+                select id, %s, %s, case when %s then now() end, now()
+                from source where code = %s
+                on conflict (source_id) do update set
+                    paused = excluded.paused,
+                    paused_reason = excluded.paused_reason,
+                    paused_at = case when excluded.paused then now() else null end,
+                    updated_at = now()
+                """,
+                (paused, reason, paused, source),
+            )
+        conn.commit()
+
     # -- метрики -----------------------------------------------------------
     def metrics(self, days: int = 30, months: int = 12) -> dict[str, Any]:
         days = max(1, min(days, 365))

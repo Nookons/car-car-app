@@ -40,6 +40,7 @@ DIGITS_RE = re.compile(r"^\s*(\d[\d\s\u00a0\u202f]*)")
 
 class ControlIn(BaseModel):
     paused: bool
+    source: str = Field(default="otomoto", max_length=40)
     reason: str | None = Field(default=None, max_length=200)
     by: str = Field(default="dashboard", max_length=40)
 
@@ -233,9 +234,12 @@ def create_app(
             except json.JSONDecodeError:
                 sweep = {}
 
+        collectors = repo.collectors() if repo is not None else []
+
         return {
             "now": now.isoformat(),
             "state": state,
+            "collectors": collectors,
             "sweep": sweep,
             "age_seconds": round(age, 1) if age is not None else None,
             "stale_after": stale_after,
@@ -366,6 +370,9 @@ def create_app(
 
     @app.post("/api/control")
     def control_set(payload: ControlIn) -> dict:
+        if repo is not None:
+            repo.set_paused(payload.source, payload.paused, payload.reason, payload.by)
+            return {"ok": True, "source": payload.source, "paused": payload.paused}
         state = save_control(
             store.control_path,
             paused=payload.paused,

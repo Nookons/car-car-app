@@ -9,7 +9,6 @@ heartbeat, журнал опросов, пауза.
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 from dataclasses import asdict, dataclass, field
@@ -20,10 +19,10 @@ from typing import Any
 from .canonical import canon_body
 from .client import Client, FetchError, GoneError
 from .config import Settings
-from .control import load_control, save_control
 from .db import DatabaseSink
 from .geo import get_geo
 from .parse import Listing, ParseError, parse_offer, parse_search, to_int
+from .state import CollectorState
 from .store import Store
 
 log = logging.getLogger("carcar")
@@ -202,20 +201,15 @@ def sweep(
     Нужен один раз для истории и потом раз в сутки для проверки «снятых»:
     инкрементальный опрос видит только новые объявления.
     """
-    state_path = store.state_dir / "sweep.json"
-    state: dict[str, Any] = {}
-    if state_path.exists():
-        try:
-            state = json.loads(state_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            state = {}
+    state = CollectorState(store, settings.source, sink)
+    saved = state.sweep_load()
 
-    page = from_page if from_page > 1 else int(state.get("next_page", 1))
+    page = from_page if from_page > 1 else int(saved.get("next_page", 1))
     started = time.monotonic()
     deadline = started + minutes * 60 if minutes else None
     totals = {"pages": 0, "inserted": 0, "updated": 0, "rejected": 0, "errors": 0}
     consecutive = 0
-    total_pages: int | None = state.get("total_pages")
+    total_pages: int | None = saved.get("total_pages")
 
     while True:
         if max_pages and totals["pages"] >= max_pages:
@@ -233,10 +227,9 @@ def sweep(
             log.exception("sweep: страница %d не удалась: %s", page, exc)
             time.sleep(min(60.0, 5.0 * consecutive))
             if consecutive >= 8:
-                save_control(
-                    store.control_path,
-                    paused=True,
-                    reason=f"авто-пауза: sweep, {totals['errors']} ошибок",
+                state.set_paused(
+                    True,
+                    f"авто-пауза: sweep, {totals['errors']} ошибок",
                     by="collector",
                 )
                 break
@@ -251,14 +244,18 @@ def sweep(
         totals["updated"] += result.updated
         totals["rejected"] += result.rejected
 
-        state = {
+        state.sweep_save(
+            next_page=page + 1,
+            total_pages=total_pages,
+            inserted=saved.get("inserted", 0) + result.inserted,
+            updated=saved.get("updated", 0) + result.updated,
+        )
+        saved = {
             "next_page": page + 1,
             "total_pages": total_pages,
-            "inserted": state.get("inserted", 0) + result.inserted,
-            "updated": state.get("updated", 0) + result.updated,
-            "updated_at": datetime.now(UTC).isoformat(),
+            "inserted": saved.get("inserted", 0) + result.inserted,
+            "updated": saved.get("updated", 0) + result.updated,
         }
-        store._atomic_write(state_path, json.dumps(state, ensure_ascii=False))
 
         if page % 50 == 0:
             elapsed = time.monotonic() - started
@@ -410,6 +407,7 @@ def watch(
     sink: DatabaseSink | None = None,
 ) -> dict[str, Any]:
     """Цикл «как в проде»: опрос выдачи каждые N секунд + карточки новинок."""
+    state = CollectorState(store, settings.source, sink)
     started = time.monotonic()
     deadline = started + minutes * 60
     total = RunStats()
@@ -422,18 +420,18 @@ def watch(
     failures = 0
 
     while time.monotonic() < deadline:
-        control = load_control(store.control_path)
-        if control.paused:
+        is_paused, pause_reason = state.paused()
+        if is_paused:
             if not paused_logged:
-                print(f"пауза: {control.reason or 'без причины'}")
+                print(f"пауза: {pause_reason or 'без причины'}")
                 paused_logged = True
-            store.write_heartbeat(
+            state.heartbeat(
                 {
                     "status": "paused",
                     "mode": "watch",
                     "round": rounds,
                     "interval": interval,
-                    "paused_reason": control.reason,
+                    "paused_reason": pause_reason,
                     "last_poll_at": last_poll_at,
                     "last_new": last_new,
                     "totals": _totals(total),
@@ -463,13 +461,12 @@ def watch(
             backoff = min(interval * (2 ** failures), 600.0)
 
             if failures >= AUTO_PAUSE_AFTER:
-                save_control(
-                    store.control_path,
-                    paused=True,
-                    reason=f"авто-пауза: {failures} ошибок подряд ({str(exc)[:120]})",
+                state.set_paused(
+                    True,
+                    f"авто-пауза: {failures} ошибок подряд ({str(exc)[:120]})",
                     by="collector",
                 )
-                store.write_heartbeat(
+                state.heartbeat(
                     {
                         "status": "paused",
                         "mode": "watch",
@@ -485,7 +482,7 @@ def watch(
                 log.error("авто-пауза после %d ошибок подряд", failures)
                 break
 
-            store.write_heartbeat(
+            state.heartbeat(
                 {
                     "status": "error",
                     "mode": "watch",
@@ -564,7 +561,7 @@ def watch(
                 "wire_bytes": wire_round,
             }
         )
-        store.write_heartbeat(
+        state.heartbeat(
             {
                 "status": "running",
                 "mode": "watch",
@@ -590,9 +587,9 @@ def watch(
         "client": client.stats.as_dict(),
     }
     store.write_run(summary)
-    store.write_heartbeat(
+    state.heartbeat(
         {
-            "status": "paused" if load_control(store.control_path).paused else "idle",
+            "status": "paused" if state.paused()[0] else "idle",
             "mode": "watch",
             "round": rounds,
             "finished_at": datetime.now(UTC).isoformat(),

@@ -1,0 +1,10 @@
+.git
+.venv
+data
+logs
+docs
+tests
+*.md
+!README.md
+.env
+.env.*

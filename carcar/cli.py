@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -80,9 +81,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_pause = sub.add_parser("pause", help="поставить сбор на паузу")
     p_pause.add_argument("--data", type=Path, default=Path("data"))
     p_pause.add_argument("--reason", default=None)
+    p_pause.add_argument("--source", default=None, help="площадка (по умолчанию из env)")
 
     p_resume = sub.add_parser("resume", help="снять паузу")
     p_resume.add_argument("--data", type=Path, default=Path("data"))
+    p_resume.add_argument("--source", default=None, help="площадка (по умолчанию из env)")
 
     p_stats = sub.add_parser("stats", help="что уже собрано")
     p_stats.add_argument("--data", type=Path, default=Path("data"))
@@ -199,18 +202,37 @@ def main(argv: list[str] | None = None) -> int:
         return _run_dashboard(args)
 
     if args.command in {"pause", "resume"}:
-        store = Store(root=args.data)
         paused = args.command == "pause"
-        state = save_control(
-            store.control_path,
-            paused=paused,
-            reason=getattr(args, "reason", None),
-            by="cli",
-        )
-        print(f"{'пауза' if paused else 'пауза снята'}: {state.updated_at}")
+        source = args.source or os.environ.get("CARCAR_SOURCE", "otomoto")
+        url = database_url()
+        if url:
+            sink = DatabaseSink(url)
+            try:
+                sink.set_paused(
+                    source, paused, getattr(args, "reason", None), by="cli"
+                )
+            finally:
+                sink.close()
+            print(f"{'пауза' if paused else 'пауза снята'}: {source} (база)")
+        else:
+            store = Store(root=args.data)
+            state = save_control(
+                store.control_path,
+                paused=paused,
+                reason=getattr(args, "reason", None),
+                by="cli",
+            )
+            print(f"{'пауза' if paused else 'пауза снята'}: {state.updated_at}")
         return 0
 
     settings = _settings(args)
+    if settings.source not in {"otomoto"}:
+        print(
+            f"парсер для площадки «{settings.source}» ещё не реализован "
+            "(сейчас поддерживается otomoto)",
+            file=sys.stderr,
+        )
+        return 2
     store = Store(root=settings.data_dir, source=settings.source)
 
     sink: DatabaseSink | None = None

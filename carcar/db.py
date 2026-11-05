@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import os
 from dataclasses import dataclass, field
@@ -406,6 +407,130 @@ class DatabaseSink:
         if bad:
             log.warning("отбраковано при построчной записи: %d", bad)
         return result
+
+    # -- состояние коллектора (Railway: у каждого свой контейнер) ----------
+    def heartbeat(self, code: str, payload: dict[str, Any]) -> None:
+        source_id = self.source_id(code)
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into collector (source_id, status, heartbeat_at, interval_seconds,
+                                       round, last_poll_at, last_error, stats, updated_at)
+                values (%s, %s, now(), %s, %s, %s, %s, %s::jsonb, now())
+                on conflict (source_id) do update set
+                    status = excluded.status,
+                    heartbeat_at = now(),
+                    interval_seconds = excluded.interval_seconds,
+                    round = excluded.round,
+                    last_poll_at = excluded.last_poll_at,
+                    last_error = excluded.last_error,
+                    stats = excluded.stats,
+                    updated_at = now()
+                """,
+                (
+                    source_id,
+                    payload.get("status", "unknown"),
+                    int(payload.get("interval") or 60),
+                    int(payload.get("round") or 0),
+                    payload.get("last_poll_at"),
+                    payload.get("last_error"),
+                    json.dumps(payload.get("totals") or {}),
+                ),
+            )
+        self.conn.commit()
+
+    def collectors(self) -> list[dict[str, Any]]:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                select s.code, c.status, c.heartbeat_at, c.interval_seconds, c.round,
+                       c.last_poll_at, c.last_error, c.stats, c.paused,
+                       c.paused_reason, c.paused_at
+                from source s left join collector c on c.source_id = s.id
+                order by s.code
+                """
+            )
+            rows = cur.fetchall()
+        keys = (
+            "source", "status", "heartbeat_at", "interval", "round", "last_poll_at",
+            "last_error", "stats", "paused", "paused_reason", "paused_at",
+        )
+        return [dict(zip(keys, row, strict=False)) for row in rows]
+
+    def set_paused(
+        self, code: str, paused: bool, reason: str | None = None, by: str = "dashboard"
+    ) -> None:
+        source_id = self.source_id(code)
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into collector (source_id, paused, paused_reason, paused_at, updated_at)
+                values (%s, %s, %s, case when %s then now() end, now())
+                on conflict (source_id) do update set
+                    paused = excluded.paused,
+                    paused_reason = excluded.paused_reason,
+                    paused_at = case when excluded.paused then now() else null end,
+                    updated_at = now()
+                """,
+                (source_id, paused, reason, paused),
+            )
+        self.conn.commit()
+
+    def is_paused(self, code: str) -> tuple[bool, str | None]:
+        source_id = self.source_id(code)
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "select paused, paused_reason from collector where source_id = %s",
+                (source_id,),
+            )
+            row = cur.fetchone()
+        return (bool(row[0]), row[1]) if row else (False, None)
+
+    def sweep_state(self, code: str) -> dict[str, Any]:
+        source_id = self.source_id(code)
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "select next_page, total_pages, inserted, updated from sweep_state "
+                "where source_id = %s",
+                (source_id,),
+            )
+            row = cur.fetchone()
+        if not row:
+            return {"next_page": 1, "total_pages": None, "inserted": 0, "updated": 0}
+        return {
+            "next_page": row[0],
+            "total_pages": row[1],
+            "inserted": row[2],
+            "updated": row[3],
+        }
+
+    def set_sweep_state(
+        self,
+        code: str,
+        *,
+        next_page: int,
+        total_pages: int | None,
+        inserted: int,
+        updated: int,
+    ) -> None:
+        source_id = self.source_id(code)
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into sweep_state (
+                    source_id, next_page, total_pages, inserted, updated, updated_at
+                )
+                values (%s, %s, %s, %s, %s, now())
+                on conflict (source_id) do update set
+                    next_page = excluded.next_page,
+                    total_pages = excluded.total_pages,
+                    inserted = excluded.inserted,
+                    updated = excluded.updated,
+                    updated_at = now()
+                """,
+                (source_id, next_page, total_pages, inserted, updated),
+            )
+        self.conn.commit()
 
     # -- наблюдаемость -----------------------------------------------------
     def log_run(

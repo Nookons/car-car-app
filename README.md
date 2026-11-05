@@ -161,6 +161,21 @@ data/
 Ссылку с координатами можно открыть напрямую (удобно для проверки):
 `http://127.0.0.1:8077/?lat=52.23&lon=21.01&radius=100`.
 
+## Деплой: Railway, по сервису на площадку
+
+Каждый коллектор — самостоятельный сервис с общим образом и общей базой:
+`CARCAR_MODE=watch|enrich|sweep|dashboard`, `CARCAR_SOURCE=otomoto|...`.
+Состояние (heartbeat, пауза, прогресс обхода) — в Supabase, поэтому контейнеры
+stateless. Подробно: [`docs/RAILWAY.md`](docs/RAILWAY.md).
+
+```bash
+# сборка образа
+docker build -t carcar .
+
+# локальная проверка режимов
+docker run --rm -e DATABASE_URL=... -e CARCAR_MODE=watch -e CARCAR_SOURCE=otomoto carcar
+```
+
 ## Дашборд
 
 ![Дашборд сборщика](docs/img/dashboard.png)
