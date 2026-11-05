@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Heart, ArrowSquareOut } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
+import { PhotoGallery } from "@/components/photo-gallery";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -87,19 +88,10 @@ export default function ListingPage() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start">
       <Card className="overflow-hidden">
-        <div className="no-scrollbar -mx-px flex snap-x snap-mandatory gap-1 overflow-x-auto">
-          {(item.photos.length ? item.photos : [item.thumbnail ?? ""]).slice(0, 12).map((src, index) =>
-            src ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={index}
-                src={src}
-                alt=""
-                className="aspect-[4/3] w-full shrink-0 snap-center object-cover"
-              />
-            ) : null,
-          )}
-        </div>
+        <PhotoGallery
+          photos={item.photos.length ? item.photos : [item.thumbnail ?? ""]}
+          title={item.title}
+        />
         <div className="space-y-3 p-4">
           <p className="text-2xl font-semibold tracking-tight">{price(item.price, item.currency)}</p>
           <h1 className="text-base font-semibold leading-snug">{item.title}</h1>
