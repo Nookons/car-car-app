@@ -95,6 +95,9 @@ class Listing:
     seller_type: str
     thumbnail: str
     is_pinned: bool = False
+    lat: float | None = None
+    lon: float | None = None
+    geo_source: str | None = None
 
     def to_row(self) -> dict[str, Any]:
         return asdict(self)

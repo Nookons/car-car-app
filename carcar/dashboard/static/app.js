@@ -15,6 +15,12 @@ const I18N = {
       "Сборщик проверяет паузу перед каждым опросом — на площадку запросы перестают идти в пределах одного интервала.",
     recentListings: "Последние объявления",
     noListings: "Пока нет объявлений — запустите сборщик",
+    nearMe: "Рядом со мной",
+    showAll: "Показать все",
+    locating: "Определяю…",
+    geoDenied: "Не удалось получить геолокацию — разрешите доступ в браузере",
+    radiusAll: "Вся Польша",
+    km: "км",
     recentPolls: "Последние опросы",
     runs: "Прогоны",
     time: "Время",
@@ -62,6 +68,12 @@ const I18N = {
       "The collector checks the pause flag before every poll — requests stop within one interval.",
     recentListings: "Latest listings",
     noListings: "No listings yet — start the collector",
+    nearMe: "Near me",
+    showAll: "Show all",
+    locating: "Locating…",
+    geoDenied: "Could not get your location — allow access in the browser",
+    radiusAll: "All Poland",
+    km: "km",
     recentPolls: "Recent polls",
     runs: "Runs",
     time: "Time",
@@ -97,9 +109,34 @@ const I18N = {
 let lang = localStorage.getItem("carcar.lang") || "ru";
 let current = null;
 let busy = false;
+let geo = readGeo();
+
+// Ссылку «рядом со мной» можно открыть с координатами: /?lat=52.23&lon=21.01&radius=50
+(() => {
+  const params = new URLSearchParams(location.search);
+  const lat = parseFloat(params.get("lat"));
+  const lon = parseFloat(params.get("lon"));
+  if (Number.isFinite(lat) && Number.isFinite(lon)) {
+    saveGeo({ lat, lon });
+  }
+})();
 
 const $ = (id) => document.getElementById(id);
 const t = (key) => I18N[lang][key] ?? key;
+
+function readGeo() {
+  try {
+    return JSON.parse(localStorage.getItem("carcar.geo") || "null");
+  } catch {
+    return null;
+  }
+}
+
+function saveGeo(value) {
+  geo = value;
+  if (value) localStorage.setItem("carcar.geo", JSON.stringify(value));
+  else localStorage.removeItem("carcar.geo");
+}
 
 function fmtTime(iso) {
   if (!iso) return "—";
@@ -124,6 +161,28 @@ function fmtMb(bytes) {
   return mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.round((bytes || 0) / 1024)} KB`;
 }
 
+function fillRadius() {
+  const select = $("radius");
+  const currentValue = select.value || "100";
+  select.innerHTML = "";
+  [25, 50, 100, 200].forEach((km) => {
+    const option = document.createElement("option");
+    option.value = String(km);
+    option.textContent = `${km} ${t("km")}`;
+    select.appendChild(option);
+  });
+  const all = document.createElement("option");
+  all.value = "0";
+  all.textContent = t("radiusAll");
+  select.appendChild(all);
+  const fromUrl = new URLSearchParams(location.search).get("radius");
+  select.value = fromUrl || currentValue;
+}
+
+function updateGeoButton() {
+  $("near").textContent = geo ? t("showAll") : t("nearMe");
+}
+
 function applyLang() {
   document.documentElement.lang = lang;
   document.querySelectorAll("[data-i18n]").forEach((el) => {
@@ -131,6 +190,8 @@ function applyLang() {
   });
   $("lang").textContent = lang === "ru" ? "EN" : "RU";
   document.title = `CarCar · ${t("title")}`;
+  fillRadius();
+  updateGeoButton();
 }
 
 function renderState(status) {
@@ -335,7 +396,11 @@ function renderListings(items) {
     const meta = [
       item.year,
       item.mileage_km ? `${fmtInt(item.mileage_km)} km` : null,
-      item.city,
+      item.distance_km != null
+        ? item.distance_km < 1
+          ? `≈ <1 ${t("km")}`
+          : `≈ ${fmtInt(Math.round(item.distance_km))} ${t("km")}`
+        : item.city,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -357,7 +422,14 @@ function renderListings(items) {
 
 async function loadListings() {
   try {
-    const response = await fetch("/api/listings?limit=8", { cache: "no-store" });
+    const params = new URLSearchParams({ limit: "8" });
+    if (geo) {
+      params.set("lat", geo.lat);
+      params.set("lon", geo.lon);
+      const radius = $("radius").value;
+      if (radius !== "0") params.set("radius_km", radius);
+    }
+    const response = await fetch(`/api/listings?${params.toString()}`, { cache: "no-store" });
     if (!response.ok) return;
     const data = await response.json();
     renderListings(data.items || []);
@@ -415,6 +487,37 @@ async function toggle() {
 }
 
 $("toggle").addEventListener("click", toggle);
+
+$("near").addEventListener("click", () => {
+  if (geo) {
+    saveGeo(null);
+    updateGeoButton();
+    loadListings();
+    return;
+  }
+  if (!navigator.geolocation) {
+    alert(t("geoDenied"));
+    return;
+  }
+  const button = $("near");
+  button.textContent = t("locating");
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      saveGeo({ lat: position.coords.latitude, lon: position.coords.longitude });
+      updateGeoButton();
+      loadListings();
+    },
+    () => {
+      button.textContent = t("nearMe");
+      alert(t("geoDenied"));
+    },
+    { timeout: 8000, maximumAge: 600000 },
+  );
+});
+
+$("radius").addEventListener("change", () => {
+  if (geo) loadListings();
+});
 $("lang").addEventListener("click", () => {
   lang = lang === "ru" ? "en" : "ru";
   localStorage.setItem("carcar.lang", lang);

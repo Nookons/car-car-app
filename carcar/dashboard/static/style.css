@@ -260,3 +260,17 @@ a.primary.link-btn {
   font-weight: 600;
 }
 a.primary.link-btn:hover { background: #1f2937; }
+
+
+/* Гео-фильтр */
+.geo-controls { display: flex; align-items: center; gap: 8px; }
+.geo-controls select {
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+}

@@ -73,7 +73,10 @@
     <section class="card listings-card">
       <div class="card-head">
         <h2 data-i18n="recentListings">Последние объявления</h2>
-        <span class="muted" id="listings-hint"></span>
+        <div class="geo-controls">
+          <button class="ghost" id="near" data-i18n="nearMe">Рядом со мной</button>
+          <select id="radius" aria-label="radius"></select>
+        </div>
       </div>
       <div class="listing-grid" id="listings"></div>
     </section>

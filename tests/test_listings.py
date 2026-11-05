@@ -46,7 +46,9 @@ def client(store) -> TestClient:
 
 
 def test_listings_empty(client):
-    assert client.get("/api/listings").json() == {"items": []}
+    data = client.get("/api/listings").json()
+    assert data["items"] == []
+    assert data["total"] == 0
 
 
 def test_listings_returns_recent_first(client, store):
@@ -115,3 +117,38 @@ def test_fetch_endpoint_downloads_card(store, offer_html):
 
 def test_fetch_unknown_listing_404(client):
     assert client.post("/api/listings/123456/fetch").status_code == 404
+
+
+def test_listings_fill_coordinates_from_city(client, store):
+    store.append_discovered([make_row(id="777", city="Gdańsk")])
+    item = client.get("/api/listings").json()["items"][0]
+    assert item["lat"] is not None and item["lon"] is not None
+    assert round(item["lat"], 1) == 54.4
+
+
+def test_listings_distance_filter(client, store):
+    store.append_discovered(
+        [
+            make_row(id="1", city="Warszawa", lat=52.22977, lon=21.01178),
+            make_row(id="2", city="Kraków", lat=50.06143, lon=19.93658),
+        ]
+    )
+    data = client.get(
+        "/api/listings", params={"lat": 52.23, "lon": 21.01, "radius_km": 50}
+    ).json()
+
+    assert [i["id"] for i in data["items"]] == ["1"]
+    assert data["items"][0]["distance_km"] < 5
+    assert data["filtered"] is True
+
+
+def test_listings_sorted_by_distance(client, store):
+    store.append_discovered(
+        [
+            make_row(id="far", city="Kraków", lat=50.06, lon=19.94),
+            make_row(id="near", city="Warszawa", lat=52.23, lon=21.01),
+        ]
+    )
+    items = client.get("/api/listings", params={"lat": 52.23, "lon": 21.01}).json()["items"]
+    assert items[0]["id"] == "near"
+    assert items[0]["distance_km"] < items[1]["distance_km"]

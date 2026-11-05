@@ -38,6 +38,7 @@ const I18N = {
     previewOnly:
       "Пока видны только данные выдачи. Нажмите «Загрузить карточку», чтобы получить фото, описание и полные характеристики.",
     loadedAt: "Карточка сохранена",
+    away: "от вас",
   },
   en: {
     title: "Listing",
@@ -76,6 +77,7 @@ const I18N = {
     previewOnly:
       "Only feed data is available. Press “Load full card” to fetch photos, description and all specs.",
     loadedAt: "Card saved",
+    away: "away",
   },
 };
 
@@ -108,6 +110,25 @@ function fmtPrice(value, currency = "PLN") {
 function fmtDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString(lang === "ru" ? "ru-RU" : "en-GB");
+}
+
+function userGeo() {
+  try {
+    return JSON.parse(localStorage.getItem("carcar.geo") || "null");
+  } catch {
+    return null;
+  }
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const rad = (x) => (x * Math.PI) / 180;
+  const dLat = rad(lat2 - lat1);
+  const dLon = rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
 }
 
 function listingId() {
@@ -208,7 +229,13 @@ function render() {
   $("chips").innerHTML = chips();
 
   const place = [card.city, card.region].filter(Boolean).join(", ");
-  $("location").textContent = place;
+  const here = userGeo();
+  let distance = "";
+  if (here && card.lat != null && card.lon != null) {
+    const km = Math.round(haversine(here.lat, here.lon, card.lat, card.lon));
+    distance = ` · ≈ ${fmtInt(km)} ${t("km")} ${t("away")}`;
+  }
+  $("location").textContent = (place || "") + distance;
 
   const kind = card.seller?.type === "PRIVATE" ? t("private") : card.seller?.type ? t("dealer") : "";
   $("seller").textContent = card.seller?.name

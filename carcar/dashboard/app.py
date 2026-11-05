@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 from ..client import BlockedError, Client, FetchError
 from ..config import Settings
 from ..control import load_control, save_control
+from ..geo import distance_km, get_geo
 from ..parse import Listing, ParseError, html_to_text
 from ..runner import fetch_detail
 from ..store import Store
@@ -90,8 +91,32 @@ def build_card(store: Store, listing_id: str) -> dict[str, Any] | None:
     price = advert.get("price") or {}
     seller = advert.get("seller") or {}
     location = advert.get("location") or {}
-    city = (location.get("city") or {}).get("name") or row.get("city") or ""
-    region = (location.get("region") or {}).get("name") or row.get("region") or ""
+    seller_location = seller.get("location") or {}
+    city = (
+        (location.get("city") or {}).get("name")
+        or seller_location.get("city")
+        or row.get("city")
+        or ""
+    )
+    region = (
+        (location.get("region") or {}).get("name")
+        or seller_location.get("region")
+        or row.get("region")
+        or ""
+    )
+
+    # Координаты: точные из карточки, иначе из строки выдачи, иначе по городу.
+    map_info = seller_location.get("map") or {}
+    lat = map_info.get("latitude")
+    lon = map_info.get("longitude")
+    geo_source = "advert" if lat is not None and lon is not None else None
+    if lat is None or lon is None:
+        lat, lon = row.get("lat"), row.get("lon")
+        geo_source = row.get("geo_source")
+    if lat is None or lon is None:
+        place = get_geo().lookup(city, region)
+        if place:
+            lat, lon, geo_source = place.lat, place.lon, "city"
 
     return {
         "id": listing_id,
@@ -125,6 +150,10 @@ def build_card(store: Store, listing_id: str) -> dict[str, Any] | None:
         "color": details.get("color") or "",
         "vin": details.get("vin") or "",
         "country_origin": details.get("country_origin") or "",
+        "lat": lat,
+        "lon": lon,
+        "geo_source": geo_source,
+        "address": seller_location.get("address") or "",
     }
 
 
@@ -199,14 +228,44 @@ def create_app(
         }
 
     @app.get("/api/listings")
-    def listings(limit: int = 8) -> dict:
+    def listings(
+        limit: int = 8,
+        lat: float | None = None,
+        lon: float | None = None,
+        radius_km: float | None = None,
+    ) -> dict:
+        """Последние объявления; с lat/lon — с расстоянием и фильтром по радиусу."""
         limit = max(1, min(limit, 24))
+        geo = get_geo()
+        nearby = lat is not None and lon is not None
+        rows = store.recent_listings(limit * 25 if nearby else limit)
+
         items = []
-        for row in store.recent_listings(limit):
+        for row in rows:
             item = dict(row)
             item["has_detail"] = store.find_detail_file(row["id"]) is not None
+            if item.get("lat") is None or item.get("lon") is None:
+                place = geo.lookup(row.get("city", ""), row.get("region"))
+                if place:
+                    item["lat"], item["lon"] = place.lat, place.lon
+                    item["geo_source"] = "city"
+            if nearby and item.get("lat") is not None and item.get("lon") is not None:
+                item["distance_km"] = round(
+                    distance_km(lat, lon, item["lat"], item["lon"]), 1
+                )
             items.append(item)
-        return {"items": items}
+
+        if nearby:
+            if radius_km and radius_km > 0:
+                limit_km = max(1.0, min(radius_km, 1000.0))
+                items = [
+                    i
+                    for i in items
+                    if i.get("distance_km") is not None and i["distance_km"] <= limit_km
+                ]
+            items.sort(key=lambda i: i.get("distance_km", 1e9))
+
+        return {"items": items[:limit], "total": len(items), "filtered": nearby}
 
     @app.get("/api/listings/{listing_id}")
     def listing_card(listing_id: str) -> dict:

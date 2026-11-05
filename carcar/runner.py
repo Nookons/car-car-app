@@ -12,6 +12,7 @@ from typing import Any
 from .client import Client, FetchError
 from .config import Settings
 from .control import load_control
+from .geo import get_geo
 from .parse import Listing, ParseError, parse_offer, parse_search
 from .store import Store
 
@@ -71,6 +72,7 @@ def discover(
         url = settings.search_url(page)
         response = client.get(url)
         parsed = parse_search(response.text, url)
+        _apply_geo(parsed.items)
         stats.pages += 1
         stats.items += len(parsed.items)
 
@@ -98,6 +100,17 @@ def discover(
 
     stats.seconds = round(time.monotonic() - started, 2)
     return DiscoverResult(items=found, stats=stats)
+
+
+def _apply_geo(items: list[Listing]) -> None:
+    """Город → координаты центра населённого пункта (если ещё нет)."""
+    geo = get_geo()
+    for item in items:
+        if item.lat is not None and item.lon is not None:
+            continue
+        place = geo.lookup(item.city, item.region)
+        if place:
+            item.lat, item.lon, item.geo_source = place.lat, place.lon, "city"
 
 
 def fetch_detail(
