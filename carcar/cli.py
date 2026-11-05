@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 from .client import BlockedError, Client, FetchError
-from .config import Settings
+from .config import Settings, load_env_file
 from .control import load_control, save_control
 from .db import DatabaseSink, database_url
 from .parse import Listing, ParseError, parse_offer
@@ -71,6 +71,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_watch.add_argument("--interval", type=float, default=60.0, help="пауза между опросами, сек")
     p_watch.add_argument("--minutes", type=float, default=10.0, help="сколько работать, мин")
     p_watch.add_argument("--details", type=int, default=5)
+
+    p_bot = sub.add_parser("bot", help="Telegram-бот: кнопка запуска Mini App")
+    p_bot.add_argument("--public-url", default=None, help="https-адрес Mini App")
+
+    p_mini = sub.add_parser("miniapp", help="Telegram Mini App (API + фронтенд)")
+    p_mini.add_argument("--host", default="127.0.0.1")
+    p_mini.add_argument("--port", type=int, default=8080)
 
     p_dash = sub.add_parser("dashboard", help="веб-дашборд со статусом и паузой")
     p_dash.add_argument("--data", type=Path, default=Path("data"))
@@ -157,6 +164,7 @@ def _run_dashboard(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    load_env_file()
     args = build_parser().parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if getattr(args, "verbose", False) else logging.INFO,
@@ -196,6 +204,26 @@ def main(argv: list[str] | None = None) -> int:
             f"очистка: снятых объявлений {row[0]}, прогонов {row[1]}, "
             f"отказов {row[2]}, событий {row[3]}"
         )
+        return 0
+
+    if args.command == "bot":
+        from .bot import Bot
+
+        token = os.environ.get("CARCAR_BOT_TOKEN", "")
+        if not token:
+            print("нужен CARCAR_BOT_TOKEN", file=sys.stderr)
+            return 2
+        public_url = args.public_url or os.environ.get("CARCAR_PUBLIC_URL")
+        Bot(token, public_url).run()
+        return 0
+
+    if args.command == "miniapp":
+        import uvicorn
+
+        from .miniapp.api import create_app as create_miniapp
+
+        print(f"mini app: http://{args.host}:{args.port}")
+        uvicorn.run(create_miniapp(), host=args.host, port=args.port, log_level="warning")
         return 0
 
     if args.command == "dashboard":

@@ -28,6 +28,12 @@ case "$MODE" in
             --rps "${CARCAR_RPS:-0.7}" \
             --minutes 0
         ;;
+    bot)
+        exec python -m carcar bot
+        ;;
+    miniapp)
+        exec python -m carcar miniapp --host 0.0.0.0 --port "${PORT:-8080}"
+        ;;
     dashboard)
         exec python -m carcar dashboard \
             --host 0.0.0.0 \

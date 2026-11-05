@@ -29,3 +29,8 @@ dist/
 
 # Логи запуска
 logs/
+
+.next/
+web/node_modules/
+web/.next/
+.vercel/

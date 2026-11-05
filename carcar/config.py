@@ -6,6 +6,21 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def load_env_file(path: Path | None = None) -> None:
+    """Подхватывает .env, не перетирая уже заданные переменные."""
+    env_path = path or ROOT / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip("'\""))
+
 # Тот же браузерный UA, с которым площадка отдаёт полную страницу.
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "

@@ -162,6 +162,45 @@ create table if not exists ingest_reject (
 create index if not exists ingest_reject_created_idx on ingest_reject (created_at desc);
 
 -- ---------------------------------------------------------------------------
+-- Пользователи Telegram Mini App
+-- ---------------------------------------------------------------------------
+
+create table if not exists app_user (
+    id           bigint generated always as identity primary key,
+    tg_id        bigint not null unique,
+    username     text,
+    first_name   text,
+    last_name    text,
+    lang         text not null default 'ru' check (lang in ('ru', 'pl', 'uk', 'en')),
+    notify_new   boolean not null default true,
+    digest       boolean not null default false,
+    created_at   timestamptz not null default now(),
+    last_seen_at timestamptz not null default now()
+);
+
+create table if not exists subscription (
+    id         bigint generated always as identity primary key,
+    user_id    bigint not null references app_user(id) on delete cascade,
+    name       text not null,
+    criteria   jsonb not null,
+    active     boolean not null default true,
+    created_at timestamptz not null default now()
+);
+
+create index if not exists subscription_user_idx on subscription (user_id) where active;
+
+create table if not exists favorite (
+    user_id    bigint not null references app_user(id) on delete cascade,
+    listing_id bigint not null references listing(id) on delete cascade,
+    created_at timestamptz not null default now(),
+    primary key (user_id, listing_id)
+);
+
+alter table app_user     enable row level security;
+alter table subscription enable row level security;
+alter table favorite     enable row level security;
+
+-- ---------------------------------------------------------------------------
 -- Состояние коллекторов (на Railway у каждого свой контейнер и нет общего диска)
 -- ---------------------------------------------------------------------------
 
