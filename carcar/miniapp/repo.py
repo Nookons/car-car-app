@@ -379,6 +379,102 @@ class MiniAppRepo:
 
         return _card(row, events, analysis)
 
+    # -- справочник для фильтров --------------------------------------------
+    def filter_makes(self) -> list[dict[str, Any]]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select make, count(*) as n
+                from listing
+                where status = 'active' and make is not null and make <> ''
+                group by make
+                order by n desc
+                """
+            )
+            return [{"value": r["make"], "count": r["n"]} for r in cur.fetchall()]
+
+    def filter_models(self, make: str) -> list[dict[str, Any]]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select model, count(*) as n
+                from listing
+                where status = 'active' and make = %s and model is not null and model <> ''
+                group by model
+                order by n desc
+                """,
+                (make,),
+            )
+            return [{"value": r["model"], "count": r["n"]} for r in cur.fetchall()]
+
+    def filter_options(self, make: str | None, model: str | None) -> dict[str, Any]:
+        where, params = [], []
+        if make:
+            where.append("make = %s")
+            params.append(make)
+        if model:
+            where.append("model = %s")
+            params.append(model)
+        clause = ("where " + " and ".join(where)) if where else ""
+
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                select gearbox, sum(listings) as n from model_option {clause}
+                group by gearbox having gearbox <> '' order by n desc
+                """,
+                params,
+            )
+            gearboxes = [{"value": r["gearbox"], "count": int(r["n"])} for r in cur.fetchall()]
+
+            cur.execute(
+                f"""
+                select fuel, sum(listings) as n from model_option {clause}
+                group by fuel having fuel <> '' order by n desc
+                """,
+                params,
+            )
+            fuels = [{"value": r["fuel"], "count": int(r["n"])} for r in cur.fetchall()]
+
+            cur.execute(
+                f"""
+                select body, sum(listings) as n from model_option {clause}
+                group by body having body <> '' order by n desc
+                """,
+                params,
+            )
+            bodies = [{"value": r["body"], "count": int(r["n"])} for r in cur.fetchall()]
+
+            cur.execute(
+                f"select min(year_min) as y0, max(year_max) as y1 from model_option {clause}",
+                params,
+            )
+            years = cur.fetchone()
+
+            cur.execute(
+                f"""
+                select min(price_p10) as p10, max(price_p90) as p90 from model_option {clause}
+                """,
+                params,
+            )
+            prices = cur.fetchone()
+
+            cur.execute(
+                f"select sum(listings) as n, count(*) as combos from model_option {clause}",
+                params,
+            )
+            totals = cur.fetchone()
+
+        return {
+            "gearboxes": gearboxes,
+            "fuels": fuels,
+            "bodies": bodies,
+            "years": {"min": years["y0"], "max": years["y1"]},
+            "price": {"p10": prices["p10"], "p90": prices["p90"]},
+            "listings": int(totals["n"] or 0),
+            "combos": int(totals["combos"] or 0),
+        }
+
     # -- подписки ----------------------------------------------------------
     def subscriptions(self, user_id: int) -> list[dict[str, Any]]:
         with self.pool.connection() as conn, conn.cursor() as cur:

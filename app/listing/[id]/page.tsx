@@ -124,13 +124,13 @@ export default function ListingPage() {
   const description = item.description?.trim();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <Link href="/list" className="inline-flex items-center gap-1 text-sm text-muted-foreground">
         <ArrowLeft size={16} /> Назад
       </Link>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start">
-        <div className="space-y-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start">
+        <div className="space-y-3">
           <Card className="overflow-hidden">
             <PhotoGallery
               photos={item.photos.length ? item.photos : [item.thumbnail ?? ""]}
@@ -204,7 +204,7 @@ export default function ListingPage() {
           ) : null}
         </div>
 
-        <div className="space-y-4 lg:sticky lg:top-20">
+        <div className="space-y-3 lg:sticky lg:top-20">
           <PriceMarket item={item} />
 
           <Card className="overflow-hidden">

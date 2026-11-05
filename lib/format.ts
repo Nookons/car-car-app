@@ -38,7 +38,22 @@ const GEARBOX: Record<string, string> = {
   other: "Другое",
 };
 
+const BODY: Record<string, string> = {
+  sedan: "Седан",
+  suv: "Внедорожник",
+  wagon: "Универсал",
+  estate: "Универсал",
+  hatchback: "Хэтчбек",
+  coupe: "Купе",
+  convertible: "Кабриолет",
+  minivan: "Минивэн",
+  van: "Фургон",
+  pickup: "Пикап",
+  other: "Другое",
+};
+
 export const fuelLabel = (value: string | null) => (value ? FUEL[value] ?? value : "");
+export const bodyLabel = (value: string | null) => (value ? BODY[value] ?? value : "");
 export const gearboxLabel = (value: string | null) => (value ? GEARBOX[value] ?? value : "");
 
 export function filtersSummary(filters: Filters): string {

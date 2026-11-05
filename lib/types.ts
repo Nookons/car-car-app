@@ -72,6 +72,7 @@ export type Filters = {
   mileage_max?: number;
   fuel?: string;
   gearbox?: string;
+  body?: string;
   lat?: number;
   lon?: number;
   radius_km?: number;

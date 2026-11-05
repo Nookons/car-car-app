@@ -223,6 +223,19 @@ def create_app(
             raise HTTPException(status_code=404, detail="объявление не найдено")
         return card
 
+    # -- справочник фильтров ------------------------------------------------
+    @app.get("/api/filters/makes")
+    def filter_makes() -> dict:
+        return {"items": repo.filter_makes()}
+
+    @app.get("/api/filters/models")
+    def filter_models(make: str = Query(min_length=1)) -> dict:
+        return {"items": repo.filter_models(make)}
+
+    @app.get("/api/filters/options")
+    def filter_options(make: str | None = None, model: str | None = None) -> dict:
+        return repo.filter_options(make, model)
+
     # -- подписки ----------------------------------------------------------
     @app.get("/api/subscriptions")
     def subscriptions(user: dict = Depends(current_user)) -> dict:
