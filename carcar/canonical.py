@@ -78,6 +78,10 @@ def _truncate(value: str | None, limit: int) -> str | None:
     return value[:limit] if value else None
 
 
+def canon_body(value: str | None) -> str | None:
+    return _canon(value, BODY)
+
+
 def _canon(value: str | None, mapping: dict[str, str], default: str | None = None) -> str | None:
     if not value:
         return default
@@ -165,7 +169,7 @@ def prepare(item: Any, source_id: int) -> Prepared:
         "body": _canon(getattr(item, "body", None), BODY),
         "power_hp": (
             getattr(item, "power_hp", None)
-            if 0 < (getattr(item, "power_hp", 0) or 0) < 2000
+            if 10 <= (getattr(item, "power_hp", 0) or 0) <= 2000
             else None
         ),
         "engine_cm3": (

@@ -276,7 +276,12 @@ function renderKpi(status) {
   $("kpi-details").textContent = fmtInt(
     isDb ? storage.listings : storage.detail_files,
   );
-  $("kpi-details-size").textContent = isDb ? storage.size : fmtMb(storage.detail_bytes);
+  const sweep = status.sweep || {};
+  const sweepText =
+    sweep.total_pages && sweep.next_page
+      ? ` · ${lang === "ru" ? "обход" : "sweep"} ${Math.min(sweep.next_page - 1, sweep.total_pages)}/${sweep.total_pages}`
+      : "";
+  $("kpi-details-size").textContent = (isDb ? storage.size : fmtMb(storage.detail_bytes)) + sweepText;
   const detailsLabel = document.querySelector('[data-i18n="details"]');
   if (detailsLabel) detailsLabel.textContent = isDb ? t("inDb") : t("details");
   $("kpi-errors").textContent = fmtInt(totals.errors);

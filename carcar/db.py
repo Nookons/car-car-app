@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -17,6 +18,8 @@ from pathlib import Path
 from typing import Any
 
 from .canonical import Prepared, prepare
+
+log = logging.getLogger("carcar")
 
 ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = ROOT / ".env.supabase"
@@ -188,30 +191,36 @@ class DatabaseSink:
                 unchanged.append(row["external_id"])
                 result.unchanged += 1
 
-        with self.conn.cursor() as cur:
-            if inserts:
-                cur.executemany(INSERT_SQL, inserts)
-            if updates:
-                cur.executemany(UPDATE_SQL, updates)
-            if unchanged:
-                cur.execute(
-                    """
-                    update listing set last_seen_at = now()
-                    where source_id = %s and external_id = any(%s)
-                    """,
-                    (source_id, unchanged),
-                )
-            if events:
-                cur.executemany(
-                    """
-                    insert into listing_event (listing_id, kind, old_price, new_price)
-                    select id, %s, %s, %s from listing
-                    where source_id = %s and external_id = %s
-                    """,
-                    [(kind, old, new, source_id, ext) for ext, kind, old, new in events],
-                )
-        self.conn.commit()
-        return result
+        try:
+            with self.conn.cursor() as cur:
+                if inserts:
+                    cur.executemany(INSERT_SQL, inserts)
+                if updates:
+                    cur.executemany(UPDATE_SQL, updates)
+                if unchanged:
+                    cur.execute(
+                        """
+                        update listing set last_seen_at = now()
+                        where source_id = %s and external_id = any(%s)
+                        """,
+                        (source_id, unchanged),
+                    )
+                if events:
+                    cur.executemany(
+                        """
+                        insert into listing_event (listing_id, kind, old_price, new_price)
+                        select id, %s, %s, %s from listing
+                        where source_id = %s and external_id = %s
+                        """,
+                        [(kind, old, new, source_id, ext) for ext, kind, old, new in events],
+                    )
+            self.conn.commit()
+            return result
+        except Exception as exc:  # noqa: BLE001
+            # Одна битая строка не должна ронять всю пачку и весь обход.
+            self.conn.rollback()
+            log.warning("пачка не записалась (%s) — пишу по одной", exc)
+            return self._upsert_individually(prepared, existing, source_id, result, events)
 
     def update_detail(
         self,
@@ -223,6 +232,10 @@ class DatabaseSink:
         lon: float | None = None,
         seller_name: str | None = None,
         seller_type: str | None = None,
+        body: str | None = None,
+        color: str | None = None,
+        power_hp: int | None = None,
+        engine_cm3: int | None = None,
         code: str = "otomoto",
     ) -> bool:
         """Обогащение после загрузки карточки: фото, VIN, точные координаты."""
@@ -235,6 +248,10 @@ class DatabaseSink:
                 lon=lon,
                 seller_name=seller_name,
                 seller_type=seller_type,
+                body=body,
+                color=color,
+                power_hp=power_hp,
+                engine_cm3=engine_cm3,
                 code=code,
             )
         except Exception as exc:  # noqa: BLE001
@@ -249,6 +266,10 @@ class DatabaseSink:
                 lon=lon,
                 seller_name=seller_name,
                 seller_type=seller_type,
+                body=body,
+                color=color,
+                power_hp=power_hp,
+                engine_cm3=engine_cm3,
                 code=code,
             )
 
@@ -262,15 +283,22 @@ class DatabaseSink:
         lon: float | None = None,
         seller_name: str | None = None,
         seller_type: str | None = None,
+        body: str | None = None,
+        color: str | None = None,
+        power_hp: int | None = None,
+        engine_cm3: int | None = None,
         code: str = "otomoto",
     ) -> bool:
         photos = [p for p in (photos or []) if isinstance(p, str) and p.startswith("https://")][:8]
         source_id = self.source_id(code)
-        with self.conn.cursor() as cur:
-            cur.execute(
-                """
-                update listing set
-                    photos = case when cardinality(%s::text[]) > 0 then %s::text[] else photos end,
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    """
+                    update listing set
+                        photos = case
+                        when cardinality(%s::text[]) > 0 then %s::text[] else photos
+                    end,
                     photos_count = case
                         when cardinality(%s::text[]) > 0 then %s else photos_count
                     end,
@@ -279,18 +307,105 @@ class DatabaseSink:
                     lon = coalesce(%s, lon),
                     seller_name = coalesce(%s, seller_name),
                     seller_type = coalesce(%s, seller_type),
+                    body = coalesce(%s, body),
+                    color = coalesce(%s, color),
+                    power_hp = coalesce(%s, power_hp),
+                    engine_cm3 = coalesce(%s, engine_cm3),
+                    details_fetched_at = now(),
                     updated_at = now()
                 where source_id = %s and external_id = %s
                 """,
                 (
                     photos, photos, photos, len(photos),
                     vin, lat, lon, seller_name, seller_type,
-                    source_id, external_id,
-                ),
-            )
-            changed = cur.rowcount
-        self.conn.commit()
+                    body, color, power_hp, engine_cm3,
+                        source_id, external_id,
+                    ),
+                )
+                changed = cur.rowcount
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
         return bool(changed)
+
+    def mark_removed(self, external_id: str, code: str = "otomoto") -> None:
+        """Объявление вернуло 404/410 — снимаем с очереди и помечаем removed."""
+        source_id = self.source_id(code)
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                update listing set status = 'removed', details_fetched_at = now(),
+                                    updated_at = now()
+                where source_id = %s and external_id = %s
+                """,
+                (source_id, external_id),
+            )
+        self.conn.commit()
+
+    def pending_details(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Объявления, по которым ещё не скачана карточка (фото, кузов, продавец)."""
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                select external_id, url
+                from listing
+                where status = 'active' and details_fetched_at is null
+                order by first_seen_at desc
+                limit %s
+                """,
+                (limit,),
+            )
+            return [{"external_id": r[0], "url": r[1]} for r in cur.fetchall()]
+
+    def _upsert_individually(self, prepared, existing, source_id, result, events):
+        bad = 0
+        for item, row in prepared:
+            old = existing.get(row["external_id"])
+            try:
+                with self.conn.transaction(), self.conn.cursor() as cur:
+                    if old is None:
+                        cur.execute(INSERT_SQL, tuple(row[c] for c in COLUMNS) and (
+                            source_id, row["external_id"], *(row[c] for c in COLUMNS)
+                        ))
+                        result.new_items.append(item)
+                        result.inserted += 1
+                    elif old[1] != row["content_hash"]:
+                        cur.execute(
+                            UPDATE_SQL,
+                            tuple(row[c] for c in COLUMNS) + (source_id, row["external_id"]),
+                        )
+                        result.updated += 1
+                    else:
+                        cur.execute(
+                            "update listing set last_seen_at = now() "
+                            "where source_id = %s and external_id = %s",
+                            (source_id, row["external_id"]),
+                        )
+                        result.unchanged += 1
+            except Exception as exc:  # noqa: BLE001
+                bad += 1
+                result.rejected += 1
+                with self.conn.transaction(), self.conn.cursor() as cur:
+                    cur.execute(
+                        "insert into ingest_reject (source_id, external_id, reason) "
+                        "values (%s, %s, %s)",
+                        (source_id, row["external_id"], f"db: {str(exc)[:150]}"),
+                    )
+        for ext, kind, old_price, new_price in events:
+            with self.conn.transaction(), self.conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into listing_event (listing_id, kind, old_price, new_price)
+                    select id, %s, %s, %s from listing
+                    where source_id = %s and external_id = %s
+                    """,
+                    (kind, old_price, new_price, source_id, ext),
+                )
+        self.conn.commit()
+        if bad:
+            log.warning("отбраковано при построчной записи: %d", bad)
+        return result
 
     # -- наблюдаемость -----------------------------------------------------
     def log_run(

@@ -257,3 +257,7 @@ def parse_offer(html: str, url: str = "") -> Offer:
         equipment_count=sum(len(group.get("values") or []) for group in equipment),
         raw=advert,
     )
+
+
+# публичный алиас для нормализации чисел вне парсера
+to_int = _to_int

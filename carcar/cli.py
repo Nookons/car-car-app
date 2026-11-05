@@ -23,7 +23,7 @@ from .config import Settings
 from .control import load_control, save_control
 from .db import DatabaseSink, database_url
 from .parse import Listing, ParseError, parse_offer
-from .runner import collect, discover, fetch_detail, watch
+from .runner import collect, discover, enrich, fetch_detail, sweep, watch
 from .store import Store
 
 log = logging.getLogger("carcar")
@@ -87,6 +87,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_stats = sub.add_parser("stats", help="что уже собрано")
     p_stats.add_argument("--data", type=Path, default=Path("data"))
     p_stats.add_argument("--file", action="store_true", help="смотреть папку, а не базу")
+
+    p_sweep = sub.add_parser("sweep", help="полный обход рынка (история, проверка снятых)")
+    _add_common(p_sweep)
+    p_sweep.add_argument("--from-page", type=int, default=0, help="продолжить с сохранённого места")
+    p_sweep.add_argument("--max-pages", type=int, default=0, help="0 — до конца")
+    p_sweep.add_argument("--minutes", type=float, default=0.0, help="0 — без ограничения")
+
+    p_enrich = sub.add_parser("enrich", help="догрузить карточки без фото")
+    _add_common(p_enrich)
+    p_enrich.add_argument("--limit", type=int, default=200)
+    p_enrich.add_argument("--minutes", type=float, default=30.0)
 
     p_purge = sub.add_parser("purge", help="очистка старых записей в базе")
     p_purge.add_argument("--days", type=int, default=30, help="сколько дней хранить снятые")
@@ -257,6 +268,42 @@ def main(argv: list[str] | None = None) -> int:
                     sink=sink,
                 )
                 _print_summary(summary)
+
+            elif args.command == "sweep":
+                if sink is None:
+                    print("нужен DATABASE_URL", file=sys.stderr)
+                    return 2
+                summary = sweep(
+                    client,
+                    store,
+                    settings,
+                    sink=sink,
+                    from_page=args.from_page,
+                    max_pages=args.max_pages,
+                    minutes=args.minutes,
+                )
+                print(
+                    f"обход: страниц {summary['pages']}, новых {summary['inserted']}, "
+                    f"обновлено {summary['updated']}, ошибок {summary['errors']}, "
+                    f"следующая страница {summary['next_page']}"
+                )
+
+            elif args.command == "enrich":
+                if sink is None:
+                    print("нужен DATABASE_URL", file=sys.stderr)
+                    return 2
+                summary = enrich(
+                    client,
+                    store,
+                    settings,
+                    sink=sink,
+                    limit=args.limit,
+                    minutes=args.minutes,
+                )
+                print(
+                    f"обогащено: {summary['enriched']} из {summary['processed']} "
+                    f"(ошибок {summary['errors']}, {summary['seconds']} с)"
+                )
 
             elif args.command == "watch":
                 summary = watch(

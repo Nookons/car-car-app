@@ -28,6 +28,10 @@ class BlockedError(FetchError):
     """Площадка ответила 403 — нас не пускают. Повторять бессмысленно и вредно."""
 
 
+class GoneError(FetchError):
+    """Объявление снято: 404/410. Ретраить бессмысленно, помечаем как removed."""
+
+
 @dataclass(slots=True)
 class FetchResult:
     url: str
@@ -129,6 +133,9 @@ class Client:
 
             elapsed = time.monotonic() - started
             self.stats.requests += 1
+
+            if response.status_code in (404, 410):
+                raise GoneError(f"{response.status_code} {url}: объявление снято")
 
             if response.status_code == 403:
                 raise BlockedError(

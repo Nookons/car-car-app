@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import time
 from collections.abc import Callable
@@ -224,9 +225,18 @@ def create_app(
             else:
                 state = "stale"
 
+        sweep: dict[str, Any] = {}
+        sweep_path = store.state_dir / "sweep.json"
+        if sweep_path.exists():
+            try:
+                sweep = json.loads(sweep_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                sweep = {}
+
         return {
             "now": now.isoformat(),
             "state": state,
+            "sweep": sweep,
             "age_seconds": round(age, 1) if age is not None else None,
             "stale_after": stale_after,
             "heartbeat": heartbeat,

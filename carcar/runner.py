@@ -9,6 +9,7 @@ heartbeat, журнал опросов, пауза.
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from dataclasses import asdict, dataclass, field
@@ -16,12 +17,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .client import Client, FetchError
+from .canonical import canon_body
+from .client import Client, FetchError, GoneError
 from .config import Settings
 from .control import load_control, save_control
 from .db import DatabaseSink
 from .geo import get_geo
-from .parse import Listing, ParseError, parse_offer, parse_search
+from .parse import Listing, ParseError, parse_offer, parse_search, to_int
 from .store import Store
 
 log = logging.getLogger("carcar")
@@ -157,14 +159,21 @@ def fetch_detail(
     if sink is not None:
         seller_location = (offer.raw.get("seller") or {}).get("location") or {}
         map_info = seller_location.get("map") or {}
+        vin = (offer.details.get("vin") or "").strip().upper() or None
+        if vin and len(vin) != 17:
+            vin = None
         changed = sink.update_detail(
             listing.id,
             photos=offer.photos,
-            vin=(offer.details.get("vin") or "").upper() or None,
+            vin=vin,
             lat=map_info.get("latitude"),
             lon=map_info.get("longitude"),
             seller_name=offer.seller_name or None,
             seller_type=_seller_type(offer.seller_type),
+            body=canon_body(offer.details.get("body_type")),
+            color=(offer.details.get("color") or "").strip() or None,
+            power_hp=to_int(offer.details.get("engine_power")),
+            engine_cm3=to_int(offer.details.get("engine_capacity")),
             code=code,
         )
         return "db" if changed else None
@@ -176,6 +185,159 @@ def fetch_detail(
         fetched_at=fetched_at,
         refresh=refresh,
     )
+
+
+def sweep(
+    client: Client,
+    store: Store,
+    settings: Settings,
+    *,
+    sink: DatabaseSink,
+    from_page: int = 1,
+    max_pages: int = 0,
+    minutes: float = 0.0,
+) -> dict[str, Any]:
+    """Полный обход рынка постранично, с сохранением прогресса.
+
+    Нужен один раз для истории и потом раз в сутки для проверки «снятых»:
+    инкрементальный опрос видит только новые объявления.
+    """
+    state_path = store.state_dir / "sweep.json"
+    state: dict[str, Any] = {}
+    if state_path.exists():
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            state = {}
+
+    page = from_page if from_page > 1 else int(state.get("next_page", 1))
+    started = time.monotonic()
+    deadline = started + minutes * 60 if minutes else None
+    totals = {"pages": 0, "inserted": 0, "updated": 0, "rejected": 0, "errors": 0}
+    consecutive = 0
+    total_pages: int | None = state.get("total_pages")
+
+    while True:
+        if max_pages and totals["pages"] >= max_pages:
+            break
+        if deadline and time.monotonic() >= deadline:
+            break
+        try:
+            response = client.get(settings.search_url(page))
+            parsed = parse_search(response.text, settings.search_url(page))
+            _apply_geo(parsed.items)
+            result = sink.upsert(parsed.items, settings.source)
+        except Exception as exc:  # noqa: BLE001
+            totals["errors"] += 1
+            consecutive += 1
+            log.exception("sweep: страница %d не удалась: %s", page, exc)
+            time.sleep(min(60.0, 5.0 * consecutive))
+            if consecutive >= 8:
+                save_control(
+                    store.control_path,
+                    paused=True,
+                    reason=f"авто-пауза: sweep, {totals['errors']} ошибок",
+                    by="collector",
+                )
+                break
+            continue
+
+        if total_pages is None and parsed.page_size:
+            total_pages = -(-parsed.total // parsed.page_size)
+
+        consecutive = 0
+        totals["pages"] += 1
+        totals["inserted"] += result.inserted
+        totals["updated"] += result.updated
+        totals["rejected"] += result.rejected
+
+        state = {
+            "next_page": page + 1,
+            "total_pages": total_pages,
+            "inserted": state.get("inserted", 0) + result.inserted,
+            "updated": state.get("updated", 0) + result.updated,
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        store._atomic_write(state_path, json.dumps(state, ensure_ascii=False))
+
+        if page % 50 == 0:
+            elapsed = time.monotonic() - started
+            left = (total_pages - page) if total_pages else 0
+            eta = (elapsed / max(page - from_page + 1, 1)) * left / 60 if total_pages else 0
+            print(
+                f"  стр. {page}/{total_pages or '?'} | новых {totals['inserted']} | "
+                f"обновлено {totals['updated']} | ошибок {totals['errors']} | "
+                f"~{eta:.0f} мин осталось",
+                flush=True,
+            )
+
+        page += 1
+
+    return {**totals, "next_page": page, "total_pages": total_pages}
+
+
+def enrich(
+    client: Client,
+    store: Store,
+    settings: Settings,
+    *,
+    sink: DatabaseSink,
+    limit: int = 200,
+    minutes: float = 30.0,
+) -> dict[str, Any]:
+    """Догружает карточки для объявлений, у которых их ещё нет.
+
+    Отдельный воркер: живой опрос не должен ждать обогащения, иначе новые
+    объявления копятся без фото.
+    """
+    started = time.monotonic()
+    deadline = started + minutes * 60
+    processed = enriched = errors = 0
+
+    while time.monotonic() < deadline and processed < limit:
+        batch = sink.pending_details(limit=50)
+        if not batch:
+            break
+        for row in batch:
+            if processed >= limit or time.monotonic() >= deadline:
+                break
+            listing = Listing(
+                id=row["external_id"],
+                url=row["url"],
+                title="",
+                created_at="",
+                price=0,
+                currency="PLN",
+                make="",
+                model="",
+                year=None,
+                mileage_km=None,
+                fuel="",
+                gearbox="",
+                engine_cm3=None,
+                power_hp=None,
+                city="",
+                region="",
+                seller_type="",
+                thumbnail="",
+            )
+            try:
+                if fetch_detail(client, store, listing, sink=sink):
+                    enriched += 1
+            except GoneError:
+                sink.mark_removed(row["external_id"])
+                log.info("снято с продажи: %s", row["external_id"])
+            except Exception as exc:  # noqa: BLE001
+                errors += 1
+                log.warning("enrich %s: %s", row["external_id"], exc)
+            processed += 1
+
+    return {
+        "processed": processed,
+        "enriched": enriched,
+        "errors": errors,
+        "seconds": round(time.monotonic() - started, 1),
+    }
 
 
 def _seller_type(raw: str) -> str | None:
@@ -292,7 +454,7 @@ def watch(
 
         try:
             result = discover(
-                client, store, settings, pages=1, stop_after_known=1, sink=sink
+                client, store, settings, pages=2, stop_after_known=2, sink=sink
             )
         except Exception as exc:  # noqa: BLE001 — демон не должен падать из-за одного опроса
             total.errors += 1

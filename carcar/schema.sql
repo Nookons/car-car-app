@@ -71,6 +71,8 @@ create table if not exists listing (
     thumb_url     text,
     photos        text[] not null default '{}',
     photos_count  smallint not null default 0,
+    -- когда по объявлению скачали карточку (фото, кузов, цвет, продавец)
+    details_fetched_at timestamptz,
 
     published_at  timestamptz,
     first_seen_at timestamptz not null default now(),
@@ -83,6 +85,9 @@ create table if not exists listing (
 
     unique (source_id, external_id)
 );
+
+-- Догоняющие колонки для уже существующих баз
+alter table listing add column if not exists details_fetched_at timestamptz;
 
 -- Индексы только под реальные запросы (лента, фильтры, гео).
 create index if not exists listing_active_published_idx
@@ -103,6 +108,10 @@ create index if not exists listing_last_seen_idx
 -- Для графиков «сколько собрано за день/месяц»
 create index if not exists listing_first_seen_idx
     on listing (first_seen_at);
+
+-- Очередь обогащения: объявления без карточки
+create index if not exists listing_needs_details_idx
+    on listing (first_seen_at) where details_fetched_at is null and status = 'active';
 
 -- ---------------------------------------------------------------------------
 -- История: только изменения, а не каждый опрос
