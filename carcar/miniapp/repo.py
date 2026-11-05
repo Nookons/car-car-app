@@ -206,7 +206,8 @@ class MiniAppRepo:
         limit = max(1, min(limit, 50))
         offset = max(0, offset)
         conds = ["l.status = 'active'"]
-        params: dict[str, Any] = {"limit": limit, "offset": offset, "radius": radius_km}
+        # радиус имеет смысл только вместе с координатами
+        params: dict[str, Any] = {"limit": limit, "offset": offset, "radius": None}
 
         if q:
             conds.append("(l.title ILIKE %(q)s OR l.make ILIKE %(q)s OR l.model ILIKE %(q)s)")
@@ -247,6 +248,7 @@ class MiniAppRepo:
             params.update(lat=lat, lon=lon)
             distance = f"({DISTANCE_SQL})"
             if radius_km:
+                params["radius"] = radius_km
                 dlat = radius_km / 111.0
                 dlon = radius_km / (111.0 * max(math.cos(math.radians(lat)), 0.05))
                 params.update(

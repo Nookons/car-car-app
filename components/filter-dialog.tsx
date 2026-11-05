@@ -96,6 +96,12 @@ export function FilterDialog({
         (cleaned as Record<string, unknown>)[key] = value;
       }
     });
+    // без координат радиус не имеет смысла — иначе фильтр вернёт ноль
+    if (cleaned.lat == null || cleaned.lon == null) {
+      delete cleaned.radius_km;
+      delete cleaned.lat;
+      delete cleaned.lon;
+    }
     onApply(cleaned);
   };
 
@@ -306,7 +312,6 @@ export function FilterDialog({
               className={selectClass}
               value={draft.radius_km ?? 50}
               onChange={(event) => set("radius_km", Number(event.target.value))}
-              disabled={!draft.lat}
             >
               {[25, 50, 100, 200].map((km) => (
                 <option key={km} value={km}>
@@ -316,6 +321,11 @@ export function FilterDialog({
             </select>
           </div>
           {geoNote ? <p className="text-xs text-muted-foreground">{geoNote}</p> : null}
+          {!draft.lat ? (
+            <p className="text-xs text-muted-foreground">
+              Радиус применится после того, как включишь геолокацию.
+            </p>
+          ) : null}
           {geoFailed ? (
             <Button
               variant="outline"
