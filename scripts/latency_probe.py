@@ -19,7 +19,7 @@ import json
 import statistics
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -30,11 +30,11 @@ DATA = Path(__file__).resolve().parent.parent / "data"
 
 
 def now_utc() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def parse_ts(s: str) -> datetime:
-    return datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    return datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
 
 
 def main() -> int:
@@ -58,8 +58,7 @@ def main() -> int:
         for page in range(1, args.pages + 1):
             url = p.SEARCH_URL + (f"&page={page}" if page > 1 else "")
             t_fetch = now_utc()
-            raw = p.fetch(url)                     # bytes после gzip/br, уже текст
-            t_parsed = now_utc()
+            raw = p.fetch(url)                     # уже распакованный текст страницы
             search = p.advert_search(p.next_data(raw))
             pages_data.append({
                 "page": page,

@@ -110,7 +110,10 @@ class Row:
 
 def params_to_dict(node: dict[str, Any]) -> dict[str, str]:
     """parameters — плоский список {key, value, displayValue}."""
-    return {p["key"]: p.get("displayValue") or p.get("value") or "" for p in node.get("parameters") or []}
+    return {
+        p["key"]: p.get("displayValue") or p.get("value") or ""
+        for p in node.get("parameters") or []
+    }
 
 
 def to_row(node: dict[str, Any]) -> Row:
@@ -192,7 +195,10 @@ def cmd_detail(url: str) -> None:
     desc = re.sub(r"<[^>]+>", " ", a.get("description") or "")
     desc = re.sub(r"\s+", " ", desc).strip()
 
-    print(f"ID:           {a.get('id')}  (originAdId={a.get('originAdId')}, site={a.get('originSiteCode')})")
+    print(
+        f"ID:           {a.get('id')}  "
+        f"(originAdId={a.get('originAdId')}, site={a.get('originSiteCode')})"
+    )
     print(f"Заголовок:    {a.get('title')}")
     print(f"Цена:         {a.get('price')}")
     print(f"Создано:      {a.get('createdAt')}   обновлено: {a.get('updatedAt')}")
@@ -205,7 +211,8 @@ def cmd_detail(url: str) -> None:
           f"fuel={details.get('fuel_type')} gearbox={details.get('gearbox')} "
           f"power={details.get('engine_power')} cm3={details.get('engine_capacity')}")
     print(f"Группы полей: {[g.get('key') for g in a.get('detailsGroups') or []]}")
-    print(f"Оснащение:    {sum(len(g.get('values') or []) for g in a.get('equipment') or [])} пунктов")
+    equipment = sum(len(g.get("values") or []) for g in a.get("equipment") or [])
+    print(f"Оснащение:    {equipment} пунктов")
 
 
 def main() -> int:

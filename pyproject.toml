@@ -1,0 +1,37 @@
+[project]
+name = "carcar"
+version = "0.1.0"
+description = "Агрегатор автообъявлений из Польши: сбор, хранение, уведомления"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.28",
+    "brotli>=1.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["carcar"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# Этот Python пропускает .pth, начинающиеся с подчёркивания, поэтому
+# editable-установка не подхватывается. Для тестов и разработки корень
+# проекта добавляем явно; в Docker ставим обычным `pip install .`.
+pythonpath = ["."]

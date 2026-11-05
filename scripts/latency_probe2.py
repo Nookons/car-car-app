@@ -15,10 +15,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import statistics
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -30,7 +29,7 @@ WARMUP_SECONDS = 30  # первые поллинги — прогрев, в ст
 
 
 def parse_ts(s: str) -> datetime:
-    return datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    return datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
 
 
 def pct(values: list[float], q: float) -> float:
@@ -50,7 +49,7 @@ def main() -> int:
     args = ap.parse_args()
 
     DATA.mkdir(exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     out_path = DATA / f"latency2-{stamp}.json"
 
     started = time.time()
@@ -68,7 +67,7 @@ def main() -> int:
             for e in search["edges"]:
                 n = e["node"]
                 found.append((n["id"], n["createdAt"], page))
-        seen_at = datetime.now(timezone.utc)
+        seen_at = datetime.now(UTC)
 
         batch = []
         for ext_id, created, page in found:

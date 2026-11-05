@@ -21,6 +21,44 @@
 | [`db/schema.draft.sql`](db/schema.draft.sql) | черновик схемы PostgreSQL (объявления, кластеры авто, история цен, подписки, уведомления) |
 | [`scripts/probe_otomoto.py`](scripts/probe_otomoto.py) | пробный сборщик otomoto: выдача и карточка, только стандартная библиотека |
 | [`scripts/latency_probe2.py`](scripts/latency_probe2.py) | замер задержки публикации: поллинг выдачи, распределение «createdAt → увидели» |
+| [`docs/PERF-collector.md`](docs/PERF-collector.md) | аудит производительности сборщика: замеры «до/после», находки, проверка |
+
+## Сборщик otomoto
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"   # один раз, из корня репозитория
+.venv/bin/python -m carcar discover --pages 2      # выдача → data/otomoto/discovered.ndjson
+.venv/bin/python -m carcar collect --details 5     # выдача + карточки новых
+.venv/bin/python -m carcar watch --minutes 30      # цикл опроса (как в проде)
+.venv/bin/python -m carcar detail --id 6151080882  # одна карточка
+.venv/bin/python -m carcar stats                   # что уже лежит на диске
+```
+
+Что делает и почему так:
+
+- ходит обычным HTTP с браузерным UA, **1 запрос в секунду** — осознанный предел;
+- brotli + keep-alive: страница 177 КБ вместо 1.7 МБ (замер — `scripts/bench_fetch.py`);
+- атомарная запись (tmp + `os.replace`), при обрыве не остаётся полуфайлов;
+- повторный запуск **не дублирует** данные: карточки по id, просмотренные id
+  в `data/state/`, новые строки — только в append-only ndjson;
+- карточка пишется как есть (`data` = объект `advert` целиком), чтобы потом можно
+  было переиграть нормализацию без повторного похода на площадку.
+
+```
+data/
+  otomoto/
+    listings/2026-11-05/<id>.json   # полный ответ карточки (JSON, не HTML)
+    discovered.ndjson               # строки выдачи, только новые
+  state/otomoto_seen.txt            # id, которые уже видели
+  runs/<timestamp>.json             # сводка каждого прогона: запросы, байты, ошибки
+```
+
+Тесты и линтер:
+
+```bash
+.venv/bin/python -m pytest        # парсер/хранилище/клиент, без сети
+.venv/bin/ruff check .
+```
 
 ## Быстрая проверка источника
 
