@@ -14,6 +14,9 @@ import httpx
 import psycopg
 from psycopg.rows import dict_row
 
+from .messages import caption as localized_caption
+from .messages import messages as msg
+
 log = logging.getLogger("carcar.notify")
 
 
@@ -100,7 +103,7 @@ class Notifier:
             cur.execute(
                 """
                 select s.id as sub_id, s.user_id, s.criteria, s.name,
-                       u.tg_id, u.digest, u.notify_new
+                       u.tg_id, u.digest, u.notify_new, u.lang
                 from subscription s
                 join app_user u on u.id = s.user_id
                 where s.active and u.notify_new
@@ -132,22 +135,16 @@ class Notifier:
         self._last_global = time.monotonic()
         self._last_chat[chat_id] = self._last_global
 
-    def send(self, chat_id: int, item: dict[str, Any]) -> bool:
+    def send(self, chat_id: int, item: dict[str, Any], lang: str | None = "ru") -> bool:
         self._throttle(chat_id)
         url = f"{self.public_url}/listing/{item['id']}"
-        price = f"{item['price']:,}".replace(",", " ") if item.get("price") else "цена не указана"
-        caption = (
-            f"🚗 {item['title']}\n"
-            f"💰 {price} zł\n"
-            f"📅 {item.get('year') or '—'} · {item.get('mileage_km') or 0:,} км\n"
-            f"📍 {item.get('city') or '—'}\n"
-            f"✅ Подходит под ваш фильтр"
-        ).replace(",", " ")
+        text = msg(lang)
+        caption = localized_caption(item, lang)
         keyboard = {
             "inline_keyboard": [
-                [{"text": "🚗 Открыть в CarCar", "web_app": {"url": url}}],
+                [{"text": text["open_app"], "web_app": {"url": url}}],
                 [
-                    {"text": "Мои фильтры", "web_app": {"url": f"{self.public_url}/account"}},
+                    {"text": text["my_filters"], "web_app": {"url": f"{self.public_url}/account"}},
                 ],
             ]
         }
@@ -195,7 +192,7 @@ class Notifier:
                 if sub["digest"]:
                     continue  # уйдёт в дайджесте
                 try:
-                    if self.send(sub["tg_id"], item):
+                    if self.send(sub["tg_id"], item, sub.get("lang")):
                         with conn.cursor() as cur:
                             cur.execute(
                                 "update notification set status = 'sent', sent_at = now() "

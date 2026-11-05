@@ -13,17 +13,11 @@ import time
 
 import httpx
 
+from .messages import messages as msg
+
 log = logging.getLogger("carcar.bot")
 
-TEXT_START = (
-    "CarCar — свежие объявления о продаже авто в Польше.\n\n"
-    "Открой приложение: поиск, фильтры по расстоянию и уведомления."
-)
 
-TEXT_NO_URL = (
-    "Бот настроен, но публичный адрес приложения ещё не задан.\n"
-    "Задай CARCAR_PUBLIC_URL (https://…) и перезапусти бота."
-)
 
 
 class Bot:
@@ -73,7 +67,12 @@ class Bot:
         # У старых чатов могла остаться своя кнопка на /en/car — переписываем.
         for tg_id in self.known_chat_ids():
             try:
-                self.call("setChatMenuButton", chat_id=tg_id, menu_button=menu)
+                localized = {
+                    "type": "web_app",
+                    "text": msg(self.lang_for(tg_id))["menu_button"],
+                    "web_app": {"url": self.public_url},
+                }
+                self.call("setChatMenuButton", chat_id=tg_id, menu_button=localized)
             except Exception as exc:  # noqa: BLE001
                 log.warning("меню для чата %s: %s", tg_id, exc)
 
@@ -96,21 +95,34 @@ class Bot:
             return []
 
     # -- обработка ---------------------------------------------------------
+    def lang_for(self, tg_id: int) -> str:
+        try:
+            from .db import database_url
+
+            url = database_url()
+            if not url:
+                return "ru"
+            import psycopg
+
+            with psycopg.connect(url, connect_timeout=10, prepare_threshold=None) as conn:
+                row = conn.execute(
+                    "select lang from app_user where tg_id = %s", (tg_id,)
+                ).fetchone()
+            return (row[0] if row and row[0] else "ru") or "ru"
+        except Exception:  # noqa: BLE001
+            return "ru"
+
     def reply_start(self, chat_id: int) -> None:
+        text = msg(self.lang_for(chat_id))
         if self.public_url:
             keyboard = {
                 "inline_keyboard": [[
-                    {"text": "🚗 Открыть CarCar", "web_app": {"url": self.public_url}}
+                    {"text": text["start_button"], "web_app": {"url": self.public_url}}
                 ]]
             }
-            self.call(
-                "sendMessage",
-                chat_id=chat_id,
-                text=TEXT_START,
-                reply_markup=keyboard,
-            )
+            self.call("sendMessage", chat_id=chat_id, text=text["start"], reply_markup=keyboard)
         else:
-            self.call("sendMessage", chat_id=chat_id, text=TEXT_NO_URL)
+            self.call("sendMessage", chat_id=chat_id, text=text["no_url"])
 
     def handle_update(self, update: dict) -> None:
         message = update.get("message") or update.get("edited_message")
