@@ -295,6 +295,8 @@ def enrich(
     sink: DatabaseSink,
     limit: int = 200,
     minutes: float = 30.0,
+    shard: int = 0,
+    shards: int = 1,
 ) -> dict[str, Any]:
     """Догружает карточки для объявлений, у которых их ещё нет.
 
@@ -306,7 +308,7 @@ def enrich(
     processed = enriched = errors = 0
 
     while time.monotonic() < deadline and processed < limit:
-        batch = sink.pending_details(limit=50)
+        batch = sink.pending_details(limit=50, shard=shard, shards=shards)
         if not batch:
             break
         for row in batch:

@@ -114,7 +114,9 @@ class DatabaseSink:
     def _connect(self):  # noqa: ANN202
         import psycopg
 
-        conn = psycopg.connect(self._url, connect_timeout=15)
+        conn = psycopg.connect(
+            self._url, connect_timeout=15, prepare_threshold=None
+        )
         conn.autocommit = False
         return conn
 
@@ -394,18 +396,21 @@ class DatabaseSink:
         self.conn.commit()
 
     @resilient
-    def pending_details(self, limit: int = 50) -> list[dict[str, Any]]:
-        """Объявления, по которым ещё не скачана карточка (фото, кузов, продавец)."""
+    def pending_details(
+        self, limit: int = 50, shard: int = 0, shards: int = 1
+    ) -> list[dict[str, Any]]:
+        """Объявления без карточки; shards/shard делят очередь между воркерами."""
         with self.conn.cursor() as cur:
             cur.execute(
                 """
                 select external_id, url
                 from listing
                 where status = 'active' and details_fetched_at is null
+                  and (%s = 1 or id %% %s = %s)
                 order by first_seen_at desc
                 limit %s
                 """,
-                (limit,),
+                (shards, shards, shard, limit),
             )
             return [{"external_id": r[0], "url": r[1]} for r in cur.fetchall()]
 

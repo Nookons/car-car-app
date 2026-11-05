@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import os
 import random
 import time
 from dataclasses import dataclass, field
@@ -16,8 +17,35 @@ import httpx
 
 from .config import Settings
 
+# Разные реальные клиенты — один и тот же UA на 200 тысяч запросов выглядит странно.
+USER_AGENTS = [
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/130.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+    "Version/17.4 Safari/605.1.15",
+]
+
 # Статусы, после которых имеет смысл повторить запрос.
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+
+
+# Общий «тормоз» на все воркеры: получили 429/403 — молчим все вместе.
+_COOLDOWN_UNTIL = 0.0
+
+
+def _pause_everyone(seconds: float) -> None:
+    global _COOLDOWN_UNTIL
+    _COOLDOWN_UNTIL = max(_COOLDOWN_UNTIL, time.monotonic() + seconds)
+
+
+def _wait_if_cooling() -> None:
+    left = _COOLDOWN_UNTIL - time.monotonic()
+    if left > 0:
+        time.sleep(left)
 
 
 class FetchError(RuntimeError):
@@ -70,11 +98,16 @@ class Client:
     _last_request: float = 0.0
 
     def __post_init__(self) -> None:
+        user_agent = os.environ.get("CARCAR_UA") or random.choice(USER_AGENTS)
         self._client = httpx.Client(
             headers={
-                "User-Agent": self.settings.user_agent,
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.8",
+                "User-Agent": user_agent,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,"
+                "image/avif,image/webp,*/*;q=0.8",
+                "Accept-Language": "pl-PL,pl;q=0.9,en-US;q=0.7,en;q=0.6",
+                "Referer": "https://www.otomoto.pl/",
+                "Cache-Control": "max-age=0",
+                "Upgrade-Insecure-Requests": "1",
             },
             timeout=self.settings.timeout,
             follow_redirects=True,
@@ -98,8 +131,10 @@ class Client:
     def _wait_for_slot(self) -> None:
         """Держим не больше settings.rps запросов в секунду."""
         wait = self._min_interval - (time.monotonic() - self._last_request)
+        # Рваный ритм: ровные интервалы — самый очевидный признак робота.
+        jitter = random.uniform(0.6, 1.9)
         if wait > 0:
-            time.sleep(wait)
+            time.sleep(wait * jitter)
         self._last_request = time.monotonic()
 
     def _sleep_backoff(
@@ -116,6 +151,7 @@ class Client:
     # -- запрос -----------------------------------------------------------
     def get(self, url: str) -> FetchResult:
         last_error: Exception | None = None
+        _wait_if_cooling()
 
         for attempt in range(1, self.settings.retries + 1):
             self._wait_for_slot()

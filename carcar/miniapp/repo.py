@@ -137,7 +137,11 @@ class MiniAppRepo:
             min_size=1,
             max_size=6,
             open=True,
-            kwargs={"connect_timeout": 10, "row_factory": dict_row},
+            kwargs={
+                "connect_timeout": 10,
+                "row_factory": dict_row,
+                "prepare_threshold": None,
+            },
         )
 
     def close(self) -> None:

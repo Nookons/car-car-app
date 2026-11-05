@@ -1,30 +1,35 @@
 #!/usr/bin/env bash
-# Держит коллекторы живыми: опрос, обогащение и (опционально) полный обход.
+# Держит коллекторы живыми: опрос, обогащение (несколько воркеров) и обход.
 #
-#   ./scripts/run_collector.sh                            # в переднем плане
-#   nohup ./scripts/run_collector.sh >/dev/null 2>&1 &    # в фоне
+#   ./scripts/run_collector.sh
 #
-# Логи: logs/collector.log (опрос и обогащение), logs/sweep.log (обход)
-# Выключить обход: CARCAR_WITH_SWEEP=0
+# Логи: logs/collector.log, logs/enrich-*.log, logs/sweep.log
+# Отключить обход: CARCAR_WITH_SWEEP=0
+# Политика: не гоняем массовое обогащение — карточки догружаются при открытии.
+# Примерка темпа: sweep 0.25 запроса/с, опрос раз в 2 минуты, рандомные паузы.
 
 set -u
 cd "$(dirname "$0")/.." || exit 1
 mkdir -p logs
 LOG="logs/collector.log"
+SHARDS="${CARCAR_ENRICH_SHARDS:-0}"
 
-# Обогащение: фото/кузов/цвет/продавец для объявлений без карточки.
-(
-    while true; do
-        .venv/bin/python -m carcar enrich --limit 500 --minutes 30 >> "$LOG" 2>&1
-        sleep 30
-    done
-) &
+# Обогащение: фото, характеристики, описание. Каждый воркер берёт свой шард очереди.
+for i in $(seq 0 $((SHARDS - 1))); do
+    (
+        while true; do
+            .venv/bin/python -m carcar enrich --limit 100000 --minutes 30 \
+                --shard "$i" --shards "$SHARDS" >> "logs/enrich-$i.log" 2>&1
+            sleep 10
+        done
+    ) &
+done
 
 # Полный обход: продолжает с места из sweep_state, поэтому рестарт безопасен.
 if [ "${CARCAR_WITH_SWEEP:-1}" = "1" ]; then
     (
         while true; do
-            .venv/bin/python -m carcar sweep --rps "${CARCAR_RPS:-0.7}" --minutes 240 \
+            .venv/bin/python -m carcar sweep --rps "${CARCAR_RPS:-0.25}" --minutes 240 \
                 >> logs/sweep.log 2>&1
             sleep 30
         done
@@ -34,7 +39,7 @@ fi
 # Опрос выдачи: две страницы раз в минуту.
 while true; do
     echo "$(date '+%F %T') запуск сборщика" >> "$LOG"
-    .venv/bin/python -m carcar watch --minutes 100000 --details 3 >> "$LOG" 2>&1
+    .venv/bin/python -m carcar watch --minutes 100000 --details 2 --interval 120 >> "$LOG" 2>&1
     code=$?
     echo "$(date '+%F %T') сборщик завершился (код $code), перезапуск через 10 с" >> "$LOG"
     sleep 10

@@ -107,6 +107,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_enrich = sub.add_parser("enrich", help="догрузить карточки без фото")
     _add_common(p_enrich)
     p_enrich.add_argument("--limit", type=int, default=200)
+    p_enrich.add_argument("--shard", type=int, default=0, help="номер шарда (0..shards-1)")
+    p_enrich.add_argument("--shards", type=int, default=1, help="сколько воркеров делят очередь")
     p_enrich.add_argument("--minutes", type=float, default=30.0)
 
     p_purge = sub.add_parser("purge", help="очистка старых записей в базе")
@@ -349,6 +351,8 @@ def main(argv: list[str] | None = None) -> int:
                     sink=sink,
                     limit=args.limit,
                     minutes=args.minutes,
+                    shard=args.shard,
+                    shards=args.shards,
                 )
                 print(
                     f"обогащено: {summary['enriched']} из {summary['processed']} "

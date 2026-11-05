@@ -76,7 +76,11 @@ class DatabaseRepo:
             min_size=1,
             max_size=4,
             open=True,
-            kwargs={"connect_timeout": 10, "row_factory": dict_row},
+            kwargs={
+                "connect_timeout": 10,
+                "row_factory": dict_row,
+                "prepare_threshold": None,
+            },
         )
 
     def close(self) -> None:
