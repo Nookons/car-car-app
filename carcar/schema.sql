@@ -1,0 +1,188 @@
+-- CarCar: каноническая схема для всех площадок.
+--
+-- Принципы (главное — не забивать базу мусором):
+--   * один набор полей для любого источника; площадочные особенности не тащим;
+--   * уникальность (source_id, external_id) — повторный сбор не создаёт дублей;
+--   * history пишется ТОЛЬКО при изменении цены/статуса, не на каждом опросе;
+--   * сырой JSON и HTML не храним (это и есть основной мусор);
+--   * описания не храним — они не нужны для фильтра/уведомления;
+--   * фото — только URL, не больше 8, без байтов;
+--   * у отклонённых записей — отдельный журнал с автоочисткой;
+--   * RLS включён: anon/authenticated по умолчанию не видят ничего.
+
+begin;
+
+create extension if not exists postgis;
+
+-- ---------------------------------------------------------------------------
+-- Источники
+-- ---------------------------------------------------------------------------
+
+create table if not exists source (
+    id          smallint generated always as identity primary key,
+    code        text not null unique,
+    name        text not null,
+    base_url    text not null,
+    enabled     boolean not null default true,
+    created_at  timestamptz not null default now()
+);
+
+insert into source (code, name, base_url) values
+    ('otomoto', 'Otomoto', 'https://www.otomoto.pl'),
+    ('olx',     'OLX',     'https://www.olx.pl')
+on conflict (code) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Объявления
+-- ---------------------------------------------------------------------------
+
+create table if not exists listing (
+    id            bigint generated always as identity primary key,
+    source_id     smallint not null references source(id) on delete restrict,
+    external_id   text not null,
+    url           text not null,
+    title         text not null,
+    price         numeric(12, 0) not null check (price > 0),
+    currency      char(3) not null default 'PLN',
+
+    make          text,
+    model         text,
+    year          smallint check (year is null or (year between 1950 and 2030)),
+    mileage_km    integer check (mileage_km is null or (mileage_km >= 0 and mileage_km < 2_000_000)),
+    fuel          text check (fuel is null or fuel in
+                    ('petrol', 'diesel', 'hybrid', 'plugin_hybrid', 'electric',
+                     'lpg', 'cng', 'other')),
+    gearbox       text check (gearbox is null or gearbox in
+                    ('manual', 'automatic', 'semi_auto', 'other')),
+    body          text,
+    power_hp      smallint check (power_hp is null or (power_hp between 10 and 2000)),
+    engine_cm3    integer check (engine_cm3 is null or (engine_cm3 between 600 and 10_000)),
+    color         text,
+    vin           text check (vin is null or length(vin) = 17),
+
+    city          text,
+    region        text,
+    lat           double precision check (lat is null or (lat between -90 and 90)),
+    lon           double precision check (lon is null or (lon between -180 and 180)),
+
+    seller_type   text check (seller_type is null or seller_type in ('private', 'dealer', 'unknown')),
+    seller_name   text,
+
+    thumb_url     text,
+    photos        text[] not null default '{}',
+    photos_count  smallint not null default 0,
+
+    published_at  timestamptz,
+    first_seen_at timestamptz not null default now(),
+    last_seen_at  timestamptz not null default now(),
+    status        text not null default 'active' check (status in ('active', 'removed')),
+
+    -- хэш канонических полей: по нему понимаем, менялось ли что-то
+    content_hash  text not null,
+    updated_at    timestamptz not null default now(),
+
+    unique (source_id, external_id)
+);
+
+-- Индексы только под реальные запросы (лента, фильтры, гео).
+create index if not exists listing_active_published_idx
+    on listing (published_at desc) where status = 'active';
+
+create index if not exists listing_active_price_idx
+    on listing (price) where status = 'active';
+
+create index if not exists listing_make_model_idx
+    on listing (make, model) where status = 'active';
+
+create index if not exists listing_geo_idx
+    on listing (lat, lon) where status = 'active' and lat is not null;
+
+create index if not exists listing_last_seen_idx
+    on listing (last_seen_at) where status = 'active';
+
+-- ---------------------------------------------------------------------------
+-- История: только изменения, а не каждый опрос
+-- ---------------------------------------------------------------------------
+
+create table if not exists listing_event (
+    id          bigint generated always as identity primary key,
+    listing_id  bigint not null references listing(id) on delete cascade,
+    kind        text not null check (kind in ('price_drop', 'price_up', 'removed', 'restored')),
+    old_price   numeric(12, 0),
+    new_price   numeric(12, 0),
+    observed_at timestamptz not null default now()
+);
+
+create index if not exists listing_event_listing_idx
+    on listing_event (listing_id, observed_at desc);
+
+-- ---------------------------------------------------------------------------
+-- Наблюдаемость и отбракованные записи
+-- ---------------------------------------------------------------------------
+
+create table if not exists crawl_run (
+    id          bigint generated always as identity primary key,
+    source_id   smallint not null references source(id) on delete cascade,
+    started_at  timestamptz not null default now(),
+    finished_at timestamptz,
+    pages       integer not null default 0,
+    items       integer not null default 0,
+    inserted    integer not null default 0,
+    updated     integer not null default 0,
+    unchanged   integer not null default 0,
+    rejected    integer not null default 0,
+    errors      integer not null default 0,
+    notes       text
+);
+
+create index if not exists crawl_run_source_idx on crawl_run (source_id, started_at desc);
+
+-- Сюда попадает всё, что не прошло валидацию: без сырого payload, только причина.
+create table if not exists ingest_reject (
+    id          bigint generated always as identity primary key,
+    source_id   smallint references source(id) on delete set null,
+    external_id text,
+    reason      text not null,
+    created_at  timestamptz not null default now()
+);
+
+create index if not exists ingest_reject_created_idx on ingest_reject (created_at desc);
+
+-- ---------------------------------------------------------------------------
+-- Очистка: чтобы база не росла бесконечно
+-- ---------------------------------------------------------------------------
+
+create or replace function carcar_purge(retention_days integer default 30)
+returns table (removed_listings bigint, old_runs bigint, old_rejects bigint, old_events bigint)
+language plpgsql
+as $$
+begin
+    -- Снятые объявления живут ещё месяц (могут понадобиться для истории цены).
+    delete from listing
+    where status = 'removed' and last_seen_at < now() - make_interval(days => retention_days);
+    get diagnostics removed_listings = row_count;
+
+    delete from crawl_run where started_at < now() - interval '90 days';
+    get diagnostics old_runs = row_count;
+
+    delete from ingest_reject where created_at < now() - interval '30 days';
+    get diagnostics old_rejects = row_count;
+
+    delete from listing_event where observed_at < now() - interval '180 days';
+    get diagnostics old_events = row_count;
+
+    return next;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- RLS: по умолчанию всё закрыто, доступ только у владельца/сервисной роли
+-- ---------------------------------------------------------------------------
+
+alter table source        enable row level security;
+alter table listing       enable row level security;
+alter table listing_event enable row level security;
+alter table crawl_run     enable row level security;
+alter table ingest_reject enable row level security;
+
+commit;

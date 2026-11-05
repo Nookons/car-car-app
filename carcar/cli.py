@@ -21,6 +21,7 @@ from pathlib import Path
 from .client import BlockedError, Client, FetchError
 from .config import Settings
 from .control import load_control, save_control
+from .db import DatabaseSink, database_url
 from .parse import Listing, ParseError, parse_offer
 from .runner import collect, discover, fetch_detail, watch
 from .store import Store
@@ -36,6 +37,9 @@ def _add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--timeout", type=float, default=20.0, help="таймаут запроса, сек")
     parser.add_argument("--retries", type=int, default=3, help="попыток на запрос")
     parser.add_argument("-v", "--verbose", action="store_true", help="подробный лог")
+    parser.add_argument(
+        "--file", action="store_true", help="хранить локально в папке, а не в базе"
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -81,6 +85,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_stats = sub.add_parser("stats", help="что уже собрано")
     p_stats.add_argument("--data", type=Path, default=Path("data"))
+    p_stats.add_argument("--file", action="store_true", help="смотреть папку, а не базу")
+
+    p_purge = sub.add_parser("purge", help="очистка старых записей в базе")
+    p_purge.add_argument("--days", type=int, default=30, help="сколько дней хранить снятые")
+    p_purge.add_argument("--data", type=Path, default=Path("data"))
 
     return parser
 
@@ -142,12 +151,33 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "stats":
         store = Store(root=args.data)
         control = load_control(store.control_path)
+        payload: dict = store.stats() | {"control": control.as_dict()}
+        url = database_url()
+        if url and not args.file:
+            sink = DatabaseSink(url)
+            try:
+                payload["database"] = sink.stats()
+            finally:
+                sink.close()
+        print(json.dumps(payload, ensure_ascii=False, indent=1))
+        return 0
+
+    if args.command == "purge":
+        url = database_url()
+        if not url:
+            print("нужен DATABASE_URL", file=sys.stderr)
+            return 2
+        sink = DatabaseSink(url)
+        try:
+            with sink.conn.cursor() as cur:
+                cur.execute("select * from carcar_purge(%s)", (args.days,))
+                row = cur.fetchone()
+            sink.conn.commit()
+        finally:
+            sink.close()
         print(
-            json.dumps(
-                store.stats() | {"control": control.as_dict()},
-                ensure_ascii=False,
-                indent=1,
-            )
+            f"очистка: снятых объявлений {row[0]}, прогонов {row[1]}, "
+            f"отказов {row[2]}, событий {row[3]}"
         )
         return 0
 
@@ -169,6 +199,15 @@ def main(argv: list[str] | None = None) -> int:
     settings = _settings(args)
     store = Store(root=settings.data_dir, source=settings.source)
 
+    sink: DatabaseSink | None = None
+    if not getattr(args, "file", False):
+        url = database_url()
+        if url:
+            sink = DatabaseSink(url)
+            print(f"хранилище: база ({url.split('@')[-1].split('/')[0]})")
+        else:
+            print("хранилище: папка (DATABASE_URL не задан)")
+
     if args.command in {"discover", "collect"} and not _guard_pause(
         store, getattr(args, "force", False)
     ):
@@ -183,7 +222,20 @@ def main(argv: list[str] | None = None) -> int:
                     settings,
                     pages=args.pages,
                     stop_after_known=args.stop_after_known,
+                    sink=sink,
                 )
+                if sink is not None:
+                    from .runner import _db_result
+
+                    sink.log_run(
+                        code=settings.source,
+                        started_at=result.stats.started_at,
+                        result=_db_result(result.stats),
+                        pages=result.stats.pages,
+                        items=result.stats.items,
+                        errors=result.stats.errors,
+                        notes="discover",
+                    )
                 summary = result.stats.as_dict() | {
                     "mode": "discover",
                     "client": client.stats.as_dict(),
@@ -199,6 +251,7 @@ def main(argv: list[str] | None = None) -> int:
                     pages=args.pages,
                     details=args.details,
                     stop_after_known=args.stop_after_known,
+                    sink=sink,
                 )
                 _print_summary(summary)
 
@@ -210,6 +263,7 @@ def main(argv: list[str] | None = None) -> int:
                     interval=args.interval,
                     minutes=args.minutes,
                     details=args.details,
+                    sink=sink,
                 )
                 _print_summary(summary)
                 print(f"на диске: {json.dumps(summary.get('storage', {}), ensure_ascii=False)}")
@@ -238,13 +292,16 @@ def main(argv: list[str] | None = None) -> int:
                         store,
                         Listing(**{k: row[k] for k in Listing.__slots__ if k in row}),
                         refresh=args.refresh,
+                        sink=sink,
                     )
                 else:
                     print("нужен --id или --url", file=sys.stderr)
                     return 2
 
-                if path:
+                if isinstance(path, Path):
                     print(f"сохранено: {path} ({path.stat().st_size / 1024:.0f} КБ)")
+                elif path:
+                    print("карточка записана в базу")
                 else:
                     print("карточка уже есть (--refresh чтобы перезаписать)")
             return 0
@@ -258,6 +315,9 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         print("\nпрервано", file=sys.stderr)
         return 130
+    finally:
+        if sink is not None:
+            sink.close()
 
     return 0
 

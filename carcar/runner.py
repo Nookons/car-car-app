@@ -1,4 +1,11 @@
-"""Сценарии сбора: discovery (выдача), detail (карточка), watch (цикл)."""
+"""Сценарии сбора: discovery (выдача), detail (карточка), watch (цикл).
+
+Два режима хранения:
+  * `sink` (DatabaseSink) — канонические строки уходят в Postgres/Supabase;
+  * без sink — локальная папка (офлайн-разработка).
+Файловое хранилище в режиме БД используется только для служебного состояния:
+heartbeat, журнал опросов, пауза.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +19,7 @@ from typing import Any
 from .client import Client, FetchError
 from .config import Settings
 from .control import load_control
+from .db import DatabaseSink
 from .geo import get_geo
 from .parse import Listing, ParseError, parse_offer, parse_search
 from .store import Store
@@ -29,6 +37,8 @@ class RunStats:
     pages: int = 0
     items: int = 0
     new_ids: int = 0
+    updated: int = 0
+    rejected: int = 0
     details_saved: int = 0
     details_skipped: int = 0
     errors: int = 0
@@ -55,15 +65,16 @@ def discover(
     pages: int = 1,
     stop_after_known: int = 2,
     fetched_at: datetime | None = None,
+    sink: DatabaseSink | None = None,
 ) -> DiscoverResult:
-    """Читает первые страницы выдачи и складывает новые строки в папку.
+    """Читает выдачу и отдаёт новые объявления (в БД или в папку).
 
     Сортировка площадки не строгая: в выдачу подмешиваются «поднятые»
     объявления со старой датой. Поэтому останавливаемся не по дате, а по
-    доле уже известных id: две страницы подряд, где >90% мы видели, — стоп.
+    доле уже известных: две страницы подряд, где >90% мы видели, — стоп.
     """
     started = time.monotonic()
-    seen = store.load_seen()
+    seen = store.load_seen() if sink is None else set()
     stats = RunStats()
     found: list[Listing] = []
     known_streak = 0
@@ -76,20 +87,31 @@ def discover(
         stats.pages += 1
         stats.items += len(parsed.items)
 
-        fresh = [item for item in parsed.items if item.id not in seen]
-        known_ratio = 1 - len(fresh) / max(len(parsed.items), 1)
-        known_streak = known_streak + 1 if known_ratio > 0.9 else 0
+        if sink is not None:
+            result = sink.upsert(parsed.items, settings.source)
+            fresh = result.new_items
+            stats.new_ids += result.inserted
+            stats.updated += result.updated
+            stats.rejected += result.rejected
+            known_ratio = 1 - result.inserted / max(len(parsed.items), 1)
+            tail = f" | обновлено {result.updated}" if result.updated else ""
+            shown = f"новых {result.inserted:2}{tail}"
+        else:
+            fresh = [item for item in parsed.items if item.id not in seen]
+            known_ratio = 1 - len(fresh) / max(len(parsed.items), 1)
+            if fresh:
+                store.append_discovered(
+                    [item.to_row() for item in fresh], fetched_at=fetched_at
+                )
+                store.add_seen([item.id for item in fresh])
+            stats.new_ids += len(fresh)
+            shown = f"новых {len(fresh):2}"
 
-        if fresh:
-            store.append_discovered(
-                [item.to_row() for item in fresh], fetched_at=fetched_at
-            )
-            store.add_seen([item.id for item in fresh])
-            found.extend(fresh)
-        stats.new_ids += len(fresh)
+        known_streak = known_streak + 1 if known_ratio > 0.9 else 0
+        found.extend(fresh)
 
         print(
-            f"  стр. {page}: {len(parsed.items):2} объявл. | новых {len(fresh):2} | "
+            f"  стр. {page}: {len(parsed.items):2} объявл. | {shown} | "
             f"{response.elapsed:4.1f} с | {response.wire_bytes / 1024:6.0f} КБ"
         )
 
@@ -120,10 +142,27 @@ def fetch_detail(
     *,
     fetched_at: datetime | None = None,
     refresh: bool = False,
-) -> Path | None:
-    """Забирает карточку объявления и сохраняет её. None — если уже сохранена."""
+    sink: DatabaseSink | None = None,
+) -> Path | str | None:
+    """Карточка объявления: в БД — фото/VIN/точные координаты, иначе файл."""
     response = client.get(listing.url)
     offer = parse_offer(response.text, listing.url)
+
+    if sink is not None:
+        seller_location = (offer.raw.get("seller") or {}).get("location") or {}
+        map_info = seller_location.get("map") or {}
+        changed = sink.update_detail(
+            listing.id,
+            photos=offer.photos,
+            vin=(offer.details.get("vin") or "").upper() or None,
+            lat=map_info.get("latitude"),
+            lon=map_info.get("longitude"),
+            seller_name=offer.seller_name or None,
+            seller_type=_seller_type(offer.seller_type),
+            code="otomoto",
+        )
+        return "db" if changed else None
+
     return store.save_detail(
         offer.raw,
         listing_id=offer.id or listing.id,
@@ -131,6 +170,14 @@ def fetch_detail(
         fetched_at=fetched_at,
         refresh=refresh,
     )
+
+
+def _seller_type(raw: str) -> str | None:
+    if raw == "PROFESSIONAL":
+        return "dealer"
+    if raw == "PRIVATE":
+        return "private"
+    return None
 
 
 def collect(
@@ -141,17 +188,18 @@ def collect(
     pages: int = 1,
     details: int = 5,
     stop_after_known: int = 2,
+    sink: DatabaseSink | None = None,
 ) -> dict[str, Any]:
-    """Выдача + карточки для новых объявлений. Основная команда «собрать»."""
+    """Выдача + карточки для новых объявлений."""
     started = time.monotonic()
     result = discover(
-        client, store, settings, pages=pages, stop_after_known=stop_after_known
+        client, store, settings, pages=pages, stop_after_known=stop_after_known, sink=sink
     )
     stats = result.stats
 
     for item in result.items[:details]:
         try:
-            saved = fetch_detail(client, store, item)
+            saved = fetch_detail(client, store, item, sink=sink)
         except (FetchError, ParseError) as exc:
             stats.errors += 1
             log.warning("карточка %s не сохранена: %s", item.id, exc)
@@ -162,14 +210,21 @@ def collect(
             stats.details_skipped += 1
 
     stats.seconds = round(time.monotonic() - started, 2)
+    if sink is not None:
+        sink.log_run(
+            code=settings.source,
+            started_at=stats.started_at,
+            result=_db_result(stats),
+            pages=stats.pages,
+            items=stats.items,
+            errors=stats.errors,
+            notes="collect",
+        )
     summary = {
         **stats.as_dict(),
         "mode": "collect",
-        "settings": {
-            "rps": settings.rps,
-            "pages": pages,
-            "details": details,
-        },
+        "storage": "db" if sink else "files",
+        "settings": {"rps": settings.rps, "pages": pages, "details": details},
         "client": client.stats.as_dict(),
     }
     store.write_run(summary)
@@ -184,12 +239,9 @@ def watch(
     interval: float = 60.0,
     minutes: float = 90.0,
     details: int = 10,
+    sink: DatabaseSink | None = None,
 ) -> dict[str, Any]:
-    """Цикл «как в проде»: опрос выдачи каждые N секунд + карточки новинок.
-
-    Перед каждым опросом читается control.json: если стоит пауза — на площадку
-    не ходим, только обновляем heartbeat, чтобы дашборд видел «на паузе».
-    """
+    """Цикл «как в проде»: опрос выдачи каждые N секунд + карточки новинок."""
     started = time.monotonic()
     deadline = started + minutes * 60
     total = RunStats()
@@ -217,6 +269,7 @@ def watch(
                     "last_new": last_new,
                     "totals": _totals(total),
                     "client": client.stats.as_dict(),
+                    "storage": "db" if sink else "files",
                 }
             )
             time.sleep(min(5.0, interval))
@@ -231,7 +284,9 @@ def watch(
         print(f"[{datetime.now().strftime('%H:%M:%S')}] опрос #{rounds}")
 
         try:
-            result = discover(client, store, settings, pages=1, stop_after_known=1)
+            result = discover(
+                client, store, settings, pages=1, stop_after_known=1, sink=sink
+            )
         except (FetchError, ParseError) as exc:
             total.errors += 1
             log.error("опрос не удался: %s", exc)
@@ -245,6 +300,7 @@ def watch(
                     "last_poll_at": last_poll_at,
                     "totals": _totals(total),
                     "client": client.stats.as_dict(),
+                    "storage": "db" if sink else "files",
                 }
             )
             time.sleep(interval)
@@ -253,6 +309,8 @@ def watch(
         total.pages += result.stats.pages
         total.items += result.stats.items
         total.new_ids += result.stats.new_ids
+        total.updated += result.stats.updated
+        total.rejected += result.stats.rejected
         total.errors += result.stats.errors
         last_new = result.stats.new_ids
         zero_streak = zero_streak + 1 if last_new == 0 else 0
@@ -265,7 +323,7 @@ def watch(
         details_round = 0
         for item in result.items[:details]:
             try:
-                if fetch_detail(client, store, item):
+                if fetch_detail(client, store, item, sink=sink):
                     total.details_saved += 1
                     details_round += 1
                 else:
@@ -273,6 +331,17 @@ def watch(
             except (FetchError, ParseError) as exc:
                 total.errors += 1
                 log.warning("карточка %s: %s", item.id, exc)
+
+        if sink is not None:
+            sink.log_run(
+                code=settings.source,
+                started_at=result.stats.started_at,
+                result=_db_result(result.stats),
+                pages=result.stats.pages,
+                items=result.stats.items,
+                errors=result.stats.errors,
+                notes="watch",
+            )
 
         spent = time.monotonic() - round_started
         pause_left = max(0.0, interval - spent)
@@ -300,11 +369,10 @@ def watch(
                 "interval": interval,
                 "last_poll_at": last_poll_at,
                 "last_new": last_new,
-                "next_poll_at": datetime.fromtimestamp(
-                    next_poll_at, tz=UTC
-                ).isoformat(),
+                "next_poll_at": datetime.fromtimestamp(next_poll_at, tz=UTC).isoformat(),
                 "totals": _totals(total),
                 "client": client.stats.as_dict(),
+                "storage": "db" if sink else "files",
             }
         )
         time.sleep(pause_left)
@@ -315,8 +383,8 @@ def watch(
         "mode": "watch",
         "rounds": rounds,
         "interval": interval,
+        "storage": "db" if sink else "files",
         "client": client.stats.as_dict(),
-        "storage": store.stats(),
     }
     store.write_run(summary)
     store.write_heartbeat(
@@ -327,9 +395,20 @@ def watch(
             "finished_at": datetime.now(UTC).isoformat(),
             "totals": _totals(total),
             "client": client.stats.as_dict(),
+            "storage": "db" if sink else "files",
         }
     )
     return summary
+
+
+def _db_result(stats: RunStats) -> Any:
+    from .db import UpsertResult
+
+    return UpsertResult(
+        inserted=stats.new_ids,
+        updated=stats.updated,
+        rejected=stats.rejected,
+    )
 
 
 def _totals(stats: RunStats) -> dict[str, Any]:
@@ -337,6 +416,8 @@ def _totals(stats: RunStats) -> dict[str, Any]:
         "polls": stats.pages,
         "items": stats.items,
         "new_ids": stats.new_ids,
+        "updated": stats.updated,
+        "rejected": stats.rejected,
         "details_saved": stats.details_saved,
         "errors": stats.errors,
     }
