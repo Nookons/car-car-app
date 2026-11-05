@@ -140,13 +140,16 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
           </div>
 
           <div className="relative flex flex-1 items-center justify-center px-2 pb-4">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={valid[index]}
-              alt={title}
-              className="max-h-full max-w-full object-contain"
-              onClick={(event) => event.stopPropagation()}
-            />
+            {/* Фиксированная рамка: фото любого размера вписывается в неё */}
+            <div className="flex h-[68vh] w-full max-w-5xl items-center justify-center overflow-hidden rounded-xl bg-black">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={valid[index]}
+                alt={title}
+                className="h-full w-full object-contain"
+                onClick={(event) => event.stopPropagation()}
+              />
+            </div>
             {count > 1 ? (
               <>
                 <button
