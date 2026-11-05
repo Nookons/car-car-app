@@ -57,9 +57,16 @@ export function initTelegram(): void {
     root.style.setProperty("--tg-safe-top", `${(safe.top ?? 0) + (content.top ?? 0)}px`);
     root.style.setProperty("--tg-safe-bottom", `${(safe.bottom ?? 0) + (content.bottom ?? 0)}px`);
   };
+  const syncFullscreen = () => {
+    document.documentElement.classList.toggle("tg-fullscreen", Boolean(tg.isFullscreen));
+  };
   tg.onEvent?.("viewportChanged", syncLayout);
-  tg.onEvent?.("fullscreenChanged", syncLayout);
+  tg.onEvent?.("fullscreenChanged", () => {
+    syncLayout();
+    syncFullscreen();
+  });
   tg.onEvent?.("safeAreaChanged", syncLayout);
   tg.onEvent?.("contentSafeAreaChanged", syncLayout);
   syncLayout();
+  syncFullscreen();
 }

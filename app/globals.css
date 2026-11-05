@@ -38,9 +38,15 @@
 
 .safe-bottom { padding-bottom: calc(0.5rem + var(--tg-safe-bottom, 0px)); }
 
-/* Fullscreen: Telegram рисует свою шапку поверх контента */
-header.sticky {
-  padding-top: calc(0.75rem + var(--tg-safe-top, 0px));
+/* Fullscreen на телефоне: шапку рисует сам Telegram — своя была бы дублем.
+   Контент начинается сразу под системными кнопками, без полосы-отступа. */
+@media (max-width: 767px) {
+  html.tg-fullscreen .app-header {
+    display: none;
+  }
+  html.tg-fullscreen main {
+    padding-top: calc(0.75rem + var(--tg-safe-top, 0px));
+  }
 }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
