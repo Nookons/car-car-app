@@ -40,7 +40,9 @@ export function FilterDialog({
   const [makes, setMakes] = React.useState<Option[]>([]);
   const [models, setModels] = React.useState<Option[]>([]);
   const [options, setOptions] = React.useState<Options | null>(null);
-  const [geoNote, setGeoNote] = React.useState(initial.lat ? "Геолокация включена" : "");
+  const [geoNote, setGeoNote] = React.useState(initial.lat ? "Локация задана" : "");
+  const [cities, setCities] = React.useState<Array<{ value: string; lat: number; lon: number; count: number }>>([]);
+  const [pickedCity, setPickedCity] = React.useState("");
   const [geoFailed, setGeoFailed] = React.useState(false);
 
   React.useEffect(() => {
@@ -50,6 +52,9 @@ export function FilterDialog({
   React.useEffect(() => {
     if (!open) return;
     api<{ items: Option[] }>("/filters/makes").then((data) => setMakes(data.items)).catch(() => {});
+    api<{ items: Array<{ value: string; lat: number; lon: number; count: number }> }>("/filters/cities")
+      .then((data) => setCities(data.items))
+      .catch(() => setCities([]));
   }, [open]);
 
   // модели для выбранной марки
@@ -81,6 +86,7 @@ export function FilterDialog({
     try {
       const { lat, lon } = await requestLocation();
       setDraft((prev) => ({ ...prev, lat, lon, radius_km: prev.radius_km ?? 50 }));
+      setPickedCity("");
       setGeoNote("Геолокация включена");
       setGeoFailed(false);
     } catch {
@@ -243,7 +249,6 @@ export function FilterDialog({
           </select>
         </label>
 
-        {draft.model ? (
         <div className="grid grid-cols-2 gap-2">
           <label className="block space-y-1.5">
             <span className="text-xs text-muted-foreground">Коробка</span>
@@ -277,13 +282,7 @@ export function FilterDialog({
           </label>
         </div>
 
-        ) : (
-          <p className="rounded-xl bg-secondary px-3 py-2 text-xs text-muted-foreground">
-            Выбери марку и модель — покажем коробки, топливо и кузова, которые для них бывают.
-          </p>
-        )}
-
-        {draft.model && bodyOptions.length > 0 ? (
+        {bodyOptions.length > 0 ? (
           <label className="block space-y-1.5">
             <span className="text-xs text-muted-foreground">Кузов</span>
             <select
@@ -301,8 +300,46 @@ export function FilterDialog({
           </label>
         ) : null}
 
+        {!draft.model ? (
+          <p className="text-xs text-muted-foreground">
+            Показаны опции по всем машинам. Выбери марку и модель — останутся только их.
+          </p>
+        ) : null}
+
         <div className="space-y-1.5">
           <span className="text-xs text-muted-foreground">Где искать</span>
+          <label className="block space-y-1.5">
+            <span className="text-xs text-muted-foreground">Город</span>
+            <select
+              className={selectClass}
+              value={pickedCity}
+              onChange={(event) => {
+                const name = event.target.value;
+                setPickedCity(name);
+                const city = cities.find((item) => item.value === name);
+                if (city) {
+                  setDraft((prev) => ({
+                    ...prev,
+                    lat: city.lat,
+                    lon: city.lon,
+                    radius_km: prev.radius_km ?? 50,
+                  }));
+                  setGeoNote(`Локация: ${name}`);
+                  setGeoFailed(false);
+                } else {
+                  setDraft((prev) => ({ ...prev, lat: undefined, lon: undefined }));
+                  setGeoNote("");
+                }
+              }}
+            >
+              <option value="">Не важно</option>
+              {cities.map((city) => (
+                <option key={city.value} value={city.value}>
+                  {city.value} ({num(city.count)})
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="grid grid-cols-2 gap-2">
             <Button variant="outline" onClick={askGeo} className="justify-start">
               <Crosshair size={18} />

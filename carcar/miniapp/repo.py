@@ -217,6 +217,7 @@ class MiniAppRepo:
         mileage_max: int | None = None,
         fuel: str | None = None,
         gearbox: str | None = None,
+        body: str | None = None,
         source: str | None = None,
         lat: float | None = None,
         lon: float | None = None,
@@ -259,6 +260,9 @@ class MiniAppRepo:
         if gearbox:
             conds.append("l.gearbox = %(gearbox)s")
             params["gearbox"] = gearbox
+        if body:
+            conds.append("l.body = %(body)s")
+            params["body"] = body
         if source:
             conds.append("s.code = %(source)s")
             params["source"] = source
@@ -467,6 +471,29 @@ class MiniAppRepo:
                 (make,),
             )
             return [{"value": r["model"], "count": r["n"]} for r in cur.fetchall()]
+
+    def filter_cities(self, q: str | None = None, limit: int = 120) -> list[dict[str, Any]]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select city,
+                       round(avg(lat)::numeric, 4)::float8 as lat,
+                       round(avg(lon)::numeric, 4)::float8 as lon,
+                       count(*) as n
+                from listing
+                where status = 'active' and city is not null and city <> ''
+                  and lat is not null and lon is not null
+                  and (%s is null or city ilike %s)
+                group by city
+                order by n desc
+                limit %s
+                """,
+                (q, f"%{q}%" if q else None, limit),
+            )
+            return [
+                {"value": r["city"], "lat": r["lat"], "lon": r["lon"], "count": int(r["n"])}
+                for r in cur.fetchall()
+            ]
 
     def filter_options(self, make: str | None, model: str | None) -> dict[str, Any]:
         where, params = [], []

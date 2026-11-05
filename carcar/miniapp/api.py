@@ -189,6 +189,7 @@ def create_app(
         mileage_max: int | None = None,
         fuel: str | None = None,
         gearbox: str | None = None,
+        body: str | None = None,
         source: str | None = None,
         lat: float | None = None,
         lon: float | None = None,
@@ -208,6 +209,7 @@ def create_app(
             mileage_max=mileage_max,
             fuel=fuel,
             gearbox=gearbox,
+            body=body,
             source=source,
             lat=lat,
             lon=lon,
@@ -231,6 +233,10 @@ def create_app(
     @app.get("/api/filters/models")
     def filter_models(make: str = Query(min_length=1)) -> dict:
         return {"items": repo.filter_models(make)}
+
+    @app.get("/api/filters/cities")
+    def filter_cities(q: str | None = None) -> dict:
+        return {"items": repo.filter_cities(q)}
 
     @app.get("/api/filters/options")
     def filter_options(make: str | None = None, model: str | None = None) -> dict:
