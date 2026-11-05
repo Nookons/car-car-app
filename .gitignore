@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Секреты и локальная конфигурация
+.env
+.env.*
+!.env.example
+
+# Данные и артефакты сбора
+data/
+*.sqlite
+*.db
+*.log
+
+# JS/TS
+node_modules/
+dist/
+.vite/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
