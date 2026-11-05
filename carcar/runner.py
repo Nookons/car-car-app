@@ -212,6 +212,8 @@ def sweep(
     total_pages: int | None = saved.get("total_pages")
 
     while True:
+        if total_pages and page > total_pages:
+            break
         if max_pages and totals["pages"] >= max_pages:
             break
         if deadline and time.monotonic() >= deadline:
@@ -260,7 +262,8 @@ def sweep(
         if page % 50 == 0:
             elapsed = time.monotonic() - started
             left = (total_pages - page) if total_pages else 0
-            eta = (elapsed / max(page - from_page + 1, 1)) * left / 60 if total_pages else 0
+            per_page = elapsed / max(totals["pages"], 1)
+            eta = per_page * left / 60 if total_pages else 0
             print(
                 f"  стр. {page}/{total_pages or '?'} | новых {totals['inserted']} | "
                 f"обновлено {totals['updated']} | ошибок {totals['errors']} | "

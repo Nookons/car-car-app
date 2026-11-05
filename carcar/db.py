@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import contextlib
+import functools
 import json
 import logging
 import os
@@ -17,6 +18,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+import psycopg
 
 from .canonical import Prepared, prepare
 
@@ -85,6 +88,21 @@ def database_url() -> str | None:
     return None
 
 
+def resilient(method):  # noqa: ANN001
+    """Один раз переподключаемся, если соединение с пулером оборвалось."""
+
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):  # noqa: ANN001
+        try:
+            return method(self, *args, **kwargs)
+        except (psycopg.OperationalError, psycopg.InterfaceError) as exc:
+            log.warning("соединение с БД потеряно (%s) — переподключаюсь", exc)
+            self._reconnect()
+            return method(self, *args, **kwargs)
+
+    return wrapper
+
+
 class DatabaseSink:
     def __init__(self, url: str) -> None:
         if "ljkugtpeboomboobodom" in url.lower():
@@ -120,14 +138,9 @@ class DatabaseSink:
         return row[0]
 
     # -- запись ------------------------------------------------------------
+    @resilient
     def upsert(self, items: list[Any], code: str = "otomoto") -> UpsertResult:
-        try:
-            return self._upsert(items, code)
-        except Exception as exc:  # noqa: BLE001
-            if "connection" not in str(exc).lower() and "server closed" not in str(exc).lower():
-                raise
-            self._reconnect()
-            return self._upsert(items, code)
+        return self._upsert(items, code)
 
     def _upsert(self, items: list[Any], code: str) -> UpsertResult:
         source_id = self.source_id(code)
@@ -223,6 +236,7 @@ class DatabaseSink:
             log.warning("пачка не записалась (%s) — пишу по одной", exc)
             return self._upsert_individually(prepared, existing, source_id, result, events)
 
+    @resilient
     def update_detail(
         self,
         external_id: str,
@@ -240,26 +254,7 @@ class DatabaseSink:
         code: str = "otomoto",
     ) -> bool:
         """Обогащение после загрузки карточки: фото, VIN, точные координаты."""
-        try:
-            return self._update_detail(
-                external_id,
-                photos=photos,
-                vin=vin,
-                lat=lat,
-                lon=lon,
-                seller_name=seller_name,
-                seller_type=seller_type,
-                body=body,
-                color=color,
-                power_hp=power_hp,
-                engine_cm3=engine_cm3,
-                code=code,
-            )
-        except Exception as exc:  # noqa: BLE001
-            if "connection" not in str(exc).lower():
-                raise
-            self._reconnect()
-            return self._update_detail(
+        return self._update_detail(
                 external_id,
                 photos=photos,
                 vin=vin,
@@ -330,6 +325,7 @@ class DatabaseSink:
             raise
         return bool(changed)
 
+    @resilient
     def mark_removed(self, external_id: str, code: str = "otomoto") -> None:
         """Объявление вернуло 404/410 — снимаем с очереди и помечаем removed."""
         source_id = self.source_id(code)
@@ -344,6 +340,7 @@ class DatabaseSink:
             )
         self.conn.commit()
 
+    @resilient
     def pending_details(self, limit: int = 50) -> list[dict[str, Any]]:
         """Объявления, по которым ещё не скачана карточка (фото, кузов, продавец)."""
         with self.conn.cursor() as cur:
@@ -409,6 +406,7 @@ class DatabaseSink:
         return result
 
     # -- состояние коллектора (Railway: у каждого свой контейнер) ----------
+    @resilient
     def heartbeat(self, code: str, payload: dict[str, Any]) -> None:
         source_id = self.source_id(code)
         with self.conn.cursor() as cur:
@@ -439,6 +437,7 @@ class DatabaseSink:
             )
         self.conn.commit()
 
+    @resilient
     def collectors(self) -> list[dict[str, Any]]:
         with self.conn.cursor() as cur:
             cur.execute(
@@ -457,6 +456,7 @@ class DatabaseSink:
         )
         return [dict(zip(keys, row, strict=False)) for row in rows]
 
+    @resilient
     def set_paused(
         self, code: str, paused: bool, reason: str | None = None, by: str = "dashboard"
     ) -> None:
@@ -476,6 +476,7 @@ class DatabaseSink:
             )
         self.conn.commit()
 
+    @resilient
     def is_paused(self, code: str) -> tuple[bool, str | None]:
         source_id = self.source_id(code)
         with self.conn.cursor() as cur:
@@ -486,6 +487,7 @@ class DatabaseSink:
             row = cur.fetchone()
         return (bool(row[0]), row[1]) if row else (False, None)
 
+    @resilient
     def sweep_state(self, code: str) -> dict[str, Any]:
         source_id = self.source_id(code)
         with self.conn.cursor() as cur:
@@ -504,6 +506,7 @@ class DatabaseSink:
             "updated": row[3],
         }
 
+    @resilient
     def set_sweep_state(
         self,
         code: str,
@@ -533,6 +536,7 @@ class DatabaseSink:
         self.conn.commit()
 
     # -- наблюдаемость -----------------------------------------------------
+    @resilient
     def log_run(
         self,
         *,
@@ -559,6 +563,7 @@ class DatabaseSink:
             )
         self.conn.commit()
 
+    @resilient
     def stats(self) -> dict[str, Any]:
         with self.conn.cursor() as cur:
             cur.execute("select count(*) from listing")
