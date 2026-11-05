@@ -166,6 +166,7 @@ export default function AccountPage() {
           <h2 className="text-base font-semibold">{t("account.filters")}</h2>
           <span className="text-xs text-muted-foreground">{subs.length}</span>
         </div>
+        <p className="text-xs text-muted-foreground">{t("account.hintFilters")}</p>
 
         {subs.length === 0 ? (
           <p className="text-sm text-muted-foreground">

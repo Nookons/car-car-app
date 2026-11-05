@@ -86,7 +86,7 @@ class Notifier:
                 """
                 select l.id, l.external_id, l.title, l.price, l.currency, l.year,
                        l.mileage_km, l.city, l.make, l.model,
-                       l.fuel, l.gearbox, l.body, l.thumb_url,
+                       l.fuel, l.gearbox, l.body, l.thumb_url, l.url,
                        s.code as source_code
                 from listing l join source s on s.id = l.source_id
                 where s.code = %s and l.external_id = %s and l.status = 'active'
@@ -140,10 +140,17 @@ class Notifier:
             f"🚗 {item['title']}\n"
             f"💰 {price} zł\n"
             f"📅 {item.get('year') or '—'} · {item.get('mileage_km') or 0:,} км\n"
-            f"📍 {item.get('city') or '—'}"
+            f"📍 {item.get('city') or '—'}\n"
+            f"✅ Подходит под ваш фильтр"
         ).replace(",", " ")
         keyboard = {
-            "inline_keyboard": [[{"text": "Открыть в CarCar", "web_app": {"url": url}}]]
+            "inline_keyboard": [
+                [{"text": "🚗 Открыть в CarCar", "web_app": {"url": url}}],
+                [
+                    {"text": "На otomoto", "url": item.get("url") or url},
+                    {"text": "Мои фильтры", "web_app": {"url": f"{self.public_url}/account"}},
+                ],
+            ]
         }
         payload: dict[str, Any] = {
             "chat_id": chat_id,
