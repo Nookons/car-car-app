@@ -83,6 +83,8 @@ export function FilterDialog({
     setDraft((prev) => ({ ...prev, [key]: value }));
 
   const askGeo = async () => {
+    setGeoNote("Определяю локацию…");
+    setGeoFailed(false);
     try {
       const { lat, lon } = await requestLocation();
       setDraft((prev) => ({ ...prev, lat, lon, radius_km: prev.radius_km ?? 50 }));

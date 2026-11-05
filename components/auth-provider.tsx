@@ -66,13 +66,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (id: number) => {
       if (!token) return;
       const isFav = favorites.has(id);
-      await api(`/favorites/${id}`, { method: isFav ? "DELETE" : "POST", token });
+
+      // Сначала переключаем UI, потом уходим в сеть — кнопка реагирует мгновенно.
       setFavorites((prev) => {
         const next = new Set(prev);
         if (isFav) next.delete(id);
         else next.add(id);
         return next;
       });
+
+      try {
+        await api(`/favorites/${id}`, { method: isFav ? "DELETE" : "POST", token });
+      } catch {
+        // не получилось — возвращаем как было
+        setFavorites((prev) => {
+          const next = new Set(prev);
+          if (isFav) next.add(id);
+          else next.delete(id);
+          return next;
+        });
+      }
     },
     [favorites, token],
   );

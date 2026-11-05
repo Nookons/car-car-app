@@ -23,9 +23,10 @@ const LANGS: Array<[string, string]> = [
 ];
 
 export default function AccountPage() {
-  const { token, user, ready, favorites } = useAuth();
+  const { token, ready, favorites } = useAuth();
   const router = useRouter();
   const [subs, setSubs] = React.useState<Subscription[]>([]);
+  const [me, setMe] = React.useState<User | null>(null);
   const [favItems, setFavItems] = React.useState<Listing[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
@@ -36,11 +37,13 @@ export default function AccountPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const [subsData, favData] = await Promise.all([
+      const [subsData, favData, meData] = await Promise.all([
         api<{ items: Subscription[] }>("/subscriptions", { token }),
         api<{ items: Listing[] }>("/favorites", { token }),
+        api<User>("/me", { token }),
       ]);
       setSubs(subsData.items);
+      setMe(meData);
       setFavItems(favData.items);
     } finally {
       setLoading(false);
@@ -52,28 +55,41 @@ export default function AccountPage() {
   }, [ready, token, load]);
 
   const patchUser = async (patch: Partial<User>) => {
-    if (!token) return;
-    await api<User>("/me", { method: "PATCH", token, body: patch });
-    await load();
-    router.refresh();
+    if (!token || !me) return;
+    const previous = me;
+    // Мгновенно показываем новое состояние, запрос — фоном.
+    setMe({ ...me, ...patch } as User);
+    try {
+      const fresh = await api<User>("/me", { method: "PATCH", token, body: patch });
+      setMe(fresh);
+    } catch {
+      setMe(previous);
+    }
   };
 
-  const saveFilter = async () => {
+  const saveFilter = () => {
     if (!token || !name.trim()) return;
-    setSaving(true);
-    try {
-      const criteria: Filters = loadFilters();
-      await api("/subscriptions", {
-        method: "POST",
-        token,
-        body: { name: name.trim(), criteria },
-      });
-      setName("");
-      setNameOpen(false);
-      await load();
-    } finally {
-      setSaving(false);
-    }
+    const criteria: Filters = loadFilters();
+    const draft: Subscription = {
+      id: -Date.now(),
+      name: name.trim(),
+      criteria,
+      active: true,
+      created_at: new Date().toISOString(),
+    };
+    // Сразу показываем новый фильтр, сохранение уходит фоном.
+    setSubs((prev) => [draft, ...prev]);
+    setName("");
+    setNameOpen(false);
+    api<Subscription>("/subscriptions", {
+      method: "POST",
+      token,
+      body: { name: draft.name, criteria },
+    })
+      .then((created) =>
+        setSubs((prev) => prev.map((item) => (item.id === draft.id ? created : item))),
+      )
+      .catch(() => setSubs((prev) => prev.filter((item) => item.id !== draft.id)));
   };
 
   if (!ready || loading) {
@@ -85,7 +101,7 @@ export default function AccountPage() {
     );
   }
 
-  const initials = (user?.first_name?.[0] ?? "?") + (user?.last_name?.[0] ?? "");
+  const initials = (me?.first_name?.[0] ?? "?") + (me?.last_name?.[0] ?? "");
 
   return (
     <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
@@ -95,10 +111,10 @@ export default function AccountPage() {
         </div>
         <div>
           <p className="font-semibold">
-            {[user?.first_name, user?.last_name].filter(Boolean).join(" ") || "Пользователь"}
+            {[me?.first_name, me?.last_name].filter(Boolean).join(" ") || "Пользователь"}
           </p>
           <p className="text-xs text-muted-foreground">
-            {user?.username ? `@${user.username}` : `Telegram ID ${user?.tg_id}`}
+            {me?.username ? `@${me.username}` : `Telegram ID ${me?.tg_id}`}
           </p>
         </div>
       </Card>
@@ -109,7 +125,7 @@ export default function AccountPage() {
           <span className="text-xs text-muted-foreground">Язык интерфейса</span>
           <select
             className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            value={user?.lang ?? "ru"}
+            value={me?.lang ?? "ru"}
             onChange={(event) => patchUser({ lang: event.target.value })}
           >
             {LANGS.map(([code, label]) => (
@@ -122,26 +138,26 @@ export default function AccountPage() {
 
         <div className="flex items-center justify-between gap-3 py-1">
           <span className="flex items-center gap-2 text-sm">
-            {user?.notify_new ? <Bell size={18} /> : <BellSlash size={18} />}
+            {me?.notify_new ? <Bell size={18} /> : <BellSlash size={18} />}
             Уведомления о новых
           </span>
           <Button
-            variant={user?.notify_new ? "default" : "outline"}
+            variant={me?.notify_new ? "default" : "outline"}
             size="sm"
-            onClick={() => patchUser({ notify_new: !user?.notify_new })}
+            onClick={() => patchUser({ notify_new: !me?.notify_new })}
           >
-            {user?.notify_new ? "Вкл" : "Выкл"}
+            {me?.notify_new ? "Вкл" : "Выкл"}
           </Button>
         </div>
 
         <div className="flex items-center justify-between gap-3 py-1">
           <span className="text-sm">Дайджест вместо мгновенных</span>
           <Button
-            variant={user?.digest ? "default" : "outline"}
+            variant={me?.digest ? "default" : "outline"}
             size="sm"
-            onClick={() => patchUser({ digest: !user?.digest })}
+            onClick={() => patchUser({ digest: !me?.digest })}
           >
-            {user?.digest ? "Вкл" : "Выкл"}
+            {me?.digest ? "Вкл" : "Выкл"}
           </Button>
         </div>
       </Card>
@@ -178,13 +194,22 @@ export default function AccountPage() {
                   <Button
                     variant={sub.active ? "default" : "outline"}
                     size="sm"
-                    onClick={async () => {
-                      await api(`/subscriptions/${sub.id}`, {
+                    onClick={() => {
+                      const nextActive = !sub.active;
+                      setSubs((prev) =>
+                        prev.map((item) => (item.id === sub.id ? { ...item, active: nextActive } : item)),
+                      );
+                      api(`/subscriptions/${sub.id}`, {
                         method: "PATCH",
                         token,
-                        body: { active: !sub.active },
-                      });
-                      await load();
+                        body: { active: nextActive },
+                      }).catch(() =>
+                        setSubs((prev) =>
+                          prev.map((item) =>
+                            item.id === sub.id ? { ...item, active: sub.active } : item,
+                          ),
+                        ),
+                      );
                     }}
                   >
                     {sub.active ? "Вкл" : "Выкл"}
@@ -192,9 +217,9 @@ export default function AccountPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={async () => {
-                      await api(`/subscriptions/${sub.id}`, { method: "DELETE", token });
-                      await load();
+                    onClick={() => {
+                      setSubs((prev) => prev.filter((item) => item.id !== sub.id));
+                      api(`/subscriptions/${sub.id}`, { method: "DELETE", token }).catch(() => load());
                     }}
                   >
                     <Trash size={16} />
