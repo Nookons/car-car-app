@@ -4,6 +4,9 @@
     python -m carcar collect --details 5       # выдача + карточки новых
     python -m carcar watch --minutes 10        # цикл, как в проде
     python -m carcar detail --id 6151080882    # одна карточка
+    python -m carcar dashboard                 # дашборд на http://127.0.0.1:8077
+    python -m carcar pause --reason "чиним"    # пауза сбора
+    python -m carcar resume                    # снять паузу
     python -m carcar stats                     # что уже лежит на диске
 """
 
@@ -17,7 +20,8 @@ from pathlib import Path
 
 from .client import BlockedError, Client, FetchError
 from .config import Settings
-from .parse import ParseError, parse_offer
+from .control import load_control, save_control
+from .parse import Listing, ParseError, parse_offer
 from .runner import collect, discover, fetch_detail, watch
 from .store import Store
 
@@ -42,12 +46,14 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common(p_discover)
     p_discover.add_argument("--pages", type=int, default=1)
     p_discover.add_argument("--stop-after-known", type=int, default=2)
+    p_discover.add_argument("--force", action="store_true", help="игнорировать паузу")
 
     p_collect = sub.add_parser("collect", help="выдача + карточки новых объявлений")
     _add_common(p_collect)
     p_collect.add_argument("--pages", type=int, default=1)
     p_collect.add_argument("--details", type=int, default=5, help="сколько карточек забрать")
     p_collect.add_argument("--stop-after-known", type=int, default=2)
+    p_collect.add_argument("--force", action="store_true", help="игнорировать паузу")
 
     p_detail = sub.add_parser("detail", help="забрать одну карточку по id или url")
     _add_common(p_detail)
@@ -60,6 +66,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_watch.add_argument("--interval", type=float, default=15.0, help="пауза между опросами, сек")
     p_watch.add_argument("--minutes", type=float, default=10.0, help="сколько работать, мин")
     p_watch.add_argument("--details", type=int, default=5)
+
+    p_dash = sub.add_parser("dashboard", help="веб-дашборд со статусом и паузой")
+    p_dash.add_argument("--data", type=Path, default=Path("data"))
+    p_dash.add_argument("--host", default="127.0.0.1", help="по умолчанию только локально")
+    p_dash.add_argument("--port", type=int, default=8077)
+
+    p_pause = sub.add_parser("pause", help="поставить сбор на паузу")
+    p_pause.add_argument("--data", type=Path, default=Path("data"))
+    p_pause.add_argument("--reason", default=None)
+
+    p_resume = sub.add_parser("resume", help="снять паузу")
+    p_resume.add_argument("--data", type=Path, default=Path("data"))
 
     p_stats = sub.add_parser("stats", help="что уже собрано")
     p_stats.add_argument("--data", type=Path, default=Path("data"))
@@ -92,6 +110,26 @@ def _print_summary(summary: dict) -> None:
         )
 
 
+def _guard_pause(store: Store, force: bool) -> bool:
+    control = load_control(store.control_path)
+    if control.paused and not force:
+        reason = control.reason or "без причины"
+        print(f"сбор на паузе ({reason}). Снять: carcar resume, или --force", file=sys.stderr)
+        return False
+    return True
+
+
+def _run_dashboard(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from .dashboard.app import create_app
+
+    app = create_app(root=args.data)
+    print(f"дашборд: http://{args.host}:{args.port}  (Ctrl+C — остановить)")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     logging.basicConfig(
@@ -100,13 +138,41 @@ def main(argv: list[str] | None = None) -> int:
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
+    # -- команды, которым не нужен HTTP-клиент ----------------------------
     if args.command == "stats":
         store = Store(root=args.data)
-        print(json.dumps(store.stats(), ensure_ascii=False, indent=1))
+        control = load_control(store.control_path)
+        print(
+            json.dumps(
+                store.stats() | {"control": control.as_dict()},
+                ensure_ascii=False,
+                indent=1,
+            )
+        )
+        return 0
+
+    if args.command == "dashboard":
+        return _run_dashboard(args)
+
+    if args.command in {"pause", "resume"}:
+        store = Store(root=args.data)
+        paused = args.command == "pause"
+        state = save_control(
+            store.control_path,
+            paused=paused,
+            reason=getattr(args, "reason", None),
+            by="cli",
+        )
+        print(f"{'пауза' if paused else 'пауза снята'}: {state.updated_at}")
         return 0
 
     settings = _settings(args)
     store = Store(root=settings.data_dir, source=settings.source)
+
+    if args.command in {"discover", "collect"} and not _guard_pause(
+        store, getattr(args, "force", False)
+    ):
+        return 4
 
     try:
         with Client(settings) as client:
@@ -118,7 +184,10 @@ def main(argv: list[str] | None = None) -> int:
                     pages=args.pages,
                     stop_after_known=args.stop_after_known,
                 )
-                summary = result.stats.as_dict() | {"client": client.stats.as_dict()}
+                summary = result.stats.as_dict() | {
+                    "mode": "discover",
+                    "client": client.stats.as_dict(),
+                }
                 store.write_run(summary)
                 _print_summary(summary)
 
@@ -164,8 +233,6 @@ def main(argv: list[str] | None = None) -> int:
                             file=sys.stderr,
                         )
                         return 2
-                    from .parse import Listing
-
                     path = fetch_detail(
                         client,
                         store,

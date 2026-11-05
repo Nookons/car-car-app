@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CarCar · сборщик</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">CC</div>
+      <div>
+        <h1>CarCar <span class="sep">·</span> <span data-i18n="title">сборщик</span></h1>
+        <p class="muted" id="subtitle">otomoto.pl · Польша</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="pill" id="state-pill"><span class="dot"></span><span id="state-text">…</span></span>
+      <button class="ghost" id="lang" title="Language">EN</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="banner hidden" id="banner"></section>
+
+    <section class="cards">
+      <article class="card kpi">
+        <span class="label" data-i18n="polls">Опросов</span>
+        <strong id="kpi-polls">—</strong>
+        <span class="hint" data-i18n="perSession">за сессию</span>
+      </article>
+      <article class="card kpi">
+        <span class="label" data-i18n="newListings">Новых объявлений</span>
+        <strong id="kpi-new">—</strong>
+        <span class="hint" data-i18n="perSession">за сессию</span>
+      </article>
+      <article class="card kpi">
+        <span class="label" data-i18n="details">Карточек в папке</span>
+        <strong id="kpi-details">—</strong>
+        <span class="hint" id="kpi-details-size">—</span>
+      </article>
+      <article class="card kpi">
+        <span class="label" data-i18n="errors">Ошибок</span>
+        <strong id="kpi-errors">—</strong>
+        <span class="hint" id="kpi-traffic">—</span>
+      </article>
+    </section>
+
+    <section class="grid">
+      <article class="card chart-card">
+        <div class="card-head">
+          <h2 data-i18n="chart">Новые объявления по опросам</h2>
+          <span class="muted" id="chart-hint"></span>
+        </div>
+        <canvas id="chart" height="140"></canvas>
+      </article>
+
+      <article class="card control-card">
+        <div class="card-head"><h2 data-i18n="control">Управление</h2></div>
+        <p class="muted small" id="control-note">—</p>
+        <label class="field">
+          <span data-i18n="reason">Причина паузы</span>
+          <input id="reason" maxlength="200" autocomplete="off" placeholder="например: чиним парсер">
+        </label>
+        <button id="toggle" class="primary">…</button>
+        <p class="tiny muted" data-i18n="pauseHint">
+          Сборщик проверяет паузу перед каждым опросом — на площадку запросы перестают идти в пределах одного интервала.
+        </p>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="card">
+        <div class="card-head"><h2 data-i18n="recentPolls">Последние опросы</h2></div>
+        <table>
+          <thead>
+            <tr>
+              <th data-i18n="time">Время</th>
+              <th data-i18n="new">Новых</th>
+              <th data-i18n="sec">Секунд</th>
+              <th data-i18n="kb">КБ</th>
+            </tr>
+          </thead>
+          <tbody id="polls"></tbody>
+        </table>
+      </article>
+
+      <article class="card">
+        <div class="card-head"><h2 data-i18n="runs">Прогоны</h2></div>
+        <table>
+          <thead>
+            <tr>
+              <th data-i18n="mode">Режим</th>
+              <th data-i18n="time">Время</th>
+              <th data-i18n="new">Новых</th>
+              <th data-i18n="detailsShort">Карточек</th>
+            </tr>
+          </thead>
+          <tbody id="runs"></tbody>
+        </table>
+      </article>
+    </section>
+  </main>
+
+  <footer class="muted tiny">
+    <span data-i18n="footer">Данные — локально, папка data. Дашборд только для владельца, слушает 127.0.0.1.</span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

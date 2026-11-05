@@ -11,6 +11,7 @@ from typing import Any
 
 from .client import Client, FetchError
 from .config import Settings
+from .control import load_control
 from .parse import Listing, ParseError, parse_offer, parse_search
 from .store import Store
 
@@ -89,9 +90,6 @@ def discover(
             f"  стр. {page}: {len(parsed.items):2} объявл. | новых {len(fresh):2} | "
             f"{response.elapsed:4.1f} с | {response.wire_bytes / 1024:6.0f} КБ"
         )
-
-        if stats.new_ids == 0 and page == 1 and parsed.items:
-            log.warning("на первой странице нет новых id — возможна смена выдачи")
 
         if known_streak >= stop_after_known:
             stats.stopped_by_known = True
@@ -174,21 +172,68 @@ def watch(
     minutes: float = 90.0,
     details: int = 10,
 ) -> dict[str, Any]:
-    """Цикл «как в проде»: опрос выдачи каждые N секунд + карточки новинок."""
+    """Цикл «как в проде»: опрос выдачи каждые N секунд + карточки новинок.
+
+    Перед каждым опросом читается control.json: если стоит пауза — на площадку
+    не ходим, только обновляем heartbeat, чтобы дашборд видел «на паузе».
+    """
     started = time.monotonic()
     deadline = started + minutes * 60
     total = RunStats()
     rounds = 0
+    paused_logged = False
+    last_poll_at: str | None = None
+    last_new = 0
+    zero_streak = 0
+    last_wire = 0
 
     while time.monotonic() < deadline:
+        control = load_control(store.control_path)
+        if control.paused:
+            if not paused_logged:
+                print(f"пауза: {control.reason or 'без причины'}")
+                paused_logged = True
+            store.write_heartbeat(
+                {
+                    "status": "paused",
+                    "mode": "watch",
+                    "round": rounds,
+                    "interval": interval,
+                    "paused_reason": control.reason,
+                    "last_poll_at": last_poll_at,
+                    "last_new": last_new,
+                    "totals": _totals(total),
+                    "client": client.stats.as_dict(),
+                }
+            )
+            time.sleep(min(5.0, interval))
+            continue
+
+        if paused_logged:
+            print("пауза снята — продолжаю")
+            paused_logged = False
+
         round_started = time.monotonic()
         rounds += 1
         print(f"[{datetime.now().strftime('%H:%M:%S')}] опрос #{rounds}")
+
         try:
             result = discover(client, store, settings, pages=1, stop_after_known=1)
         except (FetchError, ParseError) as exc:
             total.errors += 1
             log.error("опрос не удался: %s", exc)
+            store.write_heartbeat(
+                {
+                    "status": "error",
+                    "mode": "watch",
+                    "round": rounds,
+                    "interval": interval,
+                    "last_error": str(exc),
+                    "last_poll_at": last_poll_at,
+                    "totals": _totals(total),
+                    "client": client.stats.as_dict(),
+                }
+            )
             time.sleep(interval)
             continue
 
@@ -196,11 +241,20 @@ def watch(
         total.items += result.stats.items
         total.new_ids += result.stats.new_ids
         total.errors += result.stats.errors
+        last_new = result.stats.new_ids
+        zero_streak = zero_streak + 1 if last_new == 0 else 0
+        last_poll_at = datetime.now(UTC).isoformat()
+        if zero_streak and zero_streak % 20 == 0:
+            log.warning(
+                "%d опросов подряд без новых объявлений — проверьте выдачу", zero_streak
+            )
 
+        details_round = 0
         for item in result.items[:details]:
             try:
                 if fetch_detail(client, store, item):
                     total.details_saved += 1
+                    details_round += 1
                 else:
                     total.details_skipped += 1
             except (FetchError, ParseError) as exc:
@@ -208,7 +262,39 @@ def watch(
                 log.warning("карточка %s: %s", item.id, exc)
 
         spent = time.monotonic() - round_started
-        time.sleep(max(0.0, interval - spent))
+        pause_left = max(0.0, interval - spent)
+        next_poll_at = datetime.now(UTC).timestamp() + pause_left
+        total.seconds = round(time.monotonic() - started, 2)
+
+        wire_round = client.stats.wire_bytes - last_wire
+        last_wire = client.stats.wire_bytes
+        store.append_poll(
+            {
+                "at": last_poll_at,
+                "new": last_new,
+                "details": details_round,
+                "errors": result.stats.errors,
+                "seconds": round(spent, 2),
+                "items": result.stats.items,
+                "wire_bytes": wire_round,
+            }
+        )
+        store.write_heartbeat(
+            {
+                "status": "running",
+                "mode": "watch",
+                "round": rounds,
+                "interval": interval,
+                "last_poll_at": last_poll_at,
+                "last_new": last_new,
+                "next_poll_at": datetime.fromtimestamp(
+                    next_poll_at, tz=UTC
+                ).isoformat(),
+                "totals": _totals(total),
+                "client": client.stats.as_dict(),
+            }
+        )
+        time.sleep(pause_left)
 
     total.seconds = round(time.monotonic() - started, 2)
     summary = {
@@ -220,4 +306,24 @@ def watch(
         "storage": store.stats(),
     }
     store.write_run(summary)
+    store.write_heartbeat(
+        {
+            "status": "paused" if load_control(store.control_path).paused else "idle",
+            "mode": "watch",
+            "round": rounds,
+            "finished_at": datetime.now(UTC).isoformat(),
+            "totals": _totals(total),
+            "client": client.stats.as_dict(),
+        }
+    )
     return summary
+
+
+def _totals(stats: RunStats) -> dict[str, Any]:
+    return {
+        "polls": stats.pages,
+        "items": stats.items,
+        "new_ids": stats.new_ids,
+        "details_saved": stats.details_saved,
+        "errors": stats.errors,
+    }

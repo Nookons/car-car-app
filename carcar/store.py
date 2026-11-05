@@ -47,6 +47,9 @@ class Store:
         self.discovered_path = self.base / "discovered.ndjson"
         self.state_dir = self.root / "state"
         self.seen_path = self.state_dir / f"{self.source}_seen.txt"
+        self.heartbeat_path = self.state_dir / "heartbeat.json"
+        self.polls_path = self.state_dir / "polls.ndjson"
+        self.control_path = self.state_dir / "control.json"
         self.runs_dir = self.root / "runs"
         for path in (self.listings_dir, self.state_dir, self.runs_dir):
             path.mkdir(parents=True, exist_ok=True)
@@ -138,6 +141,65 @@ class Store:
             os.fsync(handle.fileno())
         seen.update(fresh)
         return len(fresh)
+
+    # -- «жив ли сборщик» --------------------------------------------------
+    def write_heartbeat(self, payload: dict[str, Any]) -> None:
+        """Отметка «я работаю» + метрики. Дашборд читает её и показывает статус."""
+        data = dict(payload)
+        data.setdefault("ts", utcnow().isoformat())
+        self._atomic_write(
+            self.heartbeat_path, json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+        )
+
+    def read_heartbeat(self) -> dict[str, Any] | None:
+        if not self.heartbeat_path.exists():
+            return None
+        try:
+            return json.loads(self.heartbeat_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return None
+
+    def append_poll(self, row: dict[str, Any]) -> None:
+        """Журнал опросов для графика. Ограничен, чтобы не расти бесконечно."""
+        item = dict(row)
+        item.setdefault("at", utcnow().isoformat())
+        with self.polls_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(item, ensure_ascii=False, separators=(",", ":")) + "\n")
+            handle.flush()
+        if self.polls_path.stat().st_size > 512_000:
+            self._trim_polls(keep=500)
+
+    def _trim_polls(self, keep: int) -> None:
+        rows = self.read_polls(limit=10_000)[-keep:]
+        text = "".join(
+            json.dumps(r, ensure_ascii=False, separators=(",", ":")) + "\n" for r in rows
+        )
+        self._atomic_write(self.polls_path, text)
+
+    def read_polls(self, limit: int = 200) -> list[dict[str, Any]]:
+        if not self.polls_path.exists():
+            return []
+        rows: list[dict[str, Any]] = []
+        for line in self.polls_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+        return rows[-limit:]
+
+    def recent_runs(self, limit: int = 5) -> list[dict[str, Any]]:
+        if not self.runs_dir.exists():
+            return []
+        files = sorted(self.runs_dir.glob("*.json"), reverse=True)[:limit]
+        runs = []
+        for path in files:
+            try:
+                runs.append(json.loads(path.read_text(encoding="utf-8")))
+            except (json.JSONDecodeError, OSError):
+                continue
+        return runs
 
     # -- чтение ------------------------------------------------------------
     def iter_discovered(self) -> Iterator[dict[str, Any]]:
