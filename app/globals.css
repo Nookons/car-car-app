@@ -27,6 +27,7 @@
   * { @apply border-border; }
   html, body { @apply bg-background text-foreground; }
   html { height: 100%; }
+  :root { --tg-safe-top: 0px; --tg-safe-bottom: 0px; }
   body {
     @apply antialiased;
     -webkit-tap-highlight-color: transparent;
@@ -35,7 +36,12 @@
   }
 }
 
-.safe-bottom { padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)); }
+.safe-bottom { padding-bottom: calc(0.5rem + var(--tg-safe-bottom, 0px)); }
+
+/* Fullscreen: Telegram рисует свою шапку поверх контента */
+header.sticky {
+  padding-top: calc(0.75rem + var(--tg-safe-top, 0px));
+}
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

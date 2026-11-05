@@ -9,6 +9,8 @@ type TelegramWebApp = {
   setBackgroundColor?: (color: string) => void;
   onEvent?: (event: string, cb: () => void) => void;
   viewportStableHeight?: number;
+  safeAreaInset?: { top: number; bottom: number; left: number; right: number };
+  contentSafeAreaInset?: { top: number; bottom: number; left: number; right: number };
   BackButton?: { show: () => void; hide: () => void; onClick: (cb: () => void) => void };
   themeParams?: Record<string, string>;
 };
@@ -43,12 +45,21 @@ export function initTelegram(): void {
   tg.expand?.();
   tg.disableVerticalSwipes?.();
 
-  // В fullscreen высота приходит из события — держим её в CSS-переменной.
-  const syncHeight = () => {
+  // В fullscreen высота и безопасные зоны приходят событиями — держим их в CSS.
+  const syncLayout = () => {
+    const root = document.documentElement;
     const height = tg.viewportStableHeight;
-    if (height) document.documentElement.style.setProperty("--tg-vh", `${height}px`);
+    if (height) root.style.setProperty("--tg-vh", `${height}px`);
+
+    const safe = tg.safeAreaInset ?? { top: 0, bottom: 0 };
+    const content = tg.contentSafeAreaInset ?? { top: 0, bottom: 0 };
+    // системная шапка Telegram рисуется поверх webview — отступаем на её высоту
+    root.style.setProperty("--tg-safe-top", `${(safe.top ?? 0) + (content.top ?? 0)}px`);
+    root.style.setProperty("--tg-safe-bottom", `${(safe.bottom ?? 0) + (content.bottom ?? 0)}px`);
   };
-  tg.onEvent?.("viewportChanged", syncHeight);
-  tg.onEvent?.("fullscreenChanged", syncHeight);
-  syncHeight();
+  tg.onEvent?.("viewportChanged", syncLayout);
+  tg.onEvent?.("fullscreenChanged", syncLayout);
+  tg.onEvent?.("safeAreaChanged", syncLayout);
+  tg.onEvent?.("contentSafeAreaChanged", syncLayout);
+  syncLayout();
 }
