@@ -14,8 +14,10 @@
 |---|---|
 | [`docs/PLAN.md`](docs/PLAN.md) | продукт, границы MVP, архитектура, стек, модель данных, план по фазам, риски, открытые вопросы |
 | [`docs/SOURCES.md`](docs/SOURCES.md) | разведка площадок: что отдаётся, чем, объёмы, `robots.txt`, что делать с OLX/Allegro |
+| [`docs/LATENCY.md`](docs/LATENCY.md) | горячий путь «публикация → сообщение»: бюджет задержки, поллинг, двухфазная обработка, мониторинг |
 | [`db/schema.draft.sql`](db/schema.draft.sql) | черновик схемы PostgreSQL (объявления, кластеры авто, история цен, подписки, уведомления) |
 | [`scripts/probe_otomoto.py`](scripts/probe_otomoto.py) | пробный сборщик otomoto: выдача и карточка, только стандартная библиотека |
+| [`scripts/latency_probe2.py`](scripts/latency_probe2.py) | замер задержки публикации: поллинг выдачи, распределение «createdAt → увидели» |
 
 ## Быстрая проверка источника
 
@@ -33,10 +35,14 @@ python3 scripts/probe_otomoto.py --detail "https://www.otomoto.pl/osobowe/oferta
 
 - otomoto.pl: **257 382** объявления «osobowe», 32 на страницу, полный JSON
   уже в HTML — браузер и прокси не нужны.
+- Brotli: **182 КБ** вместо 1.76 МБ — частый поллинг дешёвый.
 - OLX и Allegro: **403** (CDN-защита) — нужен браузер/прокси или официальный API.
 - Полный обход otomoto: ~8 044 страницы, ~13.7 ГБ HTML, ~2.2 ч при 1 req/s.
+- Новые объявления появляются в выдаче с задержкой площадки ~1–1.5 мин
+  (замер), наш участок «увидели → отправили» — секунды.
 
-Подробности и цифры — в [`docs/SOURCES.md`](docs/SOURCES.md).
+Подробности и цифры — в [`docs/SOURCES.md`](docs/SOURCES.md) и
+[`docs/LATENCY.md`](docs/LATENCY.md).
 
 ## Следующий шаг
 
