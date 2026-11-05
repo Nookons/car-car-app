@@ -60,7 +60,8 @@ def _text(value: Any) -> str:
     return str(value).strip() if value else ""
 
 
-def _clean_html(value: str | None) -> str:
+def html_to_text(value: str | None) -> str:
+    """HTML описания → плоский текст (без тегов и лишних пробелов)."""
     if not value:
         return ""
     return WS_RE.sub(" ", TAG_RE.sub(" ", value)).strip()
@@ -240,7 +241,7 @@ def parse_offer(html: str, url: str = "") -> Offer:
         id=_text(advert.get("id")),
         url=url or _text(advert.get("url")),
         title=_text(advert.get("title")),
-        description=_clean_html(advert.get("description")),
+        description=html_to_text(advert.get("description")),
         price=_to_int(price),
         currency="PLN",
         details=details,

@@ -63,7 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_watch = sub.add_parser("watch", help="цикл опроса выдачи")
     _add_common(p_watch)
-    p_watch.add_argument("--interval", type=float, default=15.0, help="пауза между опросами, сек")
+    p_watch.add_argument("--interval", type=float, default=60.0, help="пауза между опросами, сек")
     p_watch.add_argument("--minutes", type=float, default=10.0, help="сколько работать, мин")
     p_watch.add_argument("--details", type=int, default=5)
 

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CarCar · объявление</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a class="logo" href="/" title="К сборщику">CC</a>
+      <div>
+        <h1 id="title">Объявление</h1>
+        <p class="muted" id="subtitle">—</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <a class="ghost link" href="/" data-i18n="back">← К дашборду</a>
+      <button class="ghost" id="lang">EN</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="banner hidden" id="banner"></section>
+
+    <section class="listing-page" id="card" hidden>
+      <article class="card gallery-card">
+        <div class="gallery-main" id="gallery-main"></div>
+        <div class="thumbs" id="thumbs"></div>
+        <div class="muted tiny" id="photo-count"></div>
+      </article>
+
+      <article class="card side">
+        <div class="price" id="price">—</div>
+        <h2 class="listing-title" id="listing-title">—</h2>
+        <div class="chips" id="chips"></div>
+        <p class="muted small" id="location"></p>
+        <p class="muted small" id="seller"></p>
+        <a class="primary link-btn" id="open-source" target="_blank" rel="noopener noreferrer" data-i18n="openSource">
+          Открыть на otomoto
+        </a>
+        <button class="primary" id="fetch" hidden>Загрузить карточку</button>
+        <p class="tiny muted" id="hint"></p>
+        <div class="kv" id="kv"></div>
+      </article>
+    </section>
+
+    <section class="card" id="description-card" hidden>
+      <div class="card-head"><h2 data-i18n="description">Описание</h2></div>
+      <p class="desc" id="description"></p>
+      <button class="ghost" id="more" hidden data-i18n="more">Показать полностью</button>
+    </section>
+  </main>
+
+  <footer class="muted tiny">
+    <span data-i18n="footer">Фото и данные — с otomoto.pl, ссылки ведут на оригинал.</span>
+  </footer>
+
+  <script src="/static/listing.js"></script>
+</body>
+</html>

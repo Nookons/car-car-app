@@ -168,7 +168,7 @@ def watch(
     store: Store,
     settings: Settings,
     *,
-    interval: float = 15.0,
+    interval: float = 60.0,
     minutes: float = 90.0,
     details: int = 10,
 ) -> dict[str, Any]:

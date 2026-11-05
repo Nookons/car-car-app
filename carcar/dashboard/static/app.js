@@ -13,6 +13,8 @@ const I18N = {
     reason: "Причина паузы",
     pauseHint:
       "Сборщик проверяет паузу перед каждым опросом — на площадку запросы перестают идти в пределах одного интервала.",
+    recentListings: "Последние объявления",
+    noListings: "Пока нет объявлений — запустите сборщик",
     recentPolls: "Последние опросы",
     runs: "Прогоны",
     time: "Время",
@@ -58,6 +60,8 @@ const I18N = {
     reason: "Pause reason",
     pauseHint:
       "The collector checks the pause flag before every poll — requests stop within one interval.",
+    recentListings: "Latest listings",
+    noListings: "No listings yet — start the collector",
     recentPolls: "Recent polls",
     runs: "Runs",
     time: "Time",
@@ -305,6 +309,63 @@ function renderControl(status) {
   }
 }
 
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[ch]));
+}
+
+function fmtPrice(value, currency = "PLN") {
+  if (!value) return "—";
+  return new Intl.NumberFormat("pl-PL", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function renderListings(items) {
+  const box = $("listings");
+  box.innerHTML = "";
+  if (!items.length) {
+    box.innerHTML = `<p class="muted small">${t("noListings")}</p>`;
+    return;
+  }
+  items.forEach((item) => {
+    const meta = [
+      item.year,
+      item.mileage_km ? `${fmtInt(item.mileage_km)} km` : null,
+      item.city,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    const link = document.createElement("a");
+    link.className = "listing-card";
+    link.href = `/listing/${encodeURIComponent(item.id)}`;
+    link.innerHTML = `
+      <div class="thumb">${
+        item.thumbnail ? `<img loading="lazy" src="${esc(item.thumbnail)}" alt="" referrerpolicy="no-referrer">` : ""
+      }</div>
+      <div class="lc-body">
+        <div class="lc-title">${esc(item.title || "—")}</div>
+        <div class="lc-price">${fmtPrice(item.price, item.currency)}</div>
+        <div class="lc-meta">${esc(meta)}</div>
+      </div>`;
+    box.appendChild(link);
+  });
+}
+
+async function loadListings() {
+  try {
+    const response = await fetch("/api/listings?limit=8", { cache: "no-store" });
+    if (!response.ok) return;
+    const data = await response.json();
+    renderListings(data.items || []);
+  } catch {
+    /* карточки не критичны для статуса */
+  }
+}
+
 function render(status) {
   current = status;
   renderState(status);
@@ -313,6 +374,7 @@ function render(status) {
   renderPolls(status.polls || []);
   renderRuns(status.runs || []);
   renderControl(status);
+  loadListings();
 }
 
 async function load() {

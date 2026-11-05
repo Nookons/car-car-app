@@ -39,6 +39,7 @@ class Store:
     root: Path = field(default_factory=lambda: Path("data"))
     source: str = "otomoto"
     _seen: set[str] | None = field(default=None, repr=False)
+    _disc_cache: tuple[float, list[dict[str, Any]]] | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         self.root = Path(self.root)
@@ -211,11 +212,60 @@ class Store:
             if line.strip()
         )
 
+    def read_discovered(self) -> list[dict[str, Any]]:
+        """Все строки выдачи с кэшем по mtime — дашборд читает их часто."""
+        if not self.discovered_path.exists():
+            return []
+        mtime = self.discovered_path.stat().st_mtime
+        if self._disc_cache and self._disc_cache[0] == mtime:
+            return self._disc_cache[1]
+        rows: list[dict[str, Any]] = []
+        for line in self.discovered_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+        self._disc_cache = (mtime, rows)
+        return rows
+
+    def recent_listings(self, limit: int = 24) -> list[dict[str, Any]]:
+        """Последние увиденные объявления, без дублей, свежие сверху."""
+        latest: dict[str, dict[str, Any]] = {}
+        for row in self.read_discovered():
+            if row.get("id"):
+                latest[row["id"]] = row
+        items = list(latest.values())
+        return items[-limit:][::-1]
+
     def find_listing(self, listing_id: str) -> dict[str, Any] | None:
-        for row in self.iter_discovered():
+        for row in reversed(self.read_discovered()):
             if row.get("id") == listing_id:
                 return row
         return None
+
+    # -- карточки ----------------------------------------------------------
+    def find_detail_file(self, listing_id: str) -> Path | None:
+        """Файл карточки по id. id — только цифры (защита от path traversal)."""
+        if not listing_id.isdigit() or not self.listings_dir.exists():
+            return None
+        for day in sorted(self.listings_dir.iterdir(), reverse=True):
+            if not day.is_dir():
+                continue
+            candidate = day / f"{listing_id}.json"
+            if candidate.exists():
+                return candidate
+        return None
+
+    def load_detail(self, listing_id: str) -> dict[str, Any] | None:
+        path = self.find_detail_file(listing_id)
+        if not path:
+            return None
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return None
 
     def stats(self) -> dict[str, Any]:
         files = list(self.listings_dir.rglob("*.json"))
