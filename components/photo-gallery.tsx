@@ -110,7 +110,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
 
       {open ? (
         <div
-          className="fixed inset-0 z-[60] flex flex-col bg-black/95"
+          className="fixed inset-0 z-[60] flex flex-col bg-black"
           onClick={() => setOpen(false)}
           onTouchStart={(event) => {
             touchStart.current = event.touches[0].clientX;
