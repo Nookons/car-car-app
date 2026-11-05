@@ -365,7 +365,7 @@ class MiniAppRepo:
                 from ..parse import parse_offer
 
                 client = Client(Settings())
-                offer = parse_offer(client.get(row["url"]), row["url"])
+                offer = parse_offer(client.get(row["url"]).text, row["url"])
                 text = (offer.description or "").strip()[:2000]
                 if text:
                     self.set_description(listing_id, text)
