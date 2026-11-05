@@ -38,6 +38,7 @@ class RunStats:
     items: int = 0
     new_ids: int = 0
     updated: int = 0
+    unchanged: int = 0
     rejected: int = 0
     details_saved: int = 0
     details_skipped: int = 0
@@ -92,6 +93,7 @@ def discover(
             fresh = result.new_items
             stats.new_ids += result.inserted
             stats.updated += result.updated
+            stats.unchanged += result.unchanged
             stats.rejected += result.rejected
             known_ratio = 1 - result.inserted / max(len(parsed.items), 1)
             tail = f" | обновлено {result.updated}" if result.updated else ""
@@ -310,6 +312,7 @@ def watch(
         total.items += result.stats.items
         total.new_ids += result.stats.new_ids
         total.updated += result.stats.updated
+        total.unchanged += result.stats.unchanged
         total.rejected += result.stats.rejected
         total.errors += result.stats.errors
         last_new = result.stats.new_ids
@@ -407,6 +410,7 @@ def _db_result(stats: RunStats) -> Any:
     return UpsertResult(
         inserted=stats.new_ids,
         updated=stats.updated,
+        unchanged=stats.unchanged,
         rejected=stats.rejected,
     )
 
@@ -417,6 +421,7 @@ def _totals(stats: RunStats) -> dict[str, Any]:
         "items": stats.items,
         "new_ids": stats.new_ids,
         "updated": stats.updated,
+        "unchanged": stats.unchanged,
         "rejected": stats.rejected,
         "details_saved": stats.details_saved,
         "errors": stats.errors,
