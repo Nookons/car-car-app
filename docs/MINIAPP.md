@@ -40,7 +40,7 @@ Next.js на Vercel ──► FastAPI (Railway) ──► Supabase Postgres
 |---|---|
 | `NEXT_PUBLIC_API_URL` | `https://<api>.up.railway.app` |
 
-Root Directory проекта — `web`, Framework — Next.js.
+Root Directory на Vercel — корень репозитория (Next.js лежит в корне, рядом с Python-бэкендом). Framework — Next.js.
 
 ### Railway (API)
 
@@ -70,7 +70,6 @@ Root Directory проекта — `web`, Framework — Next.js.
 .venv/bin/python -m carcar miniapp --port 8080
 
 # фронт
-cd web
 pnpm install
 NEXT_PUBLIC_API_URL=http://127.0.0.1:8080 pnpm dev   # http://localhost:3000
 ```
@@ -81,11 +80,11 @@ NEXT_PUBLIC_API_URL=http://127.0.0.1:8080 pnpm dev   # http://localhost:3000
 ## Сборка
 
 ```bash
-cd web && pnpm build && pnpm start
+pnpm build && pnpm start
 ```
 
 На этом Mac нативный SWC не загружается из-за проверки подписи (Team ID),
-поэтому в `web` включены `@next/swc-wasm-nodejs` и `node-linker=hoisted`
+поэтому в репозитории включены `@next/swc-wasm-nodejs` и `node-linker=hoisted`
 (`.npmrc`). На Vercel это не нужно — там обычный linux-бинарь.
 
 ## API-контракт

@@ -1,4 +1,8 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8080";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === "production"
+    ? "https://api-production-5bee.up.railway.app"
+    : "http://127.0.0.1:8080");
 
 export class ApiError extends Error {
   status: number;
