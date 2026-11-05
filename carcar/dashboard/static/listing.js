@@ -39,6 +39,20 @@ const I18N = {
       "Пока видны только данные выдачи. Нажмите «Загрузить карточку», чтобы получить фото, описание и полные характеристики.",
     loadedAt: "Карточка сохранена",
     away: "от вас",
+    fuel: {
+      petrol: "Бензин", diesel: "Дизель", hybrid: "Гибрид",
+      plugin_hybrid: "Гибрид plug-in", electric: "Электро",
+      lpg: "Газ (LPG)", cng: "CNG", other: "Другое",
+    },
+    gearbox: {
+      manual: "Механика", automatic: "Автоматическая",
+      semi_auto: "Полуавтомат", other: "Другое",
+    },
+    bodyNames: {
+      sedan: "Седан", hatchback: "Хэтчбек", wagon: "Универсал", suv: "Кроссовер",
+      coupe: "Купе", convertible: "Кабриолет", minivan: "Минивэн",
+      pickup: "Пикап", van: "Фургон",
+    },
   },
   en: {
     title: "Listing",
@@ -78,6 +92,20 @@ const I18N = {
       "Only feed data is available. Press “Load full card” to fetch photos, description and all specs.",
     loadedAt: "Card saved",
     away: "away",
+    fuel: {
+      petrol: "Petrol", diesel: "Diesel", hybrid: "Hybrid",
+      plugin_hybrid: "Plug-in hybrid", electric: "Electric",
+      lpg: "LPG", cng: "CNG", other: "Other",
+    },
+    gearbox: {
+      manual: "Manual", automatic: "Automatic",
+      semi_auto: "Semi-auto", other: "Other",
+    },
+    bodyNames: {
+      sedan: "Sedan", hatchback: "Hatchback", wagon: "Wagon", suv: "SUV",
+      coupe: "Coupe", convertible: "Convertible", minivan: "Minivan",
+      pickup: "Pickup", van: "Van",
+    },
   },
 };
 
@@ -131,6 +159,18 @@ function haversine(lat1, lon1, lat2, lon2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+function labelFuel(value) {
+  return (value && I18N[lang].fuel[value]) || value || "";
+}
+
+function labelGearbox(value) {
+  return (value && I18N[lang].gearbox[value]) || value || "";
+}
+
+function labelBody(value) {
+  return (value && I18N[lang].bodyNames[value]) || value || "";
+}
+
 function listingId() {
   const parts = location.pathname.split("/").filter(Boolean);
   return parts[parts.length - 1] || "";
@@ -149,8 +189,8 @@ function chips() {
   const parts = [];
   if (card.year) parts.push(card.year);
   if (card.mileage_km) parts.push(`${fmtInt(card.mileage_km)} km`);
-  if (card.fuel) parts.push(card.fuel);
-  if (card.gearbox) parts.push(card.gearbox);
+  if (card.fuel) parts.push(labelFuel(card.fuel));
+  if (card.gearbox) parts.push(labelGearbox(card.gearbox));
   if (card.power_hp) parts.push(`${card.power_hp} KM`);
   if (card.engine_cm3) parts.push(`${fmtInt(card.engine_cm3)} cm³`);
   return parts.map((p) => `<span class="chip">${esc(p)}</span>`).join("");
@@ -161,11 +201,11 @@ function kvRows() {
   const rows = [
     [s.year, card.year],
     [s.mileage, card.mileage_km ? `${fmtInt(card.mileage_km)} km` : null],
-    [s.fuel, card.fuel],
-    [s.gearbox, card.gearbox],
+    [s.fuel, labelFuel(card.fuel)],
+    [s.gearbox, labelGearbox(card.gearbox)],
     [s.engine, card.engine_cm3 ? `${fmtInt(card.engine_cm3)} cm³` : null],
     [s.power, card.power_hp ? `${card.power_hp} KM` : null],
-    [s.body, card.body],
+    [s.body, labelBody(card.body)],
     [s.color, card.color],
     [s.vin, card.vin],
     [s.origin, card.country_origin],

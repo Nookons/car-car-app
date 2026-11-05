@@ -75,6 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_dash.add_argument("--data", type=Path, default=Path("data"))
     p_dash.add_argument("--host", default="127.0.0.1", help="по умолчанию только локально")
     p_dash.add_argument("--port", type=int, default=8077)
+    p_dash.add_argument("--file", action="store_true", help="читать файлы, а не базу")
 
     p_pause = sub.add_parser("pause", help="поставить сбор на паузу")
     p_pause.add_argument("--data", type=Path, default=Path("data"))
@@ -133,8 +134,10 @@ def _run_dashboard(args: argparse.Namespace) -> int:
 
     from .dashboard.app import create_app
 
-    app = create_app(root=args.data)
-    print(f"дашборд: http://{args.host}:{args.port}  (Ctrl+C — остановить)")
+    url = None if getattr(args, "file", False) else database_url()
+    app = create_app(root=args.data, use_db=bool(url), db_url=url)
+    source = "база" if url else "файлы"
+    print(f"дашборд: http://{args.host}:{args.port}  (данные: {source})")
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     return 0
 

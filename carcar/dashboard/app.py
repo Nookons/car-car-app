@@ -1,12 +1,11 @@
 """Дашборд сборщика: статус, пауза и карточки объявлений.
 
-Сборщик и дашборд — разные процессы, связанные файлами:
-  * `heartbeat.json` пишет сборщик, читает дашборд → статус и метрики;
-  * `control.json` пишет дашборд (или CLI), читает сборщик → пауза.
+Данные объявлений читаются из Postgres (Supabase) через `DatabaseRepo`.
+Файловое хранилище остаётся офлайн-режимом (`--file`) и для служебного
+состояния: heartbeat, журнал опросов, пауза.
 
-Карточка объявления собирается из уже сохранённых данных. Если карточка
-ещё не скачана (сборщик качает только N карточек на опрос), её можно догрузить
-кнопкой — дашборд сходит на площадку один раз и сохранит JSON.
+Если карточка ещё не обогащена (нет фото/VIN), её можно догрузить кнопкой —
+дашборд сходит на площадку и запишет фото в базу.
 """
 
 from __future__ import annotations
@@ -26,10 +25,12 @@ from pydantic import BaseModel, Field
 from ..client import BlockedError, Client, FetchError
 from ..config import Settings
 from ..control import load_control, save_control
+from ..db import DatabaseSink, database_url
 from ..geo import distance_km, get_geo
 from ..parse import Listing, ParseError, html_to_text
 from ..runner import fetch_detail
 from ..store import Store
+from .repo import DatabaseRepo
 
 STATIC = Path(__file__).parent / "static"
 STATS_TTL = 10.0
@@ -62,13 +63,12 @@ def _to_int(value: Any) -> int | None:
 
 
 def _pick(details: dict[str, str], row: dict[str, Any], key: str) -> Any:
-    """Значение из деталей карточки, иначе из строки выдачи."""
     value = details.get(key)
     return value if value else row.get(key)
 
 
 def build_card(store: Store, listing_id: str) -> dict[str, Any] | None:
-    """Объединённая карточка: сохранённый advert + строка выдачи."""
+    """Карточка из файлов (офлайн-режим)."""
     row = store.find_listing(listing_id) or {}
     envelope = store.load_detail(listing_id)
     advert = (envelope or {}).get("data") or {}
@@ -105,7 +105,6 @@ def build_card(store: Store, listing_id: str) -> dict[str, Any] | None:
         or ""
     )
 
-    # Координаты: точные из карточки, иначе из строки выдачи, иначе по городу.
     map_info = seller_location.get("map") or {}
     lat = map_info.get("latitude")
     lon = map_info.get("longitude")
@@ -154,6 +153,7 @@ def build_card(store: Store, listing_id: str) -> dict[str, Any] | None:
         "lon": lon,
         "geo_source": geo_source,
         "address": seller_location.get("address") or "",
+        "events": [],
     }
 
 
@@ -163,9 +163,18 @@ def create_app(
     *,
     rps: float = 1.0,
     client_factory: Callable[[Settings], Client] | None = None,
+    use_db: bool = False,
+    db_url: str | None = None,
 ) -> FastAPI:
     store = Store(root=Path(root), source=source)
     cache: dict[str, tuple[float, dict]] = {}
+    repo: DatabaseRepo | None = None
+    if use_db:
+        url = db_url or database_url()
+        if not url:
+            raise RuntimeError("use_db=True, но DATABASE_URL не задан")
+        repo = DatabaseRepo(url)
+        db_url = url
 
     app = FastAPI(title="CarCar dashboard", docs_url=None, redoc_url=None)
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
@@ -187,7 +196,7 @@ def create_app(
         cached = cache.get("storage")
         if cached and now - cached[0] < STATS_TTL:
             return cached[1]
-        data = store.stats()
+        data = repo.stats() if repo is not None else store.stats() | {"mode": "files"}
         cache["storage"] = (now, data)
         return data
 
@@ -207,7 +216,6 @@ def create_app(
 
         state = "never"
         if control.paused:
-            # Намерение пользователя важнее того, что успел записать сборщик.
             state = "paused"
         elif heartbeat:
             if age is not None and age <= stale_after:
@@ -234,12 +242,14 @@ def create_app(
         lon: float | None = None,
         radius_km: float | None = None,
     ) -> dict:
-        """Последние объявления; с lat/lon — с расстоянием и фильтром по радиусу."""
         limit = max(1, min(limit, 24))
+        if repo is not None:
+            items = repo.recent(limit, lat=lat, lon=lon, radius_km=radius_km)
+            return {"items": items, "total": len(items), "filtered": lat is not None}
+
         geo = get_geo()
         nearby = lat is not None and lon is not None
         rows = store.recent_listings(limit * 25 if nearby else limit)
-
         items = []
         for row in rows:
             item = dict(row)
@@ -254,7 +264,6 @@ def create_app(
                     distance_km(lat, lon, item["lat"], item["lon"]), 1
                 )
             items.append(item)
-
         if nearby:
             if radius_km and radius_km > 0:
                 limit_km = max(1.0, min(radius_km, 1000.0))
@@ -264,12 +273,11 @@ def create_app(
                     if i.get("distance_km") is not None and i["distance_km"] <= limit_km
                 ]
             items.sort(key=lambda i: i.get("distance_km", 1e9))
-
         return {"items": items[:limit], "total": len(items), "filtered": nearby}
 
     @app.get("/api/listings/{listing_id}")
     def listing_card(listing_id: str) -> dict:
-        card = build_card(store, listing_id)
+        card = repo.get(listing_id) if repo is not None else build_card(store, listing_id)
         if not card:
             raise HTTPException(status_code=404, detail="объявление не найдено")
         return card
@@ -278,6 +286,43 @@ def create_app(
     def fetch_card(listing_id: str) -> dict:
         if not listing_id.isdigit():
             raise HTTPException(status_code=400, detail="id должен быть числом")
+
+        if repo is not None:
+            row = repo.get(listing_id)
+            if not row:
+                raise HTTPException(status_code=404, detail="объявление не найдено")
+            if row.get("has_detail"):
+                return {"ok": True, "saved": False, "already": True}
+            listing = Listing(
+                id=listing_id,
+                url=row["url"],
+                title=row.get("title") or "",
+                created_at="",
+                price=row.get("price") or 0,
+                currency=row.get("currency") or "PLN",
+                make="",
+                model="",
+                year=None,
+                mileage_km=None,
+                fuel="",
+                gearbox="",
+                engine_cm3=None,
+                power_hp=None,
+                city="",
+                region="",
+                seller_type="",
+                thumbnail="",
+            )
+            try:
+                assert db_url is not None
+                with DatabaseSink(db_url) as sink, make_client() as client:
+                    saved = fetch_detail(client, store, listing, sink=sink)
+            except BlockedError as exc:
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            except (FetchError, ParseError) as exc:
+                raise HTTPException(status_code=502, detail=str(exc)) from exc
+            return {"ok": True, "saved": bool(saved)}
+
         row = store.find_listing(listing_id)
         if not row:
             raise HTTPException(status_code=404, detail="объявление не найдено в выдаче")

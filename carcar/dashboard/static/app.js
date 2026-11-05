@@ -6,6 +6,7 @@ const I18N = {
     polls: "Опросов",
     newListings: "Новых объявлений",
     details: "Карточек в папке",
+    inDb: "Объявлений в базе",
     errors: "Ошибок",
     perSession: "за сессию",
     chart: "Новые объявления по опросам",
@@ -59,6 +60,7 @@ const I18N = {
     polls: "Polls",
     newListings: "New listings",
     details: "Cached details",
+    inDb: "Listings in DB",
     errors: "Errors",
     perSession: "this session",
     chart: "New listings per poll",
@@ -241,8 +243,13 @@ function renderKpi(status) {
 
   $("kpi-polls").textContent = fmtInt(totals.polls);
   $("kpi-new").textContent = fmtInt(totals.new_ids);
-  $("kpi-details").textContent = fmtInt(storage.detail_files);
-  $("kpi-details-size").textContent = fmtMb(storage.detail_bytes);
+  const isDb = storage.mode === "db";
+  $("kpi-details").textContent = fmtInt(
+    isDb ? storage.listings : storage.detail_files,
+  );
+  $("kpi-details-size").textContent = isDb ? storage.size : fmtMb(storage.detail_bytes);
+  const detailsLabel = document.querySelector('[data-i18n="details"]');
+  if (detailsLabel) detailsLabel.textContent = isDb ? t("inDb") : t("details");
   $("kpi-errors").textContent = fmtInt(totals.errors);
   $("kpi-errors").closest(".kpi").classList.toggle("negative", (totals.errors || 0) > 0);
   $("kpi-traffic").textContent = client.wire_bytes
