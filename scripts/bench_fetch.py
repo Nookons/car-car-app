@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from carcar.client import Client  # noqa: E402
 from carcar.config import Settings  # noqa: E402
-from carcar.parse import extract_next_data, parse_search  # noqa: E402
+from carcar.parse import parse_search  # noqa: E402
 
 UA = Settings().user_agent
 
