@@ -100,6 +100,10 @@ create index if not exists listing_geo_idx
 create index if not exists listing_last_seen_idx
     on listing (last_seen_at) where status = 'active';
 
+-- Для графиков «сколько собрано за день/месяц»
+create index if not exists listing_first_seen_idx
+    on listing (first_seen_at);
+
 -- ---------------------------------------------------------------------------
 -- История: только изменения, а не каждый опрос
 -- ---------------------------------------------------------------------------

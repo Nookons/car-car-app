@@ -89,3 +89,9 @@ def test_watch_does_not_fetch_when_paused(tmp_path):
     assert calls["n"] == 0
     assert summary["new_ids"] == 0
     assert store.read_heartbeat()["status"] == "paused"
+
+
+def test_metrics_available_false_in_file_mode(client):
+    data = client.get("/api/metrics").json()
+    assert data["available"] is False
+    assert data["by_source"] == []

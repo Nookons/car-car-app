@@ -274,3 +274,10 @@ a.primary.link-btn:hover { background: #1f2937; }
   color: var(--text);
   cursor: pointer;
 }
+
+
+/* Метрики и графики */
+.charts { grid-template-columns: 1.6fr 1fr; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+@media (max-width: 860px) { .charts { grid-template-columns: 1fr; } }

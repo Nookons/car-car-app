@@ -1,41 +1,45 @@
 """Чтение данных для дашборда из Postgres (Supabase).
 
-Дашборд работает поверх канонической схемы: `listing` + `source` + `listing_event`.
-Файловое хранилище остаётся офлайн-режимом (`--file`).
+Мультиплатформенность: все запросы идут через `source`, поэтому дашборд
+одинаково показывает otomoto, OLX и любую следующую площадку.
 """
 
 from __future__ import annotations
 
 import math
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 DISTANCE_SQL = """
 6371 * 2 * asin(least(1.0, sqrt(
-    power(sin(radians(lat - %(lat)s) / 2), 2) +
-    cos(radians(%(lat)s)) * cos(radians(lat)) *
-    power(sin(radians(lon - %(lon)s) / 2), 2)
+    power(sin(radians(l.lat - %(lat)s) / 2), 2) +
+    cos(radians(%(lat)s)) * cos(radians(l.lat)) *
+    power(sin(radians(l.lon - %(lon)s) / 2), 2)
 )))
 """
 
 FIELDS = """
-    external_id, url, title, price, currency, make, model, year, mileage_km,
-    fuel, gearbox, body, power_hp, engine_cm3, color, vin, city, region,
-    lat, lon, seller_type, seller_name, thumb_url, photos, photos_count,
-    published_at, first_seen_at, last_seen_at, updated_at, status
+    l.id, l.external_id, l.url, l.title, l.price, l.currency, l.make, l.model,
+    l.year, l.mileage_km, l.fuel, l.gearbox, l.body, l.power_hp, l.engine_cm3,
+    l.color, l.vin, l.city, l.region, l.lat, l.lon, l.seller_type, l.seller_name,
+    l.thumb_url, l.photos, l.photos_count, l.published_at, l.first_seen_at,
+    l.last_seen_at, l.updated_at, l.status
 """
 
 
 def _num(value: Any) -> int | None:
-    if value is None:
-        return None
-    return int(value)
+    return None if value is None else int(value)
+
+
+def _iso(value: Any) -> str | None:
+    return value.isoformat() if isinstance(value, datetime) else value
 
 
 def _item(row: dict[str, Any]) -> dict[str, Any]:
-    published = row.get("published_at")
     return {
-        "id": row["external_id"],
+        "id": row["id"],
+        "external_id": row["external_id"],
+        "source": row.get("source_code"),
         "title": row["title"],
         "price": _num(row.get("price")),
         "currency": (row.get("currency") or "PLN").strip(),
@@ -45,9 +49,6 @@ def _item(row: dict[str, Any]) -> dict[str, Any]:
         "mileage_km": row.get("mileage_km"),
         "fuel": row.get("fuel"),
         "gearbox": row.get("gearbox"),
-        "body": row.get("body"),
-        "power_hp": row.get("power_hp"),
-        "engine_cm3": row.get("engine_cm3"),
         "city": row.get("city"),
         "region": row.get("region"),
         "lat": row.get("lat"),
@@ -56,7 +57,7 @@ def _item(row: dict[str, Any]) -> dict[str, Any]:
         "thumbnail": row.get("thumb_url"),
         "photos_count": row.get("photos_count") or 0,
         "has_detail": (row.get("photos_count") or 0) > 0,
-        "published_at": published.isoformat() if isinstance(published, datetime) else published,
+        "published_at": _iso(row.get("published_at")),
         "distance_km": round(row["distance_km"], 1)
         if row.get("distance_km") is not None
         else None,
@@ -65,6 +66,7 @@ def _item(row: dict[str, Any]) -> dict[str, Any]:
 
 class DatabaseRepo:
     def __init__(self, url: str) -> None:
+        from psycopg.rows import dict_row
         from psycopg_pool import ConnectionPool
 
         if "ljkugtpeboomboobodom" in url.lower():
@@ -74,7 +76,7 @@ class DatabaseRepo:
             min_size=1,
             max_size=4,
             open=True,
-            kwargs={"connect_timeout": 10, "row_factory": _dict_row()},
+            kwargs={"connect_timeout": 10, "row_factory": dict_row},
         )
 
     def close(self) -> None:
@@ -88,16 +90,20 @@ class DatabaseRepo:
         lat: float | None = None,
         lon: float | None = None,
         radius_km: float | None = None,
+        source: str | None = None,
     ) -> list[dict[str, Any]]:
-        conds = ["status = 'active'"]
+        conds = ["l.status = 'active'"]
         params: dict[str, Any] = {"limit": limit, "radius": radius_km}
-        distance = "null::float8 as distance_km"
+        distance = "null::float8"
+
+        if source:
+            conds.append("s.code = %(source)s")
+            params["source"] = source
 
         if lat is not None and lon is not None:
             params.update(lat=lat, lon=lon)
-            distance = f"({DISTANCE_SQL}) as distance_km"
+            distance = f"({DISTANCE_SQL})"
             if radius_km:
-                # bbox: отсекаем по индексу (lat, lon) до точного расчёта
                 dlat = radius_km / 111.0
                 dlon = radius_km / (111.0 * max(math.cos(math.radians(lat)), 0.05))
                 params.update(
@@ -107,15 +113,15 @@ class DatabaseRepo:
                     lon_max=lon + dlon,
                 )
                 conds.append(
-                    "lat between %(lat_min)s and %(lat_max)s "
-                    "and lon between %(lon_min)s and %(lon_max)s"
+                    "l.lat between %(lat_min)s and %(lat_max)s "
+                    "and l.lon between %(lon_min)s and %(lon_max)s"
                 )
 
         sql = f"""
             with base as (
-                select {FIELDS},
-                       {distance}
-                from listing
+                select {FIELDS}, s.code as source_code, {distance} as distance_km
+                from listing l
+                join source s on s.id = l.source_id
                 where {' and '.join(conds)}
             )
             select * from base
@@ -129,16 +135,19 @@ class DatabaseRepo:
         return [_item(row) for row in rows]
 
     # -- карточка ----------------------------------------------------------
-    def get(self, external_id: str, code: str = "otomoto") -> dict[str, Any] | None:
+    def get(self, listing_id: int | str) -> dict[str, Any] | None:
+        try:
+            key = int(listing_id)
+        except (TypeError, ValueError):
+            return None
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
                 f"""
                 select {FIELDS}, s.code as source_code
-                from listing l
-                join source s on s.id = l.source_id
-                where l.external_id = %s and s.code = %s
+                from listing l join source s on s.id = l.source_id
+                where l.id = %s
                 """,
-                (external_id, code),
+                (key,),
             )
             row = cur.fetchone()
             if not row:
@@ -146,31 +155,31 @@ class DatabaseRepo:
             cur.execute(
                 """
                 select kind, old_price, new_price, observed_at
-                from listing_event where listing_id = (
-                    select id from listing where external_id = %s
-                ) order by observed_at desc limit 10
+                from listing_event where listing_id = %s
+                order by observed_at desc limit 10
                 """,
-                (external_id,),
+                (key,),
             )
             events = [
                 {
                     "kind": e["kind"],
                     "old_price": _num(e["old_price"]),
                     "new_price": _num(e["new_price"]),
-                    "observed_at": e["observed_at"].isoformat(),
+                    "observed_at": _iso(e["observed_at"]),
                 }
                 for e in cur.fetchall()
             ]
         return self._card(row, events)
 
     def _card(self, row: dict[str, Any], events: list[dict[str, Any]]) -> dict[str, Any]:
-        photos = [p for p in (row.get("photos") or []) if p]
-        if not photos and row.get("thumb_url"):
-            photos = [row["thumb_url"]]
-        published = row.get("published_at")
-        updated = row.get("updated_at")
+        photos = [p for p in (row.get("photos") or []) if p] or (
+            [row["thumb_url"]] if row.get("thumb_url") else []
+        )
+        has_photos = (row.get("photos_count") or 0) > 0
         return {
-            "id": row["external_id"],
+            "id": row["id"],
+            "external_id": row["external_id"],
+            "source": row.get("source_code"),
             "url": row["url"],
             "title": row["title"],
             "price": _num(row.get("price")),
@@ -186,10 +195,10 @@ class DatabaseRepo:
             },
             "city": row.get("city") or "",
             "region": row.get("region") or "",
-            "created_at": published.isoformat() if isinstance(published, datetime) else published,
-            "updated_at": updated.isoformat() if isinstance(updated, datetime) else updated,
-            "has_detail": (row.get("photos_count") or 0) > 0,
-            "fetched_at": updated.isoformat() if isinstance(updated, datetime) else updated,
+            "created_at": _iso(row.get("published_at")),
+            "updated_at": _iso(row.get("updated_at")),
+            "has_detail": has_photos,
+            "fetched_at": _iso(row.get("updated_at")),
             "year": row.get("year"),
             "mileage_km": row.get("mileage_km"),
             "engine_cm3": row.get("engine_cm3"),
@@ -205,9 +214,127 @@ class DatabaseRepo:
             "address": "",
             "lat": row.get("lat"),
             "lon": row.get("lon"),
-            "geo_source": "advert" if photos and row.get("lat") is not None else "city",
+            "geo_source": "advert" if has_photos else "city",
             "events": events,
-            "source": row.get("source_code", "otomoto"),
+            "first_seen_at": _iso(row.get("first_seen_at")),
+            "last_seen_at": _iso(row.get("last_seen_at")),
+        }
+
+    # -- метрики -----------------------------------------------------------
+    def metrics(self, days: int = 30, months: int = 12) -> dict[str, Any]:
+        days = max(1, min(days, 365))
+        months = max(1, min(months, 36))
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select s.code as source,
+                       count(l.id) filter (where l.status = 'active') as active,
+                       count(l.id) as total,
+                       count(l.id) filter (
+                           where l.first_seen_at >= date_trunc('day', now())
+                       ) as today,
+                       count(l.id) filter (
+                           where l.first_seen_at >= now() - interval '7 days'
+                       ) as week,
+                       count(l.id) filter (
+                           where l.first_seen_at >= now() - interval '30 days'
+                       ) as month,
+                       percentile_cont(0.5) within group (order by l.price)
+                           filter (where l.status = 'active') as median_price,
+                       max(l.last_seen_at) as last_seen
+                from source s
+                left join listing l on l.source_id = s.id
+                group by s.code
+                order by s.code
+                """
+            )
+            by_source = [
+                {
+                    "source": r["source"],
+                    "active": int(r["active"] or 0),
+                    "total": int(r["total"] or 0),
+                    "today": int(r["today"] or 0),
+                    "week": int(r["week"] or 0),
+                    "month": int(r["month"] or 0),
+                    "median_price": _num(r["median_price"]),
+                    "last_seen": _iso(r["last_seen"]),
+                }
+                for r in cur.fetchall()
+            ]
+
+            cur.execute(
+                """
+                select to_char(d::date, 'YYYY-MM-DD') as day,
+                       s.code as source,
+                       count(l.id)::int as count
+                from generate_series(
+                        current_date - (%(days)s - 1) * interval '1 day',
+                        current_date, interval '1 day') d
+                cross join source s
+                left join listing l
+                       on l.source_id = s.id
+                      and l.first_seen_at >= d
+                      and l.first_seen_at < d + interval '1 day'
+                group by 1, 2
+                order by 1, 2
+                """,
+                {"days": days},
+            )
+            daily = [dict(r) for r in cur.fetchall()]
+
+            cur.execute(
+                """
+                select to_char(d, 'YYYY-MM') as month,
+                       s.code as source,
+                       count(l.id)::int as count
+                from generate_series(
+                        date_trunc('month', current_date)
+                            - (%(months)s - 1) * interval '1 month',
+                        date_trunc('month', current_date), interval '1 month') d
+                cross join source s
+                left join listing l
+                       on l.source_id = s.id
+                      and l.first_seen_at >= d
+                      and l.first_seen_at < d + interval '1 month'
+                group by 1, 2
+                order by 1, 2
+                """,
+                {"months": months},
+            )
+            monthly = [dict(r) for r in cur.fetchall()]
+
+            cur.execute(
+                """
+                select to_char(r.started_at::date, 'YYYY-MM-DD') as day,
+                       s.code as source,
+                       sum(r.pages)::int as pages,
+                       sum(r.inserted)::int as inserted,
+                       sum(r.errors)::int as errors
+                from crawl_run r
+                join source s on s.id = r.source_id
+                where r.started_at >= current_date - (%(days)s - 1) * interval '1 day'
+                group by 1, 2
+                order by 1, 2
+                """,
+                {"days": days},
+            )
+            runs = [dict(r) for r in cur.fetchall()]
+
+        totals = {
+            "today": sum(x["today"] for x in by_source),
+            "week": sum(x["week"] for x in by_source),
+            "month": sum(x["month"] for x in by_source),
+            "active": sum(x["active"] for x in by_source),
+            "sources": sum(1 for item in by_source if item["total"] > 0),
+        }
+        return {
+            "by_source": by_source,
+            "daily": daily,
+            "monthly": monthly,
+            "runs": runs,
+            "totals": totals,
+            "days": days,
+            "months": months,
         }
 
     # -- счётчики ----------------------------------------------------------
@@ -236,13 +363,3 @@ class DatabaseRepo:
             "detail_files": counts["total"],
             "detail_bytes": 0,
         }
-
-
-def _dict_row():  # noqa: ANN202
-    from psycopg.rows import dict_row
-
-    return dict_row
-
-
-def now_iso() -> str:
-    return datetime.now(UTC).isoformat()

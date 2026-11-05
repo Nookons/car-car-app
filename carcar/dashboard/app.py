@@ -167,6 +167,7 @@ def create_app(
     db_url: str | None = None,
 ) -> FastAPI:
     store = Store(root=Path(root), source=source)
+    source_code = source
     cache: dict[str, tuple[float, dict]] = {}
     repo: DatabaseRepo | None = None
     if use_db:
@@ -241,15 +242,21 @@ def create_app(
         lat: float | None = None,
         lon: float | None = None,
         radius_km: float | None = None,
+        source: str | None = None,
     ) -> dict:
         limit = max(1, min(limit, 24))
         if repo is not None:
-            items = repo.recent(limit, lat=lat, lon=lon, radius_km=radius_km)
+            items = repo.recent(
+                limit, lat=lat, lon=lon, radius_km=radius_km, source=source
+            )
             return {"items": items, "total": len(items), "filtered": lat is not None}
+
+        rows = [] if source and source != source_code else None
 
         geo = get_geo()
         nearby = lat is not None and lon is not None
-        rows = store.recent_listings(limit * 25 if nearby else limit)
+        if rows is None:
+            rows = store.recent_listings(limit * 25 if nearby else limit)
         items = []
         for row in rows:
             item = dict(row)
@@ -275,6 +282,12 @@ def create_app(
             items.sort(key=lambda i: i.get("distance_km", 1e9))
         return {"items": items[:limit], "total": len(items), "filtered": nearby}
 
+    @app.get("/api/metrics")
+    def metrics(days: int = 30, months: int = 12) -> dict:
+        if repo is None:
+            return {"available": False, "by_source": [], "daily": [], "monthly": [], "runs": []}
+        return {"available": True, **repo.metrics(days=days, months=months)}
+
     @app.get("/api/listings/{listing_id}")
     def listing_card(listing_id: str) -> dict:
         card = repo.get(listing_id) if repo is not None else build_card(store, listing_id)
@@ -294,7 +307,7 @@ def create_app(
             if row.get("has_detail"):
                 return {"ok": True, "saved": False, "already": True}
             listing = Listing(
-                id=listing_id,
+                id=row["external_id"],
                 url=row["url"],
                 title=row.get("title") or "",
                 created_at="",
@@ -316,7 +329,9 @@ def create_app(
             try:
                 assert db_url is not None
                 with DatabaseSink(db_url) as sink, make_client() as client:
-                    saved = fetch_detail(client, store, listing, sink=sink)
+                    saved = fetch_detail(
+                        client, store, listing, sink=sink, code=row.get("source") or "otomoto"
+                    )
             except BlockedError as exc:
                 raise HTTPException(status_code=503, detail=str(exc)) from exc
             except (FetchError, ParseError) as exc:

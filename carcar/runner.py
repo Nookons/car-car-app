@@ -145,6 +145,7 @@ def fetch_detail(
     fetched_at: datetime | None = None,
     refresh: bool = False,
     sink: DatabaseSink | None = None,
+    code: str = "otomoto",
 ) -> Path | str | None:
     """Карточка объявления: в БД — фото/VIN/точные координаты, иначе файл."""
     response = client.get(listing.url)
@@ -161,7 +162,7 @@ def fetch_detail(
             lon=map_info.get("longitude"),
             seller_name=offer.seller_name or None,
             seller_type=_seller_type(offer.seller_type),
-            code="otomoto",
+            code=code,
         )
         return "db" if changed else None
 

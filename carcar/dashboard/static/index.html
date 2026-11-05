@@ -47,6 +47,67 @@
       </article>
     </section>
 
+
+    <section class="cards">
+      <article class="card kpi">
+        <span class="label" data-i18n="today">Сегодня</span>
+        <strong id="kpi-today">—</strong>
+        <span class="hint" data-i18n="newShort">новых</span>
+      </article>
+      <article class="card kpi">
+        <span class="label" data-i18n="week">За 7 дней</span>
+        <strong id="kpi-week">—</strong>
+        <span class="hint" data-i18n="newShort">новых</span>
+      </article>
+      <article class="card kpi">
+        <span class="label" data-i18n="month">За 30 дней</span>
+        <strong id="kpi-month">—</strong>
+        <span class="hint" data-i18n="newShort">новых</span>
+      </article>
+      <article class="card kpi">
+        <span class="label" data-i18n="sources">Платформ</span>
+        <strong id="kpi-sources">—</strong>
+        <span class="hint" data-i18n="inWork">сбор идёт</span>
+      </article>
+    </section>
+
+    <section class="grid charts">
+      <article class="card chart-card">
+        <div class="card-head">
+          <h2 data-i18n="dailyChart">Новые объявления по дням</h2>
+          <span class="muted" id="daily-range"></span>
+        </div>
+        <canvas id="chart-daily" height="150"></canvas>
+        <div class="legend" id="legend-daily"></div>
+      </article>
+      <article class="card chart-card">
+        <div class="card-head">
+          <h2 data-i18n="monthlyChart">По месяцам</h2>
+          <span class="muted" id="monthly-range"></span>
+        </div>
+        <canvas id="chart-monthly" height="150"></canvas>
+        <div class="legend" id="legend-monthly"></div>
+      </article>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2 data-i18n="platforms">Платформы</h2></div>
+      <table>
+        <thead>
+          <tr>
+            <th data-i18n="source">Площадка</th>
+            <th class="num" data-i18n="active">Активных</th>
+            <th class="num" data-i18n="today">Сегодня</th>
+            <th class="num" data-i18n="week">7 дней</th>
+            <th class="num" data-i18n="month">30 дней</th>
+            <th class="num" data-i18n="total">Всего</th>
+            <th class="num" data-i18n="median">Медиана</th>
+          </tr>
+        </thead>
+        <tbody id="platforms"></tbody>
+      </table>
+    </section>
+
     <section class="grid">
       <article class="card chart-card">
         <div class="card-head">
@@ -74,6 +135,7 @@
       <div class="card-head">
         <h2 data-i18n="recentListings">Последние объявления</h2>
         <div class="geo-controls">
+          <select id="source" aria-label="source"></select>
           <button class="ghost" id="near" data-i18n="nearMe">Рядом со мной</button>
           <select id="radius" aria-label="radius"></select>
         </div>

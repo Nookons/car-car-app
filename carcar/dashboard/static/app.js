@@ -15,6 +15,20 @@ const I18N = {
     pauseHint:
       "Сборщик проверяет паузу перед каждым опросом — на площадку запросы перестают идти в пределах одного интервала.",
     recentListings: "Последние объявления",
+    today: "Сегодня",
+    week: "За 7 дней",
+    month: "За 30 дней",
+    sources: "Платформ",
+    newShort: "новых",
+    inWork: "сбор идёт",
+    dailyChart: "Новые объявления по дням",
+    monthlyChart: "По месяцам",
+    platforms: "Платформы",
+    source: "Площадка",
+    active: "Активных",
+    total: "Всего",
+    median: "Медиана",
+    allSources: "Все площадки",
     noListings: "Пока нет объявлений — запустите сборщик",
     nearMe: "Рядом со мной",
     showAll: "Показать все",
@@ -69,6 +83,20 @@ const I18N = {
     pauseHint:
       "The collector checks the pause flag before every poll — requests stop within one interval.",
     recentListings: "Latest listings",
+    today: "Today",
+    week: "Last 7 days",
+    month: "Last 30 days",
+    sources: "Platforms",
+    newShort: "new",
+    inWork: "collecting",
+    dailyChart: "New listings per day",
+    monthlyChart: "Per month",
+    platforms: "Platforms",
+    source: "Platform",
+    active: "Active",
+    total: "Total",
+    median: "Median",
+    allSources: "All platforms",
     noListings: "No listings yet — start the collector",
     nearMe: "Near me",
     showAll: "Show all",
@@ -112,6 +140,7 @@ let lang = localStorage.getItem("carcar.lang") || "ru";
 let current = null;
 let busy = false;
 let geo = readGeo();
+let lastMetrics = null;
 
 // Ссылку «рядом со мной» можно открыть с координатами: /?lat=52.23&lon=21.01&radius=50
 (() => {
@@ -430,6 +459,8 @@ function renderListings(items) {
 async function loadListings() {
   try {
     const params = new URLSearchParams({ limit: "8" });
+    const source = $("source").value;
+    if (source) params.set("source", source);
     if (geo) {
       params.set("lat", geo.lat);
       params.set("lon", geo.lon);
@@ -442,6 +473,164 @@ async function loadListings() {
     renderListings(data.items || []);
   } catch {
     /* карточки не критичны для статуса */
+  }
+}
+
+const SOURCE_COLORS = {
+  otomoto: "#2563eb",
+  olx: "#16a34a",
+  allegro: "#f59e0b",
+  autoscout24: "#8b5cf6",
+  autotrader: "#0ea5e9",
+};
+const PALETTE = ["#2563eb", "#16a34a", "#f59e0b", "#8b5cf6", "#ef4444", "#0ea5e9"];
+
+function sourceColor(source, index) {
+  return SOURCE_COLORS[source] || PALETTE[index % PALETTE.length];
+}
+
+function buildSeries(rows, key) {
+  const labels = [...new Set(rows.map((r) => r[key]))].sort();
+  const sources = [...new Set(rows.map((r) => r.source))].sort();
+  const index = new Map(rows.map((r) => [`${r[key]}|${r.source}`, r.count]));
+  const series = sources
+    .map((src, i) => ({
+      source: src,
+      color: sourceColor(src, i),
+      values: labels.map((label) => index.get(`${label}|${src}`) || 0),
+    }))
+    .filter((s) => s.values.some((value) => value > 0));
+  return { labels, series };
+}
+
+function drawStack(canvas, labels, series, labelFmt) {
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const ratio = window.devicePixelRatio || 1;
+  const width = canvas.clientWidth || 600;
+  const height = 150;
+  canvas.width = width * ratio;
+  canvas.height = height * ratio;
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+
+  const pad = 8;
+  const count = Math.max(labels.length, 1);
+  const totals = labels.map((_, i) =>
+    series.reduce((sum, item) => sum + (item.values[i] || 0), 0),
+  );
+  const max = Math.max(1, ...totals);
+  const gap = count > 20 ? 2 : 4;
+  const barWidth = Math.max(2, (width - pad * 2 - gap * (count - 1)) / count);
+
+  ctx.strokeStyle = "#eef0f3";
+  ctx.lineWidth = 1;
+  for (let i = 1; i <= 3; i += 1) {
+    const y = pad + ((height - pad * 2) * i) / 4;
+    ctx.beginPath();
+    ctx.moveTo(pad, y);
+    ctx.lineTo(width - pad, y);
+    ctx.stroke();
+  }
+
+  labels.forEach((label, i) => {
+    let y = height - pad;
+    series.forEach((item) => {
+      const value = item.values[i] || 0;
+      if (!value) return;
+      const barHeight = ((height - pad * 2) * value) / max;
+      const x = pad + i * (barWidth + gap);
+      ctx.fillStyle = item.color;
+      ctx.fillRect(x, y - barHeight, barWidth, barHeight);
+      y -= barHeight;
+    });
+  });
+
+  ctx.fillStyle = "#9ca3af";
+  ctx.font = "11px -apple-system, BlinkMacSystemFont, sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText(String(max), width - pad, 12);
+
+  const step = Math.ceil(count / 6);
+  labels.forEach((label, i) => {
+    if (i % step !== 0 && i !== count - 1) return;
+    const x = pad + i * (barWidth + gap) + barWidth / 2;
+    ctx.textAlign = i === 0 ? "left" : i === count - 1 ? "right" : "center";
+    ctx.fillStyle = "#9ca3af";
+    ctx.fillText(labelFmt(label), x, height - 2);
+  });
+  ctx.textAlign = "left";
+}
+
+function renderLegend(element, series) {
+  if (!element) return;
+  element.innerHTML = "";
+  series.forEach((item) => {
+    const chip = document.createElement("span");
+    chip.innerHTML = `<i style="background:${item.color}"></i>${esc(item.source)}`;
+    element.appendChild(chip);
+  });
+}
+
+function renderMetrics() {
+  const data = lastMetrics;
+  const charts = document.querySelector(".charts");
+  if (!data || !data.available) {
+    if (charts) charts.hidden = true;
+    return;
+  }
+  if (charts) charts.hidden = false;
+
+  $("kpi-today").textContent = fmtInt(data.totals.today);
+  $("kpi-week").textContent = fmtInt(data.totals.week);
+  $("kpi-month").textContent = fmtInt(data.totals.month);
+  $("kpi-sources").textContent = fmtInt(data.totals.sources);
+
+  const daily = buildSeries(data.daily, "day");
+  drawStack($("chart-daily"), daily.labels, daily.series, (d) => `${d.slice(8, 10)}.${d.slice(5, 7)}`);
+  renderLegend($("legend-daily"), daily.series);
+  $("daily-range").textContent = `${daily.labels.length} ${lang === "ru" ? "дней" : "days"}`;
+
+  const monthly = buildSeries(data.monthly, "month");
+  drawStack($("chart-monthly"), monthly.labels, monthly.series, (m) => m.slice(2).replace("-", "/"));
+  renderLegend($("legend-monthly"), monthly.series);
+  $("monthly-range").textContent = `${monthly.labels.length} ${lang === "ru" ? "мес." : "mo"}`;
+
+  const tbody = $("platforms");
+  tbody.innerHTML = "";
+  data.by_source.forEach((row) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(row.source)}</td>
+      <td class="num">${fmtInt(row.active)}</td>
+      <td class="num">${fmtInt(row.today)}</td>
+      <td class="num">${fmtInt(row.week)}</td>
+      <td class="num">${fmtInt(row.month)}</td>
+      <td class="num">${fmtInt(row.total)}</td>
+      <td class="num">${row.median_price ? fmtPrice(row.median_price) : "—"}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  const select = $("source");
+  const current = select.value;
+  select.innerHTML = `<option value="">${t("allSources")}</option>`;
+  data.by_source.forEach((row) => {
+    const option = document.createElement("option");
+    option.value = row.source;
+    option.textContent = row.source;
+    select.appendChild(option);
+  });
+  select.value = current;
+}
+
+async function loadMetrics() {
+  try {
+    const response = await fetch("/api/metrics?days=30&months=12", { cache: "no-store" });
+    if (!response.ok) return;
+    lastMetrics = await response.json();
+    renderMetrics();
+  } catch {
+    /* графики не критичны для статуса */
   }
 }
 
@@ -525,13 +714,18 @@ $("near").addEventListener("click", () => {
 $("radius").addEventListener("change", () => {
   if (geo) loadListings();
 });
+
+$("source").addEventListener("change", () => loadListings());
 $("lang").addEventListener("click", () => {
   lang = lang === "ru" ? "en" : "ru";
   localStorage.setItem("carcar.lang", lang);
   applyLang();
   if (current) render(current);
+  renderMetrics();
 });
 
 applyLang();
 load();
+loadMetrics();
 setInterval(load, 3000);
+setInterval(loadMetrics, 30000);
