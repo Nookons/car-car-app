@@ -29,6 +29,13 @@ export type ListingCard = Listing & {
   color: string;
   vin: string;
   created_at: string | null;
+  description: string;
+  price_analysis: {
+    median: number;
+    sample: number;
+    diff_pct: number;
+    verdict: "below" | "fair" | "above";
+  } | null;
 };
 
 export type User = {

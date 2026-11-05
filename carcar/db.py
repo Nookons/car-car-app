@@ -251,9 +251,10 @@ class DatabaseSink:
         color: str | None = None,
         power_hp: int | None = None,
         engine_cm3: int | None = None,
+        description: str | None = None,
         code: str = "otomoto",
     ) -> bool:
-        """Обогащение после загрузки карточки: фото, VIN, точные координаты."""
+        """Обогащение после загрузки карточки: фото, VIN, описание, координаты."""
         return self._update_detail(
                 external_id,
                 photos=photos,
@@ -266,6 +267,7 @@ class DatabaseSink:
                 color=color,
                 power_hp=power_hp,
                 engine_cm3=engine_cm3,
+                description=description,
                 code=code,
             )
 
@@ -283,6 +285,7 @@ class DatabaseSink:
         color: str | None = None,
         power_hp: int | None = None,
         engine_cm3: int | None = None,
+        description: str | None = None,
         code: str = "otomoto",
     ) -> bool:
         photos = [p for p in (photos or []) if isinstance(p, str) and p.startswith("https://")][:60]
@@ -307,6 +310,7 @@ class DatabaseSink:
                     color = coalesce(%s, color),
                     power_hp = coalesce(%s, power_hp),
                     engine_cm3 = coalesce(%s, engine_cm3),
+                    description = coalesce(%s, description),
                     details_fetched_at = now(),
                     updated_at = now()
                 where source_id = %s and external_id = %s
@@ -315,6 +319,7 @@ class DatabaseSink:
                     photos, photos, photos, len(photos),
                     vin, lat, lon, seller_name, seller_type,
                     body, color, power_hp, engine_cm3,
+                    (description or None),
                         source_id, external_id,
                     ),
                 )

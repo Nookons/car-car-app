@@ -19,7 +19,7 @@ FIELDS = """
     l.id, l.external_id, l.url, l.title, l.price, l.currency, l.make, l.model,
     l.year, l.mileage_km, l.fuel, l.gearbox, l.body, l.power_hp, l.engine_cm3,
     l.color, l.vin, l.city, l.region, l.lat, l.lon, l.seller_type, l.seller_name,
-    l.thumb_url, l.photos, l.photos_count, l.published_at, l.first_seen_at,
+    l.description, l.thumb_url, l.photos, l.photos_count, l.published_at, l.first_seen_at,
     l.last_seen_at, l.status
 """
 
@@ -63,7 +63,11 @@ def _item(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _card(row: dict[str, Any], events: list[dict[str, Any]]) -> dict[str, Any]:
+def _card(
+    row: dict[str, Any],
+    events: list[dict[str, Any]],
+    analysis: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     photos = [p for p in (row.get("photos") or []) if p] or (
         [row["thumb_url"]] if row.get("thumb_url") else []
     )
@@ -76,7 +80,7 @@ def _card(row: dict[str, Any], events: list[dict[str, Any]]) -> dict[str, Any]:
         "price": _num(row.get("price")),
         "currency": (row.get("currency") or "PLN").strip(),
         "photos": photos[:60],
-        "description": "",
+        "description": row.get("description") or "",
         "seller": {
             "type": "dealer"
             if row.get("seller_type") == "dealer"
@@ -101,6 +105,7 @@ def _card(row: dict[str, Any], events: list[dict[str, Any]]) -> dict[str, Any]:
         "lon": row.get("lon"),
         "events": events,
         "first_seen_at": _iso(row.get("first_seen_at")),
+        "price_analysis": analysis,
     }
 
 
@@ -282,6 +287,14 @@ class MiniAppRepo:
         total = int(rows[0]["total"]) if rows else 0
         return [_item(row) for row in rows], total
 
+    def set_description(self, listing_id: int, text: str) -> None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update listing set description = %s where id = %s and description is null",
+                (text[:2000], listing_id),
+            )
+        conn.commit()
+
     def get_listing(self, listing_id: int) -> dict[str, Any] | None:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
@@ -312,7 +325,55 @@ class MiniAppRepo:
                 }
                 for e in cur.fetchall()
             ]
-        return _card(row, events)
+
+            analysis = None
+            if row.get("price") and row.get("make") and row.get("model"):
+                year = row.get("year")
+                mileage = row.get("mileage_km")
+                cur.execute(
+                    """
+                    select percentile_cont(0.5) within group (order by price) as median,
+                           count(*) as sample
+                    from listing
+                    where status = 'active' and price is not null
+                      and make = %s and model = %s
+                      and (%s::int is null or year between %s::int - 2 and %s::int + 2)
+                      and (%s::int is null or mileage_km between %s::int * 0.7 and %s::int * 1.3)
+                    """,
+                    (
+                        row["make"], row["model"],
+                        year, year, year,
+                        mileage, mileage, mileage,
+                    ),
+                )
+                stat = cur.fetchone()
+                median = _num(stat["median"]) if stat and stat["median"] else None
+                sample = int(stat["sample"]) if stat else 0
+                if median and sample >= 5:
+                    diff = round((row["price"] - median) / median * 100)
+                    analysis = {
+                        "median": median,
+                        "sample": sample,
+                        "diff_pct": diff,
+                        "verdict": "below" if diff <= -5 else ("above" if diff >= 5 else "fair"),
+                    }
+        if not row.get("description") and row.get("url"):
+            # Описание не хранилось раньше — добираем лениво, при первом открытии.
+            try:
+                from ..client import Client
+                from ..config import Settings
+                from ..parse import parse_offer
+
+                client = Client(Settings())
+                offer = parse_offer(client.get(row["url"]), row["url"])
+                text = (offer.description or "").strip()[:2000]
+                if text:
+                    self.set_description(listing_id, text)
+                    row["description"] = text
+            except Exception:
+                pass
+
+        return _card(row, events, analysis)
 
     # -- подписки ----------------------------------------------------------
     def subscriptions(self, user_id: int) -> list[dict[str, Any]]:

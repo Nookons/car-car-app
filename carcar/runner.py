@@ -173,6 +173,7 @@ def fetch_detail(
             color=(offer.details.get("color") or "").strip() or None,
             power_hp=to_int(offer.details.get("engine_power")),
             engine_cm3=to_int(offer.details.get("engine_capacity")),
+            description=(offer.description or "").strip()[:2000] or None,
             code=code,
         )
         return "db" if changed else None

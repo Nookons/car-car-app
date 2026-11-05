@@ -269,3 +269,6 @@ alter table crawl_run     enable row level security;
 alter table ingest_reject enable row level security;
 
 commit;
+
+-- описание объявления (краткое, без HTML) для карточки
+alter table listing add column if not exists description text;

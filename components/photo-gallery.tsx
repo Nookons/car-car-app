@@ -122,7 +122,10 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
             touchStart.current = null;
           }}
         >
-          <div className="flex items-center justify-between p-3 text-white">
+          <div
+            className="flex items-center justify-between p-3 text-white"
+            style={{ paddingTop: "calc(0.75rem + var(--tg-safe-top, 0px))" }}
+          >
             <span className="text-sm">
               {index + 1} / {count}
             </span>
