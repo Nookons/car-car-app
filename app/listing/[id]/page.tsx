@@ -32,7 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
-import { date, fuelLabel, gearboxLabel, num, price } from "@/lib/format";
+import { conditionLabel, date, driveLabel, fuelLabel, gearboxLabel, liters, num, price } from "@/lib/format";
 import type { ListingCard as ListingDetail } from "@/lib/types";
 
 export default function ListingPage() {
@@ -41,6 +41,7 @@ export default function ListingPage() {
   const [item, setItem] = React.useState<ListingDetail | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [expanded, setExpanded] = React.useState(false);
+  const [allEquipment, setAllEquipment] = React.useState(false);
 
   React.useEffect(() => {
     if (!params?.id) return;
@@ -109,6 +110,27 @@ export default function ListingPage() {
       icon: <MapPin size={18} />,
       label: "Город",
       value: [item.city, item.region].filter(Boolean).join(", "),
+    },
+    { icon: <CarProfile size={18} />, label: "Версия", value: item.version },
+    { icon: <CarProfile size={18} />, label: "Поколение", value: item.generation },
+    { icon: <User size={18} />, label: "Мест", value: item.seats ?? "" },
+    { icon: <CarProfile size={18} />, label: "Дверей", value: item.doors ?? "" },
+    { icon: <Engine size={18} />, label: "Привод", value: driveLabel(item.drive) },
+    { icon: <Tag size={18} />, label: "Состояние", value: conditionLabel(item.condition) },
+    {
+      icon: <GasPump size={18} />,
+      label: "Расход, город",
+      value: liters(item.consumption_urban),
+    },
+    {
+      icon: <GasPump size={18} />,
+      label: "Расход, трасса",
+      value: liters(item.consumption_extra),
+    },
+    {
+      icon: <Lightning size={18} />,
+      label: "CO₂",
+      value: item.co2_gkm ? `${item.co2_gkm} г/км` : "",
     },
     { icon: <Clock size={18} />, label: "Добавлено", value: item.created_at ? date(item.created_at) : "" },
   ].filter((row) => row.value) as Array<{ icon: React.ReactNode; label: string; value: string | number }>;
@@ -243,6 +265,24 @@ export default function ListingPage() {
               ))}
             </dl>
           </Card>
+
+          {item.equipment.length > 0 ? (
+            <Card className="space-y-2 p-4">
+              <h2 className="text-base font-semibold">
+                Комплектация <span className="text-sm text-muted-foreground">({item.equipment.length})</span>
+              </h2>
+              <div className="flex flex-wrap gap-1.5">
+                {(allEquipment ? item.equipment : item.equipment.slice(0, 24)).map((feature) => (
+                  <Badge key={feature}>{feature}</Badge>
+                ))}
+              </div>
+              {item.equipment.length > 24 ? (
+                <Button variant="ghost" size="sm" onClick={() => setAllEquipment((value) => !value)}>
+                  {allEquipment ? "Свернуть" : `Показать все (${item.equipment.length})`}
+                </Button>
+              ) : null}
+            </Card>
+          ) : null}
         </div>
       </div>
     </div>

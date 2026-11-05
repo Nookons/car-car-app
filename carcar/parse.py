@@ -193,6 +193,16 @@ class Offer:
     updated_at: str
     price_drop: dict[str, Any] | None
     equipment_count: int
+    version: str
+    generation: str
+    doors: int | None
+    seats: int | None
+    drive: str | None
+    condition: str | None
+    co2_gkm: int | None
+    consumption_urban: float | None
+    consumption_extra: float | None
+    equipment: list[str]
     raw: dict[str, Any]
 
     def to_summary(self) -> dict[str, Any]:
@@ -218,6 +228,42 @@ class Offer:
             "photos_count": len(self.photos),
             "created_at": self.created_at,
         }
+
+
+def _condition(value: str | None) -> str | None:
+    text = (value or "").lower()
+    if "now" in text or "new" in text:
+        return "new"
+    if "uż" in text or "used" in text:
+        return "used"
+    return None
+
+
+def _drive_value(value: str | None) -> str | None:
+    text = (value or "").lower()
+    if "przednie" in text or "front" in text:
+        return "front"
+    if "tylne" in text or "rear" in text:
+        return "rear"
+    if "4x4" in text or "wszystkie" in text or "awd" in text or "all" in text:
+        return "awd"
+    return None
+
+
+def _to_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    match = re.search(r"\d+(?:[.,]\d+)?", str(value))
+    if not match:
+        return None
+    try:
+        return float(match.group(0).replace(",", "."))
+    except ValueError:
+        return None
+
+
+class _Drive:
+    parse = staticmethod(_drive_value)
 
 
 def parse_offer(html: str, url: str = "") -> Offer:
@@ -255,6 +301,21 @@ def parse_offer(html: str, url: str = "") -> Offer:
         updated_at=_text(advert.get("updatedAt")),
         price_drop=advert.get("priceDrop"),
         equipment_count=sum(len(group.get("values") or []) for group in equipment),
+        version=details.get("version") or "",
+        generation=details.get("generation") or "",
+        doors=_to_int(details.get("door_count")),
+        seats=_to_int(details.get("nr_seats")),
+        drive=_Drive.parse(details.get("transmission")),
+        condition=_condition(details.get("new_used")),
+        co2_gkm=_to_int(details.get("co2_emissions")),
+        consumption_urban=_to_float(details.get("urban_consumption")),
+        consumption_extra=_to_float(details.get("extra_urban_consumption")),
+        equipment=[
+            _text(value.get("label"))
+            for group in equipment
+            for value in (group.get("values") or [])
+            if value.get("label")
+        ],
         raw=advert,
     )
 

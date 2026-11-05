@@ -174,6 +174,16 @@ def fetch_detail(
             power_hp=to_int(offer.details.get("engine_power")),
             engine_cm3=to_int(offer.details.get("engine_capacity")),
             description=(offer.description or "").strip()[:2000] or None,
+            version=offer.version or None,
+            generation=offer.generation or None,
+            doors=offer.doors,
+            seats=offer.seats,
+            drive=offer.drive,
+            condition=offer.condition,
+            co2_gkm=offer.co2_gkm,
+            consumption_urban=offer.consumption_urban,
+            consumption_extra=offer.consumption_extra,
+            equipment=offer.equipment,
             code=code,
         )
         return "db" if changed else None

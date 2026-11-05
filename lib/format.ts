@@ -54,6 +54,18 @@ const BODY: Record<string, string> = {
 
 export const fuelLabel = (value: string | null) => (value ? FUEL[value] ?? value : "");
 export const bodyLabel = (value: string | null) => (value ? BODY[value] ?? value : "");
+
+const DRIVE: Record<string, string> = {
+  front: "Передний",
+  rear: "Задний",
+  awd: "Полный (4x4)",
+};
+
+export const driveLabel = (value: string | null) => (value ? DRIVE[value] ?? value : "");
+export const conditionLabel = (value: string | null) =>
+  value === "new" ? "Новый" : value === "used" ? "С пробегом" : "";
+export const liters = (value: number | null | undefined) =>
+  value == null ? "" : `${value.toFixed(1).replace(".", ",")} л/100 км`;
 export const gearboxLabel = (value: string | null) => (value ? GEARBOX[value] ?? value : "");
 
 export function filtersSummary(filters: Filters): string {

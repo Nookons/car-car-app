@@ -32,6 +32,16 @@ export type ListingCard = Listing & {
   lon: number | null;
   created_at: string | null;
   description: string;
+  version: string;
+  generation: string;
+  doors: number | null;
+  seats: number | null;
+  drive: "front" | "rear" | "awd" | null;
+  condition: "new" | "used" | null;
+  co2_gkm: number | null;
+  consumption_urban: number | null;
+  consumption_extra: number | null;
+  equipment: string[];
   price_analysis: {
     median: number;
     p10: number | null;

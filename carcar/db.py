@@ -252,9 +252,19 @@ class DatabaseSink:
         power_hp: int | None = None,
         engine_cm3: int | None = None,
         description: str | None = None,
+        version: str | None = None,
+        generation: str | None = None,
+        doors: int | None = None,
+        seats: int | None = None,
+        drive: str | None = None,
+        condition: str | None = None,
+        co2_gkm: int | None = None,
+        consumption_urban: float | None = None,
+        consumption_extra: float | None = None,
+        equipment: list[str] | None = None,
         code: str = "otomoto",
     ) -> bool:
-        """Обогащение после загрузки карточки: фото, VIN, описание, координаты."""
+        """Обогащение после загрузки карточки: фото, VIN, описание, характеристики."""
         return self._update_detail(
                 external_id,
                 photos=photos,
@@ -268,6 +278,16 @@ class DatabaseSink:
                 power_hp=power_hp,
                 engine_cm3=engine_cm3,
                 description=description,
+                version=version,
+                generation=generation,
+                doors=doors,
+                seats=seats,
+                drive=drive,
+                condition=condition,
+                co2_gkm=co2_gkm,
+                consumption_urban=consumption_urban,
+                consumption_extra=consumption_extra,
+                equipment=equipment,
                 code=code,
             )
 
@@ -286,9 +306,20 @@ class DatabaseSink:
         power_hp: int | None = None,
         engine_cm3: int | None = None,
         description: str | None = None,
+        version: str | None = None,
+        generation: str | None = None,
+        doors: int | None = None,
+        seats: int | None = None,
+        drive: str | None = None,
+        condition: str | None = None,
+        co2_gkm: int | None = None,
+        consumption_urban: float | None = None,
+        consumption_extra: float | None = None,
+        equipment: list[str] | None = None,
         code: str = "otomoto",
     ) -> bool:
         photos = [p for p in (photos or []) if isinstance(p, str) and p.startswith("https://")][:60]
+        tags = [tag for tag in (equipment or []) if isinstance(tag, str)][:120]
         source_id = self.source_id(code)
         try:
             with self.conn.cursor() as cur:
@@ -311,6 +342,19 @@ class DatabaseSink:
                     power_hp = coalesce(%s, power_hp),
                     engine_cm3 = coalesce(%s, engine_cm3),
                     description = coalesce(%s, description),
+                    version = coalesce(%s, version),
+                    generation = coalesce(%s, generation),
+                    doors = coalesce(%s, doors),
+                    seats = coalesce(%s, seats),
+                    drive = coalesce(%s, drive),
+                    condition = coalesce(%s, condition),
+                    co2_gkm = coalesce(%s, co2_gkm),
+                    consumption_urban = coalesce(%s, consumption_urban),
+                    consumption_extra = coalesce(%s, consumption_extra),
+                    equipment = case
+                        when cardinality(%s::text[]) > 0 then %s::text[]
+                        else equipment
+                    end,
                     details_fetched_at = now(),
                     updated_at = now()
                 where source_id = %s and external_id = %s
@@ -320,6 +364,10 @@ class DatabaseSink:
                     vin, lat, lon, seller_name, seller_type,
                     body, color, power_hp, engine_cm3,
                     (description or None),
+                    version or None, generation or None, doors, seats,
+                    drive or None, condition or None, co2_gkm,
+                    consumption_urban, consumption_extra,
+                    tags, tags,
                         source_id, external_id,
                     ),
                 )

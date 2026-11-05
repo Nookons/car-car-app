@@ -19,9 +19,15 @@ FIELDS = """
     l.id, l.external_id, l.url, l.title, l.price, l.currency, l.make, l.model,
     l.year, l.mileage_km, l.fuel, l.gearbox, l.body, l.power_hp, l.engine_cm3,
     l.color, l.vin, l.city, l.region, l.lat, l.lon, l.seller_type, l.seller_name,
-    l.description, l.thumb_url, l.photos, l.photos_count, l.published_at, l.first_seen_at,
+    l.description, l.version, l.generation, l.doors, l.seats, l.drive, l.condition,
+    l.co2_gkm, l.consumption_urban, l.consumption_extra, l.equipment,
+    l.thumb_url, l.photos, l.photos_count, l.published_at, l.first_seen_at,
     l.last_seen_at, l.status
 """
+
+
+def _flt(value: Any) -> float | None:
+    return float(value) if value is not None else None
 
 
 def _num(value: Any) -> int | None:
@@ -106,6 +112,16 @@ def _card(
         "events": events,
         "first_seen_at": _iso(row.get("first_seen_at")),
         "price_analysis": analysis,
+        "version": row.get("version") or "",
+        "generation": row.get("generation") or "",
+        "doors": row.get("doors"),
+        "seats": row.get("seats"),
+        "drive": row.get("drive"),
+        "condition": row.get("condition"),
+        "co2_gkm": row.get("co2_gkm"),
+        "consumption_urban": _flt(row.get("consumption_urban")),
+        "consumption_extra": _flt(row.get("consumption_extra")),
+        "equipment": list(row.get("equipment") or []),
     }
 
 
@@ -289,6 +305,33 @@ class MiniAppRepo:
         total = int(rows[0]["total"]) if rows else 0
         return [_item(row) for row in rows], total
 
+    def apply_detail(self, listing_id: int, values: dict[str, Any]) -> None:
+        tags = [tag for tag in (values.get("equipment") or []) if tag][:120]
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                update listing set
+                    description = coalesce(%(description)s, description),
+                    version = coalesce(%(version)s, version),
+                    generation = coalesce(%(generation)s, generation),
+                    doors = coalesce(%(doors)s, doors),
+                    seats = coalesce(%(seats)s, seats),
+                    drive = coalesce(%(drive)s, drive),
+                    condition = coalesce(%(condition)s, condition),
+                    co2_gkm = coalesce(%(co2_gkm)s, co2_gkm),
+                    consumption_urban = coalesce(%(consumption_urban)s, consumption_urban),
+                    consumption_extra = coalesce(%(consumption_extra)s, consumption_extra),
+                    equipment = case when cardinality(%(tags)s::text[]) > 0
+                                     then %(tags)s::text[] else equipment end,
+                    vin = coalesce(%(vin)s, vin),
+                    details_fetched_at = now(),
+                    updated_at = now()
+                where id = %(id)s
+                """,
+                {"id": listing_id, "tags": tags, **values},
+            )
+        conn.commit()
+
     def set_description(self, listing_id: int, text: str) -> None:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
@@ -363,8 +406,8 @@ class MiniAppRepo:
                         "diff_pct": diff,
                         "verdict": "below" if diff <= -5 else ("above" if diff >= 5 else "fair"),
                     }
-        if not row.get("description") and row.get("url"):
-            # Описание не хранилось раньше — добираем лениво, при первом открытии.
+        if (not row.get("description") or not row.get("equipment")) and row.get("url"):
+            # Карточка скачана раньше без полного набора полей — добираем лениво.
             try:
                 from ..client import Client
                 from ..config import Settings
@@ -372,10 +415,22 @@ class MiniAppRepo:
 
                 client = Client(Settings())
                 offer = parse_offer(client.get(row["url"]).text, row["url"])
-                text = (offer.description or "").strip()[:2000]
-                if text:
-                    self.set_description(listing_id, text)
-                    row["description"] = text
+                values = {
+                    "description": (offer.description or "").strip()[:2000] or None,
+                    "version": offer.version or None,
+                    "generation": offer.generation or None,
+                    "doors": offer.doors,
+                    "seats": offer.seats,
+                    "drive": offer.drive,
+                    "condition": offer.condition,
+                    "co2_gkm": offer.co2_gkm,
+                    "consumption_urban": offer.consumption_urban,
+                    "consumption_extra": offer.consumption_extra,
+                    "equipment": offer.equipment or [],
+                    "vin": (offer.details.get("vin") or "").strip().upper() or None,
+                }
+                self.apply_detail(listing_id, values)
+                row.update({key: value for key, value in values.items() if value is not None})
             except Exception:
                 pass
 

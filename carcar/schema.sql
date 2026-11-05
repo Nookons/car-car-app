@@ -272,3 +272,16 @@ commit;
 
 -- описание объявления (краткое, без HTML) для карточки
 alter table listing add column if not exists description text;
+
+-- расширенные характеристики карточки
+alter table listing
+    add column if not exists version             text,
+    add column if not exists generation          text,
+    add column if not exists doors               smallint,
+    add column if not exists seats               smallint,
+    add column if not exists drive               text,
+    add column if not exists condition           text,
+    add column if not exists co2_gkm             smallint,
+    add column if not exists consumption_urban   numeric(4,1),
+    add column if not exists consumption_extra   numeric(4,1),
+    add column if not exists equipment           text[];
