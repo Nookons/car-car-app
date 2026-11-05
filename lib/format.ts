@@ -11,9 +11,11 @@ export function num(value: number | null | undefined) {
   return new Intl.NumberFormat("ru-RU").format(value ?? 0);
 }
 
-export function date(iso: string | null | undefined) {
+const DATE_LOCALE: Record<string, string> = { ru: "ru-RU", pl: "pl-PL", en: "en-GB" };
+
+export function date(iso: string | null | undefined, lang: string = "ru") {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("ru-RU", {
+  return new Date(iso).toLocaleDateString(DATE_LOCALE[lang] ?? "ru-RU", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

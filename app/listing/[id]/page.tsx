@@ -39,7 +39,7 @@ import type { ListingCard as ListingDetail } from "@/lib/types";
 export default function ListingPage() {
   const params = useParams<{ id: string }>();
   const { token, favorites, toggleFavorite } = useAuth();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [item, setItem] = React.useState<ListingDetail | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [expanded, setExpanded] = React.useState(false);
@@ -81,7 +81,7 @@ export default function ListingPage() {
 
   const chips = [
     item.year,
-    item.mileage_km ? `${num(item.mileage_km)} км` : null,
+    item.mileage_km ? `${num(item.mileage_km)} ${t("filter.radius")}` : null,
     labelFor(t, "fuel", item.fuel),
     labelFor(t, "gearbox", item.gearbox),
   ].filter(Boolean) as string[];
@@ -91,19 +91,19 @@ export default function ListingPage() {
     {
       icon: <Gauge size={18} />,
       label: t("spec.mileage"),
-      value: item.mileage_km ? `${num(item.mileage_km)} км` : "",
+      value: item.mileage_km ? `${num(item.mileage_km)} ${t("filter.radius")}` : "",
     },
     { icon: <GasPump size={18} />, label: t("spec.fuel"), value: labelFor(t, "fuel", item.fuel) },
     { icon: <GearSix size={18} />, label: t("spec.gearbox"), value: labelFor(t, "gearbox", item.gearbox) },
     {
       icon: <Engine size={18} />,
       label: t("spec.engine"),
-      value: item.engine_cm3 ? `${num(item.engine_cm3)} см³` : "",
+      value: item.engine_cm3 ? `${num(item.engine_cm3)} cm³` : "",
     },
     {
       icon: <Lightning size={18} />,
       label: t("spec.power"),
-      value: item.power_hp ? `${item.power_hp} л.с.` : "",
+      value: item.power_hp ? `${item.power_hp} KM` : "",
     },
     { icon: <CarProfile size={18} />, label: t("spec.body"), value: labelFor(t, "body", item.body) },
     { icon: <Palette size={18} />, label: t("spec.color"), value: item.color ?? "" },
@@ -132,9 +132,9 @@ export default function ListingPage() {
     {
       icon: <Lightning size={18} />,
       label: t("spec.co2"),
-      value: item.co2_gkm ? `${item.co2_gkm} г/км` : "",
+      value: item.co2_gkm ? `${item.co2_gkm} g/km` : "",
     },
-    { icon: <Clock size={18} />, label: t("spec.added"), value: item.created_at ? date(item.created_at) : "" },
+    { icon: <Clock size={18} />, label: t("spec.added"), value: item.created_at ? date(item.created_at, lang) : "" },
   ].filter((row) => row.value) as Array<{ icon: React.ReactNode; label: string; value: string | number }>;
 
   const mapQuery = item.lat != null && item.lon != null
