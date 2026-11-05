@@ -3,6 +3,7 @@
 import * as React from "react";
 import { X } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 export function Dialog({
   open,
@@ -17,6 +18,8 @@ export function Dialog({
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
+  const { t } = useI18n();
+
   React.useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
@@ -45,7 +48,7 @@ export function Dialog({
           <button
             onClick={onClose}
             className="rounded-lg p-1 text-muted-foreground hover:bg-accent"
-            aria-label="Закрыть"
+            aria-label={t("common.close")}
           >
             <X size={20} />
           </button>

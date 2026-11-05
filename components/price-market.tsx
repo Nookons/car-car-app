@@ -2,9 +2,11 @@
 
 import { Tag, TrendDown, TrendUp } from "@phosphor-icons/react";
 import { price } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import type { ListingCard } from "@/lib/types";
 
 export function PriceMarket({ item }: { item: ListingCard }) {
+  const { t } = useI18n();
   const analysis = item.price_analysis;
   if (!analysis || item.price == null) return null;
 
@@ -24,15 +26,15 @@ export function PriceMarket({ item }: { item: ListingCard }) {
 
   const label =
     analysis.verdict === "below"
-      ? "ниже рынка"
+      ? t("market.below")
       : analysis.verdict === "above"
-        ? "выше рынка"
-        : "в рынке";
+        ? t("market.above")
+        : t("market.fair");
 
   return (
     <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
       <h2 className="flex items-center gap-2 text-base font-semibold">
-        <Tag size={18} /> Цена на рынке
+        <Tag size={18} /> {t("market.title")}
       </h2>
 
       <div className="flex items-baseline justify-between gap-2">
@@ -58,19 +60,21 @@ export function PriceMarket({ item }: { item: ListingCard }) {
           <span
             className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-foreground shadow"
             style={{ left: `${position}%` }}
-            title={`Эта машина: ${price(item.price, item.currency)}`}
+            title={`${t("market.thisCar")}: ${price(item.price, item.currency)}`}
           />
         </div>
         <div className="flex justify-between text-[11px] text-muted-foreground">
           <span>{price(low, item.currency)}</span>
-          <span>медиана {price(analysis.median, item.currency)}</span>
+          <span>
+            {t("market.median")} {price(analysis.median, item.currency)}
+          </span>
           <span>{price(high, item.currency)}</span>
         </div>
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Эта машина — {price(item.price, item.currency)}. Расчёт по {analysis.sample}{" "}
-        похожим объявлениям (та же модель, ±2 года, пробег ±30%).
+        {t("market.thisCar")} — {price(item.price, item.currency)}. {t("market.explain")} ·{" "}
+        {analysis.sample}
       </p>
     </div>
   );

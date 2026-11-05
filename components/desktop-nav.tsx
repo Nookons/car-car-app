@@ -3,18 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 const links = [
-  { href: "/", label: "Главная" },
-  { href: "/list", label: "Объявления" },
-  { href: "/account", label: "Аккаунт" },
-];
+  { href: "/", key: "nav.home" },
+  { href: "/list", key: "nav.list" },
+  { href: "/account", key: "nav.account" },
+] as const;
 
 export function DesktopNav() {
   const pathname = usePathname();
+  const { t } = useI18n();
   return (
     <nav className="hidden items-center gap-1 md:flex">
-      {links.map(({ href, label }) => {
+      {links.map(({ href, key }) => {
         const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
         return (
           <Link
@@ -25,7 +27,7 @@ export function DesktopNav() {
               active ? "bg-secondary font-medium" : "text-muted-foreground hover:bg-accent",
             )}
           >
-            {label}
+            {t(key)}
           </Link>
         );
       })}

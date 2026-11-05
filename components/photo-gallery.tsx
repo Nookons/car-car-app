@@ -3,8 +3,10 @@
 import * as React from "react";
 import { ArrowsOut, CaretLeft, CaretRight, X } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 export function PhotoGallery({ photos, title }: { photos: string[]; title: string }) {
+  const { t } = useI18n();
   const [index, setIndex] = React.useState(0);
   const [open, setOpen] = React.useState(false);
   const touchStart = React.useRef<number | null>(null);
@@ -36,7 +38,11 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
   }, [open, go]);
 
   if (!count) {
-    return <div className="grid aspect-[4/3] place-items-center bg-muted text-sm text-muted-foreground">Фото ещё не загружены</div>;
+    return (
+      <div className="grid aspect-[4/3] place-items-center bg-muted text-sm text-muted-foreground">
+        {t("listing.noPhotos")}
+      </div>
+    );
   }
 
   return (
@@ -45,7 +51,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
         type="button"
         onClick={() => setOpen(true)}
         className="group relative block w-full cursor-zoom-in bg-muted"
-        aria-label="Открыть фото на весь экран"
+        aria-label={t("listing.openMap")}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -70,7 +76,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
               go(-1);
             }}
             className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white backdrop-blur transition hover:bg-black/70"
-            aria-label="Предыдущее фото"
+            aria-label="Previous photo"
           >
             <CaretLeft size={20} />
           </button>
@@ -81,7 +87,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
               go(1);
             }}
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white backdrop-blur transition hover:bg-black/70"
-            aria-label="Следующее фото"
+            aria-label="Next photo"
           >
             <CaretRight size={20} />
           </button>
@@ -99,7 +105,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
                 "h-14 w-20 shrink-0 overflow-hidden rounded-lg border-2 transition",
                 position === index ? "border-primary" : "border-transparent opacity-70 hover:opacity-100",
               )}
-              aria-label={`Фото ${position + 1}`}
+              aria-label={`${position + 1}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={src} alt="" className="h-full w-full object-cover" loading="lazy" />
@@ -133,7 +139,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
               type="button"
               onClick={() => setOpen(false)}
               className="rounded-full bg-white/10 p-2"
-              aria-label="Закрыть"
+              aria-label={t("common.close")}
             >
               <X size={20} />
             </button>
@@ -159,7 +165,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
                     go(-1);
                   }}
                   className="absolute left-2 rounded-full bg-white/15 p-3 text-white"
-                  aria-label="Предыдущее фото"
+                  aria-label="Previous photo"
                 >
                   <CaretLeft size={22} />
                 </button>
@@ -170,7 +176,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
                     go(1);
                   }}
                   className="absolute right-2 rounded-full bg-white/15 p-3 text-white"
-                  aria-label="Следующее фото"
+                  aria-label="Next photo"
                 >
                   <CaretRight size={22} />
                 </button>

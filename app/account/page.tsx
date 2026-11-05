@@ -12,19 +12,14 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { loadFilters, saveFilters } from "@/lib/filters";
+import { LANGS, labelFor, useI18n, type Key } from "@/lib/i18n";
 import { filtersSummary } from "@/lib/format";
 import type { Filters, Listing, Subscription, User } from "@/lib/types";
-
-const LANGS: Array<[string, string]> = [
-  ["ru", "Русский"],
-  ["pl", "Polski"],
-  ["uk", "Українська"],
-  ["en", "English"],
-];
 
 export default function AccountPage() {
   const { token, ready, favorites } = useAuth();
   const router = useRouter();
+  const { t, lang, setLang } = useI18n();
   const [subs, setSubs] = React.useState<Subscription[]>([]);
   const [me, setMe] = React.useState<User | null>(null);
   const [favItems, setFavItems] = React.useState<Listing[]>([]);
@@ -111,22 +106,26 @@ export default function AccountPage() {
         </div>
         <div>
           <p className="font-semibold">
-            {[me?.first_name, me?.last_name].filter(Boolean).join(" ") || "Пользователь"}
+            {[me?.first_name, me?.last_name].filter(Boolean).join(" ") || t("account.user")}
           </p>
           <p className="text-xs text-muted-foreground">
-            {me?.username ? `@${me.username}` : `Telegram ID ${me?.tg_id}`}
+            {me?.username ? `@${me.username}` : `${t("account.telegramId")} ${me?.tg_id}`}
           </p>
         </div>
       </Card>
 
       <Card className="space-y-3 p-4">
-        <h2 className="text-base font-semibold">Настройки</h2>
+        <h2 className="text-base font-semibold">{t("account.settings")}</h2>
         <label className="block space-y-1.5">
-          <span className="text-xs text-muted-foreground">Язык интерфейса</span>
+          <span className="text-xs text-muted-foreground">{t("account.lang")}</span>
           <select
             className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            value={me?.lang ?? "ru"}
-            onChange={(event) => patchUser({ lang: event.target.value })}
+            value={lang}
+            onChange={(event) => {
+              const next = event.target.value as (typeof LANGS)[number][0];
+              setLang(next);
+              void patchUser({ lang: next });
+            }}
           >
             {LANGS.map(([code, label]) => (
               <option key={code} value={code}>
@@ -139,38 +138,38 @@ export default function AccountPage() {
         <div className="flex items-center justify-between gap-3 py-1">
           <span className="flex items-center gap-2 text-sm">
             {me?.notify_new ? <Bell size={18} /> : <BellSlash size={18} />}
-            Уведомления о новых
+            {t("account.notify")}
           </span>
           <Button
             variant={me?.notify_new ? "default" : "outline"}
             size="sm"
             onClick={() => patchUser({ notify_new: !me?.notify_new })}
           >
-            {me?.notify_new ? "Вкл" : "Выкл"}
+            {me?.notify_new ? t("account.on") : t("account.off")}
           </Button>
         </div>
 
         <div className="flex items-center justify-between gap-3 py-1">
-          <span className="text-sm">Дайджест вместо мгновенных</span>
+          <span className="text-sm">{t("account.digest")}</span>
           <Button
             variant={me?.digest ? "default" : "outline"}
             size="sm"
             onClick={() => patchUser({ digest: !me?.digest })}
           >
-            {me?.digest ? "Вкл" : "Выкл"}
+            {me?.digest ? t("account.on") : t("account.off")}
           </Button>
         </div>
       </Card>
 
       <Card className="space-y-3 p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Мои фильтры</h2>
+          <h2 className="text-base font-semibold">{t("account.filters")}</h2>
           <span className="text-xs text-muted-foreground">{subs.length}</span>
         </div>
 
         {subs.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Пока нет — собери фильтр в «Объявлениях» и сохрани.
+            {t("account.noFilters")}
           </p>
         ) : (
           <ul className="space-y-3">
@@ -178,7 +177,7 @@ export default function AccountPage() {
               <li key={sub.id} className="space-y-2 border-b pb-3 last:border-none last:pb-0">
                 <div>
                   <p className="text-sm font-medium">{sub.name}</p>
-                  <p className="text-xs text-muted-foreground">{filtersSummary(sub.criteria)}</p>
+                  <p className="text-xs text-muted-foreground">{summary(sub.criteria, t)}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -189,7 +188,7 @@ export default function AccountPage() {
                       router.push("/list");
                     }}
                   >
-                    <Eye size={16} /> Показать
+                    <Eye size={16} /> {t("account.show")}
                   </Button>
                   <Button
                     variant={sub.active ? "default" : "outline"}
@@ -212,7 +211,7 @@ export default function AccountPage() {
                       );
                     }}
                   >
-                    {sub.active ? "Вкл" : "Выкл"}
+                    {sub.active ? t("account.on") : t("account.off")}
                   </Button>
                   <Button
                     variant="ghost"
@@ -231,17 +230,17 @@ export default function AccountPage() {
         )}
 
         <Button variant="outline" className="w-full" onClick={() => setNameOpen(true)}>
-          Сохранить текущий фильтр
+          {t("account.saveCurrent")}
         </Button>
       </Card>
 
       <Card className="space-y-3 p-4 lg:col-span-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Избранное</h2>
+          <h2 className="text-base font-semibold">{t("account.favorites")}</h2>
           <span className="text-xs text-muted-foreground">{favorites.size}</span>
         </div>
         {favItems.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Пусто — добавляй машины звёздочкой.</p>
+          <p className="text-sm text-muted-foreground">{t("account.emptyFavorites")}</p>
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {favItems.slice(0, 6).map((item) => (
@@ -254,10 +253,10 @@ export default function AccountPage() {
       <Dialog
         open={nameOpen}
         onClose={() => setNameOpen(false)}
-        title="Название фильтра"
+        title={t("account.filterName")}
         footer={
           <Button className="w-full" onClick={saveFilter} disabled={saving || !name.trim()}>
-            {saving ? "Сохраняю…" : "Сохранить"}
+            {t("account.save")}
           </Button>
         }
       >
@@ -271,4 +270,16 @@ export default function AccountPage() {
       </Dialog>
     </div>
   );
+}
+
+function summary(filters: Filters, t: (key: Key) => string): string {
+  const parts = [
+    filters.make,
+    filters.price_max ? `≤ ${filters.price_max} zł` : null,
+    filters.year_min ? `≥ ${filters.year_min}` : null,
+    filters.mileage_max ? `≤ ${filters.mileage_max} km` : null,
+    filters.gearbox ? labelFor(t, "gearbox", filters.gearbox) : null,
+    filters.radius_km ? `${filters.radius_km} km` : null,
+  ].filter(Boolean);
+  return parts.join(" · ");
 }

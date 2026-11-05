@@ -9,11 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { filtersToQuery, loadFilters, saveFilters } from "@/lib/filters";
-import { filtersSummary, num } from "@/lib/format";
+import { num } from "@/lib/format";
+import { labelFor, useI18n, type Key } from "@/lib/i18n";
 import type { Filters, Listing } from "@/lib/types";
 
 export default function ListPage() {
   const { token, ready } = useAuth();
+  const { t } = useI18n();
   const [filters, setFilters] = React.useState<Filters>({});
   const [items, setItems] = React.useState<Listing[]>([]);
   const [total, setTotal] = React.useState(0);
@@ -65,15 +67,19 @@ export default function ListPage() {
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-lg font-semibold">Объявления</h1>
-            <p className="text-xs text-muted-foreground">{filtersSummary(filters)}</p>
+            <h1 className="text-lg font-semibold">{t("list.title")}</h1>
+            <p className="text-xs text-muted-foreground">{summary(filters, t)}</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
             <SlidersHorizontal size={16} />
-            Фильтры
+            {t("list.filters")}
           </Button>
         </div>
-        {total > 0 ? <p className="text-xs text-muted-foreground">Найдено: {num(total)}</p> : null}
+        {total > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {t("list.found")}: {num(total)}
+          </p>
+        ) : null}
       </div>
 
       {loading && items.length === 0 ? (
@@ -84,7 +90,7 @@ export default function ListPage() {
         </div>
       ) : items.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
-          Ничего не нашлось. Попробуй изменить фильтры.
+          {t("list.empty")}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
@@ -101,11 +107,23 @@ export default function ListPage() {
           disabled={loading}
           onClick={() => fetchPage(filters, items.length)}
         >
-          {loading ? "Загружаю…" : `Показать ещё (${num(total - items.length)})`}
+          {loading ? t("list.loading") : `${t("list.more")} (${num(total - items.length)})`}
         </Button>
       ) : null}
 
       <FilterDialog open={open} initial={filters} onClose={() => setOpen(false)} onApply={apply} />
     </div>
   );
+}
+
+function summary(filters: Filters, t: (key: Key) => string): string {
+  const parts = [
+    filters.make,
+    filters.price_max ? `≤ ${num(filters.price_max)} zł` : null,
+    filters.year_min ? `≥ ${filters.year_min}` : null,
+    filters.mileage_max ? `≤ ${num(filters.mileage_max)} km` : null,
+    filters.gearbox ? labelFor(t, "gearbox", filters.gearbox) : null,
+    filters.radius_km ? `${filters.radius_km} km` : null,
+  ].filter(Boolean);
+  return parts.join(" · ");
 }

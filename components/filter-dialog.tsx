@@ -5,15 +5,17 @@ import { Crosshair } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
-import { bodyLabel, fuelLabel, gearboxLabel, num } from "@/lib/format";
+import { num } from "@/lib/format";
+import { labelFor, useI18n } from "@/lib/i18n";
 import { openLocationSettings, requestLocation } from "@/lib/telegram";
 import type { Filters } from "@/lib/types";
 
-const PRICES = [0, 10_000, 20_000, 30_000, 40_000, 50_000, 70_000, 100_000, 150_000, 200_000, 300_000, 500_000];
+const PRICES = [10_000, 20_000, 30_000, 40_000, 50_000, 70_000, 100_000, 150_000, 200_000, 300_000, 500_000];
 const MILEAGE = [50_000, 100_000, 150_000, 200_000, 250_000, 300_000, 400_000, 500_000];
 const YEARS = Array.from({ length: new Date().getFullYear() - 1989 }, (_, index) => new Date().getFullYear() - index);
 
 type Option = { value: string; count: number };
+type City = { value: string; lat: number; lon: number; count: number };
 type Options = {
   gearboxes: Option[];
   fuels: Option[];
@@ -36,13 +38,14 @@ export function FilterDialog({
   onClose: () => void;
   onApply: (filters: Filters) => void;
 }) {
+  const { t } = useI18n();
   const [draft, setDraft] = React.useState<Filters>(initial);
   const [makes, setMakes] = React.useState<Option[]>([]);
   const [models, setModels] = React.useState<Option[]>([]);
   const [options, setOptions] = React.useState<Options | null>(null);
-  const [geoNote, setGeoNote] = React.useState(initial.lat ? "Локация задана" : "");
-  const [cities, setCities] = React.useState<Array<{ value: string; lat: number; lon: number; count: number }>>([]);
+  const [cities, setCities] = React.useState<City[]>([]);
   const [pickedCity, setPickedCity] = React.useState("");
+  const [geoNote, setGeoNote] = React.useState(initial.lat ? t("filter.calibrated") : "");
   const [geoFailed, setGeoFailed] = React.useState(false);
 
   React.useEffect(() => {
@@ -52,12 +55,11 @@ export function FilterDialog({
   React.useEffect(() => {
     if (!open) return;
     api<{ items: Option[] }>("/filters/makes").then((data) => setMakes(data.items)).catch(() => {});
-    api<{ items: Array<{ value: string; lat: number; lon: number; count: number }> }>("/filters/cities")
+    api<{ items: City[] }>("/filters/cities")
       .then((data) => setCities(data.items))
       .catch(() => setCities([]));
   }, [open]);
 
-  // модели для выбранной марки
   React.useEffect(() => {
     if (!open || !draft.make) {
       setModels([]);
@@ -68,7 +70,6 @@ export function FilterDialog({
       .catch(() => setModels([]));
   }, [open, draft.make]);
 
-  // опции (КПП, топливо, кузов) для марки/модели
   React.useEffect(() => {
     if (!open) return;
     const params = new URLSearchParams();
@@ -83,17 +84,16 @@ export function FilterDialog({
     setDraft((prev) => ({ ...prev, [key]: value }));
 
   const askGeo = async () => {
-    setGeoNote("Определяю локацию…");
+    setGeoNote(t("filter.detecting"));
     setGeoFailed(false);
     try {
       const { lat, lon } = await requestLocation();
       setDraft((prev) => ({ ...prev, lat, lon, radius_km: prev.radius_km ?? 50 }));
       setPickedCity("");
-      setGeoNote("Геолокация включена");
-      setGeoFailed(false);
+      setGeoNote(t("filter.calibrated"));
     } catch {
       setGeoFailed(true);
-      setGeoNote("Геолокация выключена — разреши доступ к ней в настройках Telegram.");
+      setGeoNote(t("filter.geoOff"));
     }
   };
 
@@ -104,7 +104,6 @@ export function FilterDialog({
         (cleaned as Record<string, unknown>)[key] = value;
       }
     });
-    // без координат радиус не имеет смысла — иначе фильтр вернёт ноль
     if (cleaned.lat == null || cleaned.lon == null) {
       delete cleaned.radius_km;
       delete cleaned.lat;
@@ -121,31 +120,30 @@ export function FilterDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      title="Фильтры"
+      title={t("filter.title")}
       footer={
         <div className="grid grid-cols-2 gap-3">
           <Button variant="outline" onClick={() => setDraft({})}>
-            Сбросить
+            {t("filter.reset")}
           </Button>
-          <Button onClick={apply}>Показать</Button>
+          <Button onClick={apply}>{t("filter.show")}</Button>
         </div>
       }
     >
       <div className="space-y-3">
         <label className="block space-y-1.5">
-          <span className="text-xs text-muted-foreground">Марка</span>
+          <span className="text-xs text-muted-foreground">{t("filter.make")}</span>
           <select
             className={selectClass}
             value={draft.make ?? ""}
-            onChange={(event) => {
-              const make = event.target.value || undefined;
-              setDraft((prev) => ({ ...prev, make, model: undefined }));
-            }}
+            onChange={(event) =>
+              setDraft((prev) => ({ ...prev, make: event.target.value || undefined, model: undefined }))
+            }
           >
-            <option value="">Любая марка</option>
-            {makes.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.value} ({num(m.count)})
+            <option value="">{t("filter.anyMake")}</option>
+            {makes.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.value} ({num(item.count)})
               </option>
             ))}
           </select>
@@ -153,16 +151,16 @@ export function FilterDialog({
 
         {draft.make ? (
           <label className="block space-y-1.5">
-            <span className="text-xs text-muted-foreground">Модель</span>
+            <span className="text-xs text-muted-foreground">{t("filter.model")}</span>
             <select
               className={selectClass}
               value={draft.model ?? ""}
               onChange={(event) => set("model", event.target.value || undefined)}
             >
-              <option value="">Любая модель</option>
-              {models.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.value} ({num(m.count)})
+              <option value="">{t("filter.anyModel")}</option>
+              {models.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.value} ({num(item.count)})
                 </option>
               ))}
             </select>
@@ -171,31 +169,31 @@ export function FilterDialog({
 
         <div className="grid grid-cols-2 gap-2">
           <label className="block space-y-1.5">
-            <span className="text-xs text-muted-foreground">Цена от</span>
+            <span className="text-xs text-muted-foreground">{t("filter.priceFrom")}</span>
             <select
               className={selectClass}
               value={draft.price_min ?? ""}
               onChange={(event) => set("price_min", event.target.value ? Number(event.target.value) : undefined)}
             >
-              <option value="">Не важно</option>
-              {PRICES.filter(Boolean).map((p) => (
-                <option key={p} value={p}>
-                  {num(p)} zł
+              <option value="">{t("filter.any")}</option>
+              {PRICES.map((value) => (
+                <option key={value} value={value}>
+                  {num(value)} zł
                 </option>
               ))}
             </select>
           </label>
           <label className="block space-y-1.5">
-            <span className="text-xs text-muted-foreground">Цена до</span>
+            <span className="text-xs text-muted-foreground">{t("filter.priceTo")}</span>
             <select
               className={selectClass}
               value={draft.price_max ?? ""}
               onChange={(event) => set("price_max", event.target.value ? Number(event.target.value) : undefined)}
             >
-              <option value="">Не важно</option>
-              {PRICES.filter(Boolean).map((p) => (
-                <option key={p} value={p}>
-                  {num(p)} zł
+              <option value="">{t("filter.any")}</option>
+              {PRICES.map((value) => (
+                <option key={value} value={value}>
+                  {num(value)} zł
                 </option>
               ))}
             </select>
@@ -204,13 +202,13 @@ export function FilterDialog({
 
         <div className="grid grid-cols-2 gap-2">
           <label className="block space-y-1.5">
-            <span className="text-xs text-muted-foreground">Год от</span>
+            <span className="text-xs text-muted-foreground">{t("filter.yearFrom")}</span>
             <select
               className={selectClass}
               value={draft.year_min ?? ""}
               onChange={(event) => set("year_min", event.target.value ? Number(event.target.value) : undefined)}
             >
-              <option value="">Не важно</option>
+              <option value="">{t("filter.any")}</option>
               {YEARS.map((year) => (
                 <option key={year} value={year}>
                   {year}
@@ -219,13 +217,13 @@ export function FilterDialog({
             </select>
           </label>
           <label className="block space-y-1.5">
-            <span className="text-xs text-muted-foreground">Год до</span>
+            <span className="text-xs text-muted-foreground">{t("filter.yearTo")}</span>
             <select
               className={selectClass}
               value={draft.year_max ?? ""}
               onChange={(event) => set("year_max", event.target.value ? Number(event.target.value) : undefined)}
             >
-              <option value="">Не важно</option>
+              <option value="">{t("filter.any")}</option>
               {YEARS.map((year) => (
                 <option key={year} value={year}>
                   {year}
@@ -236,16 +234,16 @@ export function FilterDialog({
         </div>
 
         <label className="block space-y-1.5">
-          <span className="text-xs text-muted-foreground">Пробег до</span>
+          <span className="text-xs text-muted-foreground">{t("filter.mileage")}</span>
           <select
             className={selectClass}
             value={draft.mileage_max ?? ""}
             onChange={(event) => set("mileage_max", event.target.value ? Number(event.target.value) : undefined)}
           >
-            <option value="">Не важно</option>
+            <option value="">{t("filter.any")}</option>
             {MILEAGE.map((km) => (
               <option key={km} value={km}>
-                {num(km)} км
+                {num(km)} {t("filter.radius")}
               </option>
             ))}
           </select>
@@ -253,31 +251,31 @@ export function FilterDialog({
 
         <div className="grid grid-cols-2 gap-2">
           <label className="block space-y-1.5">
-            <span className="text-xs text-muted-foreground">Коробка</span>
+            <span className="text-xs text-muted-foreground">{t("filter.gearbox")}</span>
             <select
               className={selectClass}
               value={draft.gearbox ?? ""}
               onChange={(event) => set("gearbox", event.target.value || undefined)}
             >
-              <option value="">Любая</option>
-              {gearboxOptions.map((g) => (
-                <option key={g.value} value={g.value}>
-                  {gearboxLabel(g.value)} ({num(g.count)})
+              <option value="">{t("filter.anyGearbox")}</option>
+              {gearboxOptions.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {labelFor(t, "gearbox", item.value)} ({num(item.count)})
                 </option>
               ))}
             </select>
           </label>
           <label className="block space-y-1.5">
-            <span className="text-xs text-muted-foreground">Топливо</span>
+            <span className="text-xs text-muted-foreground">{t("filter.fuel")}</span>
             <select
               className={selectClass}
               value={draft.fuel ?? ""}
               onChange={(event) => set("fuel", event.target.value || undefined)}
             >
-              <option value="">Любое</option>
-              {fuelOptions.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {fuelLabel(f.value)} ({num(f.count)})
+              <option value="">{t("filter.anyFuel")}</option>
+              {fuelOptions.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {labelFor(t, "fuel", item.value)} ({num(item.count)})
                 </option>
               ))}
             </select>
@@ -286,16 +284,16 @@ export function FilterDialog({
 
         {bodyOptions.length > 0 ? (
           <label className="block space-y-1.5">
-            <span className="text-xs text-muted-foreground">Кузов</span>
+            <span className="text-xs text-muted-foreground">{t("filter.body")}</span>
             <select
               className={selectClass}
               value={draft.body ?? ""}
               onChange={(event) => set("body", event.target.value || undefined)}
             >
-              <option value="">Любой</option>
-              {bodyOptions.map((b) => (
-                <option key={b.value} value={b.value}>
-                  {bodyLabel(b.value)} ({num(b.count)})
+              <option value="">{t("filter.anyBody")}</option>
+              {bodyOptions.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {labelFor(t, "body", item.value)} ({num(item.count)})
                 </option>
               ))}
             </select>
@@ -303,15 +301,13 @@ export function FilterDialog({
         ) : null}
 
         {!draft.model ? (
-          <p className="text-xs text-muted-foreground">
-            Показаны опции по всем машинам. Выбери марку и модель — останутся только их.
-          </p>
+          <p className="text-xs text-muted-foreground">{t("filter.optionsAll")}</p>
         ) : null}
 
         <div className="space-y-1.5">
-          <span className="text-xs text-muted-foreground">Где искать</span>
+          <span className="text-xs text-muted-foreground">{t("filter.where")}</span>
           <label className="block space-y-1.5">
-            <span className="text-xs text-muted-foreground">Город</span>
+            <span className="text-xs text-muted-foreground">{t("filter.city")}</span>
             <select
               className={selectClass}
               value={pickedCity}
@@ -326,7 +322,7 @@ export function FilterDialog({
                     lon: city.lon,
                     radius_km: prev.radius_km ?? 50,
                   }));
-                  setGeoNote(`Локация: ${name}`);
+                  setGeoNote(`${t("filter.calibratedCity")}: ${name}`);
                   setGeoFailed(false);
                 } else {
                   setDraft((prev) => ({ ...prev, lat: undefined, lon: undefined }));
@@ -334,7 +330,7 @@ export function FilterDialog({
                 }
               }}
             >
-              <option value="">Не важно</option>
+              <option value="">{t("filter.noCity")}</option>
               {cities.map((city) => (
                 <option key={city.value} value={city.value}>
                   {city.value} ({num(city.count)})
@@ -345,7 +341,7 @@ export function FilterDialog({
           <div className="grid grid-cols-2 gap-2">
             <Button variant="outline" onClick={askGeo} className="justify-start">
               <Crosshair size={18} />
-              Рядом со мной
+              {t("filter.nearMe")}
             </Button>
             <select
               className={selectClass}
@@ -354,35 +350,31 @@ export function FilterDialog({
             >
               {[25, 50, 100, 200].map((km) => (
                 <option key={km} value={km}>
-                  {km} км
+                  {km} {t("filter.radius")}
                 </option>
               ))}
             </select>
           </div>
           {geoNote ? <p className="text-xs text-muted-foreground">{geoNote}</p> : null}
-          {!draft.lat ? (
-            <p className="text-xs text-muted-foreground">
-              Радиус применится после того, как включишь геолокацию.
-            </p>
+          {!draft.lat && !pickedCity ? (
+            <p className="text-xs text-muted-foreground">{t("filter.radiusHint")}</p>
           ) : null}
           {geoFailed ? (
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
-                if (!openLocationSettings()) {
-                  setGeoNote("Открой Telegram → Настройки → Данные и память → Геоданные");
-                }
+                if (!openLocationSettings()) setGeoNote(t("filter.geoOff"));
               }}
             >
-              Открыть настройки Telegram
+              {t("filter.openSettings")}
             </Button>
           ) : null}
         </div>
 
         {options ? (
           <p className="text-[11px] text-muted-foreground">
-            Опции собраны из {num(options.listings)} объявлений в нашей базе
+            {t("filter.optionsFrom")} {num(options.listings)} {t("filter.listingsWord")}
             {draft.make ? ` · ${draft.make}` : ""}
             {draft.model ? ` ${draft.model}` : ""}
           </p>
