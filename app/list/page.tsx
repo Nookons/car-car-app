@@ -58,7 +58,12 @@ export default function ListPage() {
     setFilters(next);
     saveFilters(next);
     setOpen(false);
+    // Сразу убираем старую выдачу и показываем скелетон: видно, что фильтр сработал.
+    setItems([]);
+    setTotal(0);
+    setLoading(true);
     window.history.replaceState(null, "", "/list");
+    window.scrollTo({ top: 0, behavior: "smooth" });
     void fetchPage(next, 0);
   };
 
@@ -82,7 +87,7 @@ export default function ListPage() {
         ) : null}
       </div>
 
-      {loading && items.length === 0 ? (
+      {loading ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 6 }).map((_, index) => (
             <Skeleton key={index} className="h-56" />

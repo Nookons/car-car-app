@@ -83,6 +83,16 @@ export type Filters = {
   fuel?: string;
   gearbox?: string;
   body?: string;
+  drive?: string;
+  condition?: string;
+  seller_type?: string;
+  color?: string;
+  doors?: number;
+  seats?: number;
+  power_min?: number;
+  power_max?: number;
+  engine_min?: number;
+  engine_max?: number;
   lat?: number;
   lon?: number;
   radius_km?: number;

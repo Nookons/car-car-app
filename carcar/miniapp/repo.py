@@ -221,6 +221,16 @@ class MiniAppRepo:
         fuel: str | None = None,
         gearbox: str | None = None,
         body: str | None = None,
+        drive: str | None = None,
+        condition: str | None = None,
+        seller_type: str | None = None,
+        color: str | None = None,
+        doors: int | None = None,
+        seats: int | None = None,
+        power_min: int | None = None,
+        power_max: int | None = None,
+        engine_min: int | None = None,
+        engine_max: int | None = None,
         source: str | None = None,
         lat: float | None = None,
         lon: float | None = None,
@@ -266,6 +276,36 @@ class MiniAppRepo:
         if body:
             conds.append("l.body = %(body)s")
             params["body"] = body
+        if drive:
+            conds.append("l.drive = %(drive)s")
+            params["drive"] = drive
+        if condition:
+            conds.append("l.condition = %(condition)s")
+            params["condition"] = condition
+        if seller_type:
+            conds.append("l.seller_type = %(seller_type)s")
+            params["seller_type"] = seller_type
+        if color:
+            conds.append("l.color = %(color)s")
+            params["color"] = color
+        if doors:
+            conds.append("l.doors = %(doors)s")
+            params["doors"] = doors
+        if seats:
+            conds.append("l.seats = %(seats)s")
+            params["seats"] = seats
+        if power_min is not None:
+            conds.append("l.power_hp >= %(power_min)s")
+            params["power_min"] = power_min
+        if power_max is not None:
+            conds.append("l.power_hp <= %(power_max)s")
+            params["power_max"] = power_max
+        if engine_min is not None:
+            conds.append("l.engine_cm3 >= %(engine_min)s")
+            params["engine_min"] = engine_min
+        if engine_max is not None:
+            conds.append("l.engine_cm3 <= %(engine_max)s")
+            params["engine_max"] = engine_max
         if source:
             conds.append("s.code = %(source)s")
             params["source"] = source
@@ -537,6 +577,45 @@ class MiniAppRepo:
             )
             bodies = [{"value": r["body"], "count": int(r["n"])} for r in cur.fetchall()]
 
+            model_clause = (
+                "where status = 'active'"
+                " and (%s::text is null or make = %s)"
+                " and (%s::text is null or model = %s)"
+            )
+            model_params = (make, make, model, model)
+
+            cur.execute(
+                f"""
+                select drive, count(*) as n from listing {model_clause}
+                  and drive is not null and drive <> ''
+                group by drive order by n desc
+                """,
+                model_params,
+            )
+            drives = [{"value": r["drive"], "count": int(r["n"])} for r in cur.fetchall()]
+
+            cur.execute(
+                f"""
+                select condition, count(*) as n from listing {model_clause}
+                  and condition is not null and condition <> ''
+                group by condition order by n desc
+                """,
+                model_params,
+            )
+            conditions = [
+                {"value": r["condition"], "count": int(r["n"])} for r in cur.fetchall()
+            ]
+
+            cur.execute(
+                f"""
+                select color, count(*) as n from listing {model_clause}
+                  and color is not null and color <> ''
+                group by color order by n desc limit 40
+                """,
+                model_params,
+            )
+            colors = [{"value": r["color"], "count": int(r["n"])} for r in cur.fetchall()]
+
             cur.execute(
                 f"select min(year_min) as y0, max(year_max) as y1 from model_option {clause}",
                 params,
@@ -561,6 +640,9 @@ class MiniAppRepo:
             "gearboxes": gearboxes,
             "fuels": fuels,
             "bodies": bodies,
+            "drives": drives,
+            "conditions": conditions,
+            "colors": colors,
             "years": {"min": years["y0"], "max": years["y1"]},
             "price": {"p10": prices["p10"], "p90": prices["p90"]},
             "listings": int(totals["n"] or 0),

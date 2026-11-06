@@ -5,6 +5,7 @@ import { Crosshair } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
+import { useAuth } from "@/components/auth-provider";
 import { num } from "@/lib/format";
 import { labelFor, useI18n } from "@/lib/i18n";
 import { openLocationSettings, requestLocation } from "@/lib/telegram";
@@ -20,6 +21,9 @@ type Options = {
   gearboxes: Option[];
   fuels: Option[];
   bodies: Option[];
+  drives: Option[];
+  conditions: Option[];
+  colors: Option[];
   years: { min: number | null; max: number | null };
   price: { p10: number | null; p90: number | null };
   listings: number;
@@ -39,6 +43,7 @@ export function FilterDialog({
   onApply: (filters: Filters) => void;
 }) {
   const { t } = useI18n();
+  const { token } = useAuth();
   const [draft, setDraft] = React.useState<Filters>(initial);
   const [makes, setMakes] = React.useState<Option[]>([]);
   const [models, setModels] = React.useState<Option[]>([]);
@@ -47,6 +52,9 @@ export function FilterDialog({
   const [pickedCity, setPickedCity] = React.useState("");
   const [geoNote, setGeoNote] = React.useState(initial.lat ? t("filter.calibrated") : "");
   const [geoFailed, setGeoFailed] = React.useState(false);
+  const [saveMode, setSaveMode] = React.useState(false);
+  const [saveName, setSaveName] = React.useState("");
+  const [saved, setSaved] = React.useState(false);
 
   React.useEffect(() => {
     if (open) setDraft(initial);
@@ -122,12 +130,60 @@ export function FilterDialog({
       onClose={onClose}
       title={t("filter.title")}
       footer={
-        <div className="grid grid-cols-2 gap-3">
-          <Button variant="outline" onClick={() => setDraft({})}>
-            {t("filter.reset")}
-          </Button>
-          <Button onClick={apply}>{t("filter.show")}</Button>
-        </div>
+        saveMode ? (
+          <div className="space-y-2">
+            <input
+              autoFocus
+              value={saveName}
+              onChange={(event) => setSaveName(event.target.value)}
+              placeholder={t("filter.namePrompt")}
+              maxLength={120}
+              className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" onClick={() => setSaveMode(false)}>
+                {t("filter.reset")}
+              </Button>
+              <Button
+                disabled={!saveName.trim()}
+                onClick={async () => {
+                  if (!token) return;
+                  await api("/subscriptions", {
+                    method: "POST",
+                    token,
+                    body: { name: saveName.trim(), criteria: draft },
+                  });
+                  setSaveMode(false);
+                  setSaveName("");
+                  setSaved(true);
+                  setTimeout(() => setSaved(false), 2500);
+                }}
+              >
+                {saved ? t("filter.saved") : t("filter.save")}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2">
+            <Button variant="outline" onClick={() => setDraft({})}>
+              {t("filter.reset")}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSaveName(
+                  [draft.make, draft.model, draft.price_max ? `≤ ${num(draft.price_max)} zł` : ""]
+                    .filter(Boolean)
+                    .join(" ") || t("filter.save"),
+                );
+                setSaveMode(true);
+              }}
+            >
+              {t("filter.save")}
+            </Button>
+            <Button onClick={apply}>{t("filter.show")}</Button>
+          </div>
+        )
       }
     >
       <div className="space-y-3">
@@ -299,6 +355,168 @@ export function FilterDialog({
             </select>
           </label>
         ) : null}
+
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block space-y-1.5">
+            <span className="text-xs text-muted-foreground">{t("filter.drive")}</span>
+            <select
+              className={selectClass}
+              value={draft.drive ?? ""}
+              onChange={(event) => set("drive", event.target.value || undefined)}
+            >
+              <option value="">{t("filter.anyDrive")}</option>
+              {(options?.drives ?? []).map((item) => (
+                <option key={item.value} value={item.value}>
+                  {labelFor(t, "drive", item.value)} ({num(item.count)})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs text-muted-foreground">{t("filter.condition")}</span>
+            <select
+              className={selectClass}
+              value={draft.condition ?? ""}
+              onChange={(event) => set("condition", event.target.value || undefined)}
+            >
+              <option value="">{t("filter.anyCondition")}</option>
+              {(options?.conditions ?? []).map((item) => (
+                <option key={item.value} value={item.value}>
+                  {labelFor(t, "condition", item.value)} ({num(item.count)})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block space-y-1.5">
+            <span className="text-xs text-muted-foreground">{t("filter.seller")}</span>
+            <select
+              className={selectClass}
+              value={draft.seller_type ?? ""}
+              onChange={(event) => set("seller_type", event.target.value || undefined)}
+            >
+              <option value="">{t("filter.anySeller")}</option>
+              <option value="private">{t("filter.private")}</option>
+              <option value="dealer">{t("filter.dealer")}</option>
+            </select>
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs text-muted-foreground">{t("filter.color")}</span>
+            <select
+              className={selectClass}
+              value={draft.color ?? ""}
+              onChange={(event) => set("color", event.target.value || undefined)}
+            >
+              <option value="">{t("filter.anyColor")}</option>
+              {(options?.colors ?? []).map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.value} ({num(item.count)})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block space-y-1.5">
+            <span className="text-xs text-muted-foreground">{t("filter.doors")}</span>
+            <select
+              className={selectClass}
+              value={draft.doors ?? ""}
+              onChange={(event) => set("doors", event.target.value ? Number(event.target.value) : undefined)}
+            >
+              <option value="">{t("filter.any")}</option>
+              {[2, 3, 4, 5, 6].map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs text-muted-foreground">{t("filter.seats")}</span>
+            <select
+              className={selectClass}
+              value={draft.seats ?? ""}
+              onChange={(event) => set("seats", event.target.value ? Number(event.target.value) : undefined)}
+            >
+              <option value="">{t("filter.any")}</option>
+              {[2, 4, 5, 6, 7, 8].map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block space-y-1.5">
+            <span className="text-xs text-muted-foreground">{t("filter.powerFrom")}</span>
+            <select
+              className={selectClass}
+              value={draft.power_min ?? ""}
+              onChange={(event) => set("power_min", event.target.value ? Number(event.target.value) : undefined)}
+            >
+              <option value="">{t("filter.any")}</option>
+              {[50, 100, 150, 200, 250, 300, 400, 500].map((value) => (
+                <option key={value} value={value}>
+                  {value} KM
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs text-muted-foreground">{t("filter.powerTo")}</span>
+            <select
+              className={selectClass}
+              value={draft.power_max ?? ""}
+              onChange={(event) => set("power_max", event.target.value ? Number(event.target.value) : undefined)}
+            >
+              <option value="">{t("filter.any")}</option>
+              {[100, 150, 200, 250, 300, 400, 500, 700].map((value) => (
+                <option key={value} value={value}>
+                  {value} KM
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block space-y-1.5">
+            <span className="text-xs text-muted-foreground">{t("filter.engineFrom")}</span>
+            <select
+              className={selectClass}
+              value={draft.engine_min ?? ""}
+              onChange={(event) => set("engine_min", event.target.value ? Number(event.target.value) : undefined)}
+            >
+              <option value="">{t("filter.any")}</option>
+              {[900, 1200, 1600, 2000, 2500, 3000].map((value) => (
+                <option key={value} value={value}>
+                  {value} cm³
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs text-muted-foreground">{t("filter.engineTo")}</span>
+            <select
+              className={selectClass}
+              value={draft.engine_max ?? ""}
+              onChange={(event) => set("engine_max", event.target.value ? Number(event.target.value) : undefined)}
+            >
+              <option value="">{t("filter.any")}</option>
+              {[1200, 1600, 2000, 2500, 3000, 4000, 5000].map((value) => (
+                <option key={value} value={value}>
+                  {value} cm³
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
         {!draft.model ? (
           <p className="text-xs text-muted-foreground">{t("filter.optionsAll")}</p>
