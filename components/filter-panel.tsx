@@ -45,6 +45,7 @@ export function FilterPanel({
     colors: Option[];
   }>({ gearboxes: [], fuels: [], bodies: [], drives: [], colors: [] });
   const [saving, setSaving] = React.useState(false);
+  const [saveMode, setSaveMode] = React.useState(false);
   const [saveName, setSaveName] = React.useState("");
   const [saved, setSaved] = React.useState(false);
 
@@ -119,6 +120,7 @@ export function FilterPanel({
       });
       setSaved(true);
       setSaveName("");
+      setSaveMode(false);
       setTimeout(() => setSaved(false), 2500);
     } finally {
       setSaving(false);
@@ -396,6 +398,29 @@ export function FilterPanel({
         ))}
       </div>
 
+      <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1 md:hidden">
+        {makes.slice(0, 8).map((make) => (
+          <button
+            key={make.value}
+            onClick={() => {
+              const next = { ...draft, make: draft.make === make.value ? undefined : make.value, model: undefined };
+              setDraft(next);
+              if (draft.make === make.value) onApply(next);
+            }}
+            className={`flex w-16 shrink-0 flex-col items-center gap-1 text-[11px] ${
+              draft.make === make.value ? "opacity-100" : "opacity-80"
+            }`}
+          >
+            <span className={`grid h-12 w-12 place-items-center rounded-full border bg-card text-sm font-semibold ${
+              draft.make === make.value ? "border-primary" : ""
+            }`}>
+              {make.value.slice(0, 2).toUpperCase()}
+            </span>
+            <span className="truncate w-full text-center">{make.value}</span>
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => setShowMore((v) => !v)}
@@ -406,7 +431,7 @@ export function FilterPanel({
         </button>
 
         <div className="ml-auto flex flex-1 items-center gap-2 md:flex-none">
-          {saveName || saved ? (
+          {saveMode || saved ? (
             <div className="flex flex-1 gap-2">
               <input
                 value={saveName}
@@ -419,7 +444,7 @@ export function FilterPanel({
               </Button>
             </div>
           ) : (
-            <Button variant="ghost" onClick={() => setSaveName(" ")}>
+            <Button variant="ghost" onClick={() => { setSaveMode(true); setSaveName(""); }}>
               <BookmarkSimple size={18} />
               {t("filter.saveSearch")}
             </Button>
