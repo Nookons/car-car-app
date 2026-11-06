@@ -45,11 +45,21 @@ class ControlIn(BaseModel):
     by: str = Field(default="dashboard", max_length=40)
 
 
-def _parse_iso(value: str | None) -> datetime | None:
+def _safe(call, fallback, errors: list[str], name: str):
+    try:
+        return call()
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"{name}: {exc}")
+        return fallback
+
+
+def _parse_iso(value: str | datetime | None) -> datetime | None:
     if not value:
         return None
+    if isinstance(value, datetime):
+        return value
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
         return None
 
@@ -226,7 +236,13 @@ def create_app(
             else:
                 state = "stale"
 
+        errors: list[str] = []
         sweep: dict[str, Any] = {}
+        if repo is not None:
+            try:
+                sweep = repo.sweep_state(source_code)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"sweep: {exc}")
         sweep_path = store.state_dir / "sweep.json"
         if sweep_path.exists():
             try:
@@ -234,7 +250,22 @@ def create_app(
             except json.JSONDecodeError:
                 sweep = {}
 
-        collectors = repo.collectors() if repo is not None else []
+        try:
+            collectors = repo.collectors() if repo is not None else []
+        except Exception as exc:  # noqa: BLE001
+            collectors = []
+            errors.append(f"collectors: {exc}")
+
+        # На Railway heartbeat-файла нет: состояние берём из записи коллектора.
+        if not heartbeat and collectors:
+            active = next((c for c in collectors if c.get("last_poll_at")), None)
+            if active:
+                started_at = _parse_iso(active["last_poll_at"])
+                if started_at:
+                    age = max(0.0, (now - started_at).total_seconds())
+                state = str(active.get("status") or "running")
+                if age is not None and age > stale_after:
+                    state = "stale"
 
         return {
             "now": now.isoformat(),
@@ -246,8 +277,13 @@ def create_app(
             "heartbeat": heartbeat,
             "control": control.as_dict(),
             "storage": storage_stats(),
-            "polls": store.read_polls(limit=60),
-            "runs": store.recent_runs(limit=5),
+            "polls": _safe(lambda: repo.polls(limit=60), store.read_polls(limit=60), errors, "polls")
+            if repo is not None
+            else store.read_polls(limit=60),
+            "runs": _safe(lambda: repo.runs(limit=5), store.recent_runs(limit=5), errors, "runs")
+            if repo is not None
+            else store.recent_runs(limit=5),
+            "errors": errors,
         }
 
     @app.get("/api/listings")

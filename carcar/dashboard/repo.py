@@ -228,6 +228,60 @@ class DatabaseRepo:
         }
 
     # -- коллекторы --------------------------------------------------------
+    def runs(self, limit: int = 5) -> list[dict[str, Any]]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select started_at, finished_at, pages, items, inserted, errors, notes
+                from crawl_run order by started_at desc limit %s
+                """,
+                (limit,),
+            )
+            return [
+                {
+                    "started_at": _iso(r["started_at"]),
+                    "finished_at": _iso(r["finished_at"]),
+                    "pages": r["pages"],
+                    "items": r["items"],
+                    "new": r["inserted"],
+                    "errors": r["errors"],
+                    "notes": r["notes"],
+                }
+                for r in cur.fetchall()
+            ]
+
+    def polls(self, limit: int = 60) -> list[dict[str, Any]]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select started_at, inserted, errors from crawl_run
+                where notes = 'watch' order by started_at desc limit %s
+                """,
+                (limit,),
+            )
+            rows = cur.fetchall()
+        return [
+            {
+                "ts": _iso(r["started_at"]),
+                "new": r["inserted"],
+                "errors": r["errors"],
+            }
+            for r in reversed(rows)
+        ]
+
+    def sweep_state(self, source: str = "otomoto") -> dict[str, Any]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select w.next_page, w.total_pages, w.inserted, w.updated
+                from sweep_state w join source s on s.id = w.source_id
+                where s.code = %s
+                """,
+                (source,),
+            )
+            row = cur.fetchone()
+        return dict(row) if row else {}
+
     def collectors(self) -> list[dict[str, Any]]:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
