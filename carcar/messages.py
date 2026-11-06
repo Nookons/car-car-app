@@ -76,6 +76,75 @@ MESSAGES: dict[str, dict[str, str]] = {
 }
 
 
+SPEC_LABELS: dict[str, dict[str, str]] = {
+    "ru": {
+        "specs_button": "📋 Характеристики",
+        "year": "Год", "mileage": "Пробег", "engine": "Объём", "power": "Мощность",
+        "fuel": "Топливо", "gearbox": "КПП", "body": "Кузов", "drive": "Привод",
+        "color": "Цвет", "doors": "Двери", "seats": "Мест", "condition": "Состояние",
+        "co2": "CO₂", "urban": "Расход город", "extra": "Расход трасса",
+        "city": "Город", "seller": "Продавец", "vin": "VIN",
+        "open": "Открыть в CarCar",
+    },
+    "pl": {
+        "specs_button": "📋 Dane techniczne",
+        "year": "Rok", "mileage": "Przebieg", "engine": "Pojemność", "power": "Moc",
+        "fuel": "Paliwo", "gearbox": "Skrzynia", "body": "Nadwozie", "drive": "Napęd",
+        "color": "Kolor", "doors": "Drzwi", "seats": "Miejsca", "condition": "Stan",
+        "co2": "CO₂", "urban": "Spalanie miasto", "extra": "Spalanie trasa",
+        "city": "Miasto", "seller": "Sprzedający", "vin": "VIN",
+        "open": "Otwórz w CarCar",
+    },
+    "en": {
+        "specs_button": "📋 Specifications",
+        "year": "Year", "mileage": "Mileage", "engine": "Engine", "power": "Power",
+        "fuel": "Fuel", "gearbox": "Gearbox", "body": "Body", "drive": "Drive",
+        "color": "Color", "doors": "Doors", "seats": "Seats", "condition": "Condition",
+        "co2": "CO₂", "urban": "Consumption city", "extra": "Consumption highway",
+        "city": "City", "seller": "Seller", "vin": "VIN",
+        "open": "Open in CarCar",
+    },
+    "uk": {
+        "specs_button": "📋 Характеристики",
+        "year": "Рік", "mileage": "Пробіг", "engine": "Об'єм", "power": "Потужність",
+        "fuel": "Паливо", "gearbox": "КПП", "body": "Кузов", "drive": "Привід",
+        "color": "Колір", "doors": "Двері", "seats": "Місць", "condition": "Стан",
+        "co2": "CO₂", "urban": "Витрата місто", "extra": "Витрата траса",
+        "city": "Місто", "seller": "Продавець", "vin": "VIN",
+        "open": "Відкрити в CarCar",
+    },
+}
+
+FUEL_LABELS = {
+    "ru": {"petrol": "Бензин", "diesel": "Дизель", "hybrid": "Гибрид",
+           "plugin_hybrid": "Гибрид plug-in", "electric": "Электро", "lpg": "Газ"},
+    "pl": {"petrol": "Benzyna", "diesel": "Diesel", "hybrid": "Hybryda",
+           "plugin_hybrid": "Hybryda plug-in", "electric": "Elektryczny", "lpg": "LPG"},
+    "en": {"petrol": "Petrol", "diesel": "Diesel", "hybrid": "Hybrid",
+           "plugin_hybrid": "Plug-in hybrid", "electric": "Electric", "lpg": "LPG"},
+    "uk": {"petrol": "Бензин", "diesel": "Дизель", "hybrid": "Гібрид",
+           "plugin_hybrid": "Гібрид plug-in", "electric": "Електро", "lpg": "Газ"},
+}
+
+GEARBOX_LABELS = {
+    "ru": {"manual": "Механика", "automatic": "Автоматическая", "semi_auto": "Полуавтомат"},
+    "pl": {"manual": "Manualna", "automatic": "Automatyczna", "semi_auto": "Półautomat"},
+    "en": {"manual": "Manual", "automatic": "Automatic", "semi_auto": "Semi-automatic"},
+    "uk": {"manual": "Механіка", "automatic": "Автоматична", "semi_auto": "Напівавтомат"},
+}
+
+DRIVE_LABELS = {
+    "ru": {"front": "Передний", "rear": "Задний", "awd": "Полный (4x4)"},
+    "pl": {"front": "Przedni", "rear": "Tylny", "awd": "4x4"},
+    "en": {"front": "Front", "rear": "Rear", "awd": "All-wheel (4x4)"},
+    "uk": {"front": "Передній", "rear": "Задній", "awd": "Повний (4x4)"},
+}
+
+
+def specs(lang: str | None) -> dict[str, str]:
+    return SPEC_LABELS.get((lang or "ru").lower(), SPEC_LABELS["ru"])
+
+
 def messages(lang: str | None) -> dict[str, str]:
     return MESSAGES.get((lang or "ru").lower(), MESSAGES["ru"])
 

@@ -8,11 +8,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import re
 import time
 
 import httpx
 
+from .messages import DRIVE_LABELS, FUEL_LABELS, GEARBOX_LABELS, SPEC_LABELS
 from .messages import messages as msg
 
 log = logging.getLogger("carcar.bot")
@@ -95,6 +98,94 @@ class Bot:
             return []
 
     # -- обработка ---------------------------------------------------------
+    def specs_text(self, listing_id: int, lang: str) -> str | None:
+        labels = SPEC_LABELS.get(lang, SPEC_LABELS["ru"])
+        try:
+            from .db import database_url
+
+            url = database_url()
+            if not url:
+                return None
+            import psycopg
+
+            with psycopg.connect(url, connect_timeout=10, prepare_threshold=None) as conn:
+                row = conn.execute(
+                    """
+                    select title, price, url, year, mileage_km, engine_cm3, power_hp,
+                           fuel, gearbox, body, drive, color, doors, seats, condition,
+                           co2_gkm, consumption_urban, consumption_extra, city, seller_name
+                    from listing where id = %s
+                    """,
+                    (listing_id,),
+                ).fetchone()
+        except Exception:  # noqa: BLE001
+            return None
+        if not row:
+            return None
+
+        fuel = FUEL_LABELS.get(lang, {}).get(row[7] or "", row[7] or "")
+        gearbox = GEARBOX_LABELS.get(lang, {}).get(row[8] or "", row[8] or "")
+        drive = DRIVE_LABELS.get(lang, {}).get(row[10] or "", row[10] or "")
+        miles = f"{row[4]:,}".replace(",", " ") if row[4] else ""
+        price = f"{row[1]:,}".replace(",", " ") if row[1] else ""
+        rows = [
+            (labels["year"], row[3]),
+            (labels["mileage"], miles),
+            (labels["engine"], f"{row[5]} cm³" if row[5] else ""),
+            (labels["power"], f"{row[6]} KM" if row[6] else ""),
+            (labels["fuel"], fuel),
+            (labels["gearbox"], gearbox),
+            (labels["body"], row[9]),
+            (labels["drive"], drive),
+            (labels["color"], row[11]),
+            (labels["doors"], row[12]),
+            (labels["seats"], row[13]),
+            (labels["condition"], row[14]),
+            (labels["co2"], f"{row[15]} g/km" if row[15] else ""),
+            (labels["urban"], f"{row[16]} l/100" if row[16] else ""),
+            (labels["extra"], f"{row[17]} l/100" if row[17] else ""),
+            (labels["city"], row[18]),
+            (labels["seller"], row[19]),
+        ]
+        table = "\n".join(f"{label:<20}{value}" for label, value in rows if value)
+        title = str(row[0]).replace("<", "&lt;").replace(">", "&gt;")
+        return (
+            f"<b>{title}</b>\n{price} zł\n\n"
+            f"<blockquote expandable><pre>{table}</pre></blockquote>"
+        )
+
+    def send_specs(self, chat_id: int, listing_id: int) -> None:
+        lang = self.lang_for(chat_id)
+        text = self.specs_text(listing_id, lang)
+        if not text:
+            self.call("sendMessage", chat_id=chat_id, text="Не нашёл характеристики")
+            return
+        keyboard = {
+            "inline_keyboard": [[
+                {
+                    "text": msg(lang)["open_app"],
+                    "web_app": {"url": f"{self.public_url}/listing/{listing_id}"},
+                }
+            ]]
+        }
+        try:
+            self.call(
+                "sendMessage",
+                chat_id=chat_id,
+                text=text,
+                parse_mode="HTML",
+                reply_markup=keyboard,
+                disable_web_page_preview=True,
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning("specs HTML не принят (%s), отправляю текстом", exc)
+            plain = re.sub(r"<[^>]+>", "", text)
+            self.call("sendMessage", chat_id=chat_id, text=plain, reply_markup=keyboard)
+
+    def answer_callback(self, callback_id: str) -> None:
+        with contextlib.suppress(Exception):
+            self.call("answerCallbackQuery", callback_query_id=callback_id)
+
     def lang_for(self, tg_id: int) -> str:
         try:
             from .db import database_url

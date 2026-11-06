@@ -14,6 +14,7 @@ import httpx
 import psycopg
 from psycopg.rows import dict_row
 
+from .messages import SPEC_LABELS
 from .messages import caption as localized_caption
 from .messages import messages as msg
 
@@ -156,6 +157,10 @@ class Notifier:
         keyboard = {
             "inline_keyboard": [
                 [{"text": text["open_app"], "web_app": {"url": url}}],
+                [{
+                    "text": SPEC_LABELS.get(lang or "ru", SPEC_LABELS["ru"])["specs_button"],
+                    "callback_data": f"specs:{item['id']}",
+                }],
                 [
                     {"text": text["my_filters"], "web_app": {"url": f"{self.public_url}/account"}},
                 ],

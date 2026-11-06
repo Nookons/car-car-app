@@ -188,6 +188,23 @@ def create_app(
     ) -> dict:
         if webhook_secret and not hmac.compare_digest(secret or "", webhook_secret):
             raise HTTPException(status_code=403, detail="плохой секрет")
+        callback = update.get("callback_query")
+        if callback:
+            from ..bot import Bot
+
+            bot = Bot(bot_token, public_url)
+            data = callback.get("data") or ""
+            if data.startswith("specs:"):
+                try:
+                    listing_id = int(data.split(":", 1)[1])
+                except ValueError:
+                    listing_id = 0
+                chat_id = (callback.get("message") or {}).get("chat", {}).get("id")
+                if listing_id and chat_id:
+                    bot.send_specs(chat_id, listing_id)
+            bot.answer_callback(callback.get("id", ""))
+            return {"ok": True}
+
         message = update.get("message") or {}
         text = (message.get("text") or "").strip()
         chat_id = (message.get("chat") or {}).get("id")
