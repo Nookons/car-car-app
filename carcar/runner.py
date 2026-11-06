@@ -186,6 +186,13 @@ def fetch_detail(
         vin = (offer.details.get("vin") or "").strip().upper() or None
         if vin and len(vin) != 17:
             vin = None
+        # Некоторые карточки отдают мусор в мощности/объёме — не роняем запись.
+        power = to_int(offer.details.get("engine_power"))
+        if power is not None and not 3 <= power <= 2000:
+            power = None
+        engine = to_int(offer.details.get("engine_capacity"))
+        if engine is not None and not 50 <= engine <= 10000:
+            engine = None
         changed = sink.update_detail(
             listing.id,
             photos=offer.photos,
@@ -196,8 +203,8 @@ def fetch_detail(
             seller_type=_seller_type(offer.seller_type),
             body=canon_body(offer.details.get("body_type")),
             color=(offer.details.get("color") or "").strip() or None,
-            power_hp=to_int(offer.details.get("engine_power")),
-            engine_cm3=to_int(offer.details.get("engine_capacity")),
+            power_hp=power,
+            engine_cm3=engine,
             description=(offer.description or "").strip()[:2000] or None,
             version=offer.version or None,
             generation=offer.generation or None,
