@@ -51,6 +51,29 @@ class NullBus(EventBus):
             time.sleep(30)
 
 
+class HttpBus(EventBus):
+    """Сборщик без прямого доступа к Redis отправляет события через API."""
+
+    def __init__(self, url: str, token: str) -> None:
+        self.url = url.rstrip("/") + "/api/ingest/events"
+        self.token = token
+
+    def publish(self, event: dict[str, Any]) -> None:
+        import httpx
+
+        httpx.post(
+            self.url,
+            json={"events": [event]},
+            headers={"X-Ingest-Token": self.token},
+            timeout=15,
+        ).raise_for_status()
+
+    def consume(
+        self, handler: Callable[[dict[str, Any]], None], consumer: str = "worker-1"
+    ) -> None:
+        log.warning("HttpBus не умеет читать события")
+
+
 class RedisStreamBus(EventBus):
     def __init__(self, url: str) -> None:
         import redis as redis_lib
@@ -140,6 +163,10 @@ def make_bus() -> EventBus:
             return KafkaBus(kafka)
         except Exception as exc:  # noqa: BLE001
             log.warning("Kafka недоступна (%s), падаю на Redis", exc)
+    ingest_url = os.environ.get("CARCAR_INGEST_URL")
+    ingest_token = os.environ.get("CARCAR_INGEST_TOKEN")
+    if ingest_url and ingest_token:
+        return HttpBus(ingest_url, ingest_token)
     url = os.environ.get("REDIS_URL")
     if url:
         try:

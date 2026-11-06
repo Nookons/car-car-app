@@ -74,6 +74,7 @@ def create_app(
     repo = MiniAppRepo(url)
     cache = Cache()
     dev_token = os.environ.get("CARCAR_DEV_TOKEN", "")
+    ingest_token = os.environ.get("CARCAR_INGEST_TOKEN", "")
 
     public_url = os.environ.get("CARCAR_PUBLIC_URL", "").rstrip("/")
     api_url = os.environ.get("CARCAR_API_URL", "").rstrip("/")
@@ -128,6 +129,34 @@ def create_app(
     @app.get("/")
     def index() -> FileResponse:
         return FileResponse(STATIC / "index.html")
+
+    @app.post("/api/ingest/events")
+    def ingest_events(
+        payload: dict[str, Any],
+        token: str | None = Header(default=None, alias="X-Ingest-Token"),
+    ) -> dict:
+        """Сборщик публикует события через API: у него нет прямого доступа к Redis."""
+        if not ingest_token or not hmac.compare_digest(token or "", ingest_token):
+            raise HTTPException(status_code=403, detail="нет доступа")
+        events = payload.get("events") or []
+        if not isinstance(events, list) or len(events) > 200:
+            raise HTTPException(status_code=400, detail="ожидаю events[] до 200")
+        from ..bus import make_bus
+
+        bus = make_bus()
+        published = 0
+        for event in events:
+            if not isinstance(event, dict) or not event.get("external_id"):
+                continue
+            bus.publish(
+                {
+                    "type": event.get("type", "listing.created"),
+                    "source": event.get("source", "otomoto"),
+                    "external_id": str(event["external_id"]),
+                }
+            )
+            published += 1
+        return {"ok": True, "published": published}
 
     @app.post("/api/dev/publish")
     def dev_publish(
