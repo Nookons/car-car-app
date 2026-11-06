@@ -142,6 +142,9 @@ class MiniAppRepo:
                 "row_factory": dict_row,
                 "prepare_threshold": None,
             },
+            # transaction pooler рвёт простаивающие соединения — проверяем при выдаче
+            check=ConnectionPool.check_connection,
+            max_idle=60,
         )
 
     def close(self) -> None:
