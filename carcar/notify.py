@@ -164,7 +164,8 @@ class Notifier:
         }
         payload: dict[str, Any] = {
             "chat_id": chat_id,
-            "text": body[:4000],
+            # URL в тексте нужен Telegram, чтобы построить превью-карточку
+            "text": f"{body[:3900]}\n\n{url}",
             "parse_mode": "HTML",
             "reply_markup": keyboard,
             # Большой превью-блок с фото: Telegram берёт OpenGraph нашей страницы
