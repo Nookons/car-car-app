@@ -25,12 +25,12 @@ export function BodyIcon({ body, className }: { body: string; className?: string
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={`/bodies/${file}.svg`}
+        src={`/bodies/${file}.svg?v=2`}
         alt=""
         loading="lazy"
         decoding="async"
         onError={() => setFailed(true)}
-        className={cn("h-8 w-12 object-contain", className)}
+        className={cn("h-8 w-12 object-contain grayscale", className)}
       />
     );
   }
