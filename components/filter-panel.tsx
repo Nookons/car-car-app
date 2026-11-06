@@ -35,6 +35,8 @@ export function FilterPanel({
   const [showAdvanced, setShowAdvanced] = React.useState(false);
   const [showMore, setShowMore] = React.useState(false);
   const [total, setTotal] = React.useState<number | null>(null);
+  const [countLoading, setCountLoading] = React.useState(true);
+  const countSeq = React.useRef(0);
   const [makes, setMakes] = React.useState<Option[]>([]);
   const [models, setModels] = React.useState<Option[]>([]);
   const [options, setOptions] = React.useState<{
@@ -77,12 +79,25 @@ export function FilterPanel({
 
   // Живой счётчик под выбранные параметры — как «Показать 672 382 предложения».
   React.useEffect(() => {
-    const timer = setTimeout(() => {
-      api<{ total: number }>(`/listings?${filtersToQuery(draft, 0, 1)}`)
-        .then((d) => setTotal(d.total))
-        .catch(() => setTotal(null));
+    const id = ++countSeq.current;
+    const controller = new AbortController();
+    setCountLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const data = await api<{ total: number }>(`/listings?${filtersToQuery(draft, 0, 1)}`, {
+          signal: controller.signal,
+        });
+        if (id === countSeq.current) setTotal(data.total);
+      } catch {
+        if (id === countSeq.current) setTotal(null);
+      } finally {
+        if (id === countSeq.current) setCountLoading(false);
+      }
     }, 350);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [draft]);
 
   const tab: "all" | "new" | "used" =
@@ -452,8 +467,14 @@ export function FilterPanel({
         </div>
       </div>
 
-      <Button className="h-14 w-full rounded-2xl text-base" onClick={() => onApply(draft)}>
-        {t("filter.showCount").replace("{count}", num(total ?? 0))}
+      <Button
+        className="h-14 w-full rounded-2xl text-base"
+        disabled={countLoading}
+        onClick={() => onApply(draft)}
+      >
+        {countLoading
+          ? t("filter.counting")
+          : t("filter.showCount").replace("{count}", num(total ?? 0))}
       </Button>
     </section>
   );

@@ -154,12 +154,15 @@ const ru = {
   "filter.allFilters": "Все фильтры",
   "filter.hideFilters": "Свернуть фильтры",
   "filter.showCount": "Показать {count} предложений",
+  "filter.counting": "Считаем…",
   "filter.saveSearch": "Сохранить поиск",
   "filter.makeModel": "Выбрать марку и модель",
   "filter.params": "Параметры",
   "filter.engineFromL": "Объём от, л",
   "filter.engineToL": "до, л",
   "common.from": "от",
+  "common.retry": "Повторить",
+
   "common.to": "до",
 
   "fuel.petrol": "Бензин",
@@ -336,12 +339,15 @@ const pl: Record<Key, string> = {
   "filter.allFilters": "Wszystkie filtry",
   "filter.hideFilters": "Zwiń filtry",
   "filter.showCount": "Pokaż {count} ofert",
+  "filter.counting": "Liczę…",
   "filter.saveSearch": "Zapisz wyszukiwanie",
   "filter.makeModel": "Wybierz markę i model",
   "filter.params": "Parametry",
   "filter.engineFromL": "Pojemność od, l",
   "filter.engineToL": "do, l",
   "common.from": "od",
+  "common.retry": "Spróbuj ponownie",
+
   "common.to": "do",
 
   "fuel.petrol": "Benzyna",
@@ -516,12 +522,15 @@ const en: Record<Key, string> = {
   "filter.allFilters": "All filters",
   "filter.hideFilters": "Hide filters",
   "filter.showCount": "Show {count} listings",
+  "filter.counting": "Counting…",
   "filter.saveSearch": "Save search",
   "filter.makeModel": "Choose make and model",
   "filter.params": "Parameters",
   "filter.engineFromL": "Engine from, l",
   "filter.engineToL": "to, l",
   "common.from": "from",
+  "common.retry": "Retry",
+
   "common.to": "to",
 
   "fuel.petrol": "Petrol",
@@ -697,12 +706,15 @@ const uk: Record<Key, string> = {
   "filter.allFilters": "Усі фільтри",
   "filter.hideFilters": "Згорнути фільтри",
   "filter.showCount": "Показати {count} оголошень",
+  "filter.counting": "Рахую…",
   "filter.saveSearch": "Зберегти пошук",
   "filter.makeModel": "Обрати марку й модель",
   "filter.params": "Параметри",
   "filter.engineFromL": "Об'єм від, л",
   "filter.engineToL": "до, л",
   "common.from": "від",
+  "common.retry": "Повторити",
+
   "common.to": "до",
 
   "fuel.petrol": "Бензин",

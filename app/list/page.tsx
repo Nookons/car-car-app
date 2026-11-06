@@ -19,20 +19,43 @@ export default function ListPage() {
   const [items, setItems] = React.useState<Listing[]>([]);
   const [total, setTotal] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
+  const [loadingMore, setLoadingMore] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const seq = React.useRef(0);
+  const abortRef = React.useRef<AbortController | null>(null);
 
   const fetchPage = React.useCallback(
     async (next: Filters, offset = 0) => {
       if (!token) return;
-      setLoading(true);
+      // Новый запрос отменяет предыдущий: старый ответ не перетрёт новый.
+      const id = ++seq.current;
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setError(null);
+      if (offset === 0) {
+        setLoading(true);
+        setItems([]);
+        setTotal(0);
+      } else {
+        setLoadingMore(true);
+      }
       try {
         const data = await api<{ items: Listing[]; total: number }>(
           `/listings?${filtersToQuery(next, offset)}`,
-          { token },
+          { token, signal: controller.signal },
         );
+        if (id !== seq.current) return;
         setTotal(data.total);
         setItems((prev) => (offset === 0 ? data.items : [...prev, ...data.items]));
+      } catch (exc) {
+        if (controller.signal.aborted) return;
+        if (id === seq.current) setError(exc instanceof Error ? exc.message : "error");
       } finally {
-        setLoading(false);
+        if (id === seq.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
     [token],
@@ -76,7 +99,14 @@ export default function ListPage() {
 
       <FilterPanel initial={filters} onApply={apply} />
 
-      {loading ? (
+      {error ? (
+        <div className="space-y-3 rounded-2xl border bg-card p-6 text-center">
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button variant="outline" onClick={() => fetchPage(filters, 0)}>
+            {t("common.retry")}
+          </Button>
+        </div>
+      ) : loading ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, index) => (
             <Skeleton key={index} className="h-56" />
@@ -92,14 +122,22 @@ export default function ListPage() {
         </div>
       )}
 
+      {loadingMore ? (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-56" />
+          ))}
+        </div>
+      ) : null}
+
       {items.length < total ? (
         <Button
           variant="outline"
           className="w-full"
-          disabled={loading}
+          disabled={loadingMore}
           onClick={() => fetchPage(filters, items.length)}
         >
-          {loading ? t("list.loading") : `${t("list.more")} (${num(total - items.length)})`}
+          {loadingMore ? t("list.loading") : `${t("list.more")} (${num(total - items.length)})`}
         </Button>
       ) : null}
     </div>

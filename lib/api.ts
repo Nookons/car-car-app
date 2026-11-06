@@ -14,7 +14,12 @@ export class ApiError extends Error {
 
 export async function api<T>(
   path: string,
-  options: { token?: string | null; method?: string; body?: unknown } = {},
+  options: {
+    token?: string | null;
+    method?: string;
+    body?: unknown;
+    signal?: AbortSignal;
+  } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
@@ -25,6 +30,7 @@ export async function api<T>(
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
     cache: "no-store",
+    signal: options.signal,
   });
 
   if (!response.ok) {
