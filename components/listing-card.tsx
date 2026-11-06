@@ -17,7 +17,7 @@ export function ListingCard({ item }: { item: Listing }) {
   return (
     <Link
       href={`/listing/${item.id}`}
-      className="group overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md"
+      className="group min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md"
     >
       <SmartImage
         src={item.thumbnail ?? ""}

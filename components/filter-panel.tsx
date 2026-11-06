@@ -4,6 +4,7 @@ import * as React from "react";
 import { BookmarkSimple, CaretDown, SlidersHorizontal } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
 import { BodyIcon } from "@/components/body-icon";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { filtersToQuery } from "@/lib/filters";
@@ -32,6 +33,11 @@ export function FilterPanel({
   const { t } = useI18n();
   const { token } = useAuth();
   const [draft, setDraft] = React.useState<Filters>(initial);
+
+  // Если фильтры применили снаружи (URL/сохранённый поиск) — подхватываем их.
+  React.useEffect(() => {
+    setDraft(initial);
+  }, [initial]);
   const [showAdvanced, setShowAdvanced] = React.useState(false);
   const [showMore, setShowMore] = React.useState(false);
   const [total, setTotal] = React.useState<number | null>(null);
@@ -148,7 +154,7 @@ export function FilterPanel({
     }`;
 
   return (
-    <section className="space-y-3 rounded-2xl border bg-card p-3 md:p-4">
+    <section className="w-full min-w-0 space-y-3 rounded-2xl border bg-card p-3 md:p-4">
       <div className="flex gap-1 rounded-2xl bg-secondary p-1">
         <button className={tabClass(tab === "all")} onClick={() => applyTab("all")}>
           {t("tab.all")}
@@ -161,14 +167,22 @@ export function FilterPanel({
         </button>
       </div>
 
-      <div className="flex gap-2 md:hidden">
-        <Button variant="outline" className="flex-1 justify-between" onClick={() => setShowAdvanced((v) => !v)}>
-          {t("filter.makeModel")}
-          <CaretDown size={16} className={showAdvanced ? "rotate-180" : ""} />
+      <div className="grid grid-cols-2 gap-2 md:hidden">
+        <Button
+          variant="outline"
+          className="min-w-0 justify-between px-3"
+          onClick={() => setShowAdvanced((v) => !v)}
+        >
+          <span className="truncate">{t("filter.makeModel")}</span>
+          <CaretDown size={16} className={`shrink-0 ${showAdvanced ? "rotate-180" : ""}`} />
         </Button>
-        <Button variant="outline" onClick={() => setShowAdvanced((v) => !v)}>
-          <SlidersHorizontal size={16} />
-          {t("filter.params")}
+        <Button
+          variant="outline"
+          className="min-w-0 px-3"
+          onClick={() => setShowAdvanced((v) => !v)}
+        >
+          <SlidersHorizontal size={16} className="shrink-0" />
+          <span className="truncate">{t("filter.params")}</span>
         </Button>
       </div>
 
@@ -398,7 +412,7 @@ export function FilterPanel({
         </div>
       ) : null}
 
-      <div className="no-scrollbar flex gap-2 overflow-x-auto md:hidden">
+      <div className="no-scrollbar flex w-full min-w-0 gap-2 overflow-x-auto md:hidden">
         {BODIES.map((body) => (
           <button
             key={body}
@@ -413,7 +427,7 @@ export function FilterPanel({
         ))}
       </div>
 
-      <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1 md:hidden">
+      <div className="no-scrollbar flex w-full min-w-0 gap-3 overflow-x-auto pb-1 md:hidden">
         {makes.slice(0, 8).map((make) => (
           <button
             key={make.value}
@@ -426,17 +440,18 @@ export function FilterPanel({
               draft.make === make.value ? "opacity-100" : "opacity-80"
             }`}
           >
-            <span className={`grid h-12 w-12 place-items-center rounded-full border bg-card text-sm font-semibold ${
-              draft.make === make.value ? "border-primary" : ""
-            }`}>
-              {make.value.slice(0, 2).toUpperCase()}
-            </span>
+            <BrandLogo
+              make={make.value}
+              className={`h-12 w-12 border ${
+                draft.make === make.value ? "border-primary" : "border-border"
+              }`}
+            />
             <span className="truncate w-full text-center">{make.value}</span>
           </button>
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <button
           onClick={() => setShowMore((v) => !v)}
           className="inline-flex items-center gap-1 text-sm font-medium"
@@ -445,7 +460,7 @@ export function FilterPanel({
           {showMore ? t("filter.hideFilters") : t("filter.allFilters")}
         </button>
 
-        <div className="ml-auto flex flex-1 items-center gap-2 md:flex-none">
+        <div className="ml-auto flex min-w-0 flex-1 items-center gap-2 md:flex-none">
           {saveMode || saved ? (
             <div className="flex flex-1 gap-2">
               <input

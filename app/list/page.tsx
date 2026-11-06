@@ -107,7 +107,7 @@ export default function ListPage() {
           </Button>
         </div>
       ) : loading ? (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+        <div className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, index) => (
             <Skeleton key={index} className="h-56" />
           ))}
@@ -115,7 +115,7 @@ export default function ListPage() {
       ) : items.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">{t("list.empty")}</p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+        <div className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {items.map((item) => (
             <ListingCard key={item.id} item={item} />
           ))}
@@ -123,7 +123,7 @@ export default function ListPage() {
       )}
 
       {loadingMore ? (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+        <div className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
             <Skeleton key={index} className="h-56" />
           ))}
