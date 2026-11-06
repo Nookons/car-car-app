@@ -15,6 +15,7 @@ LOG="logs/collector.log"
 SHARDS="${CARCAR_ENRICH_SHARDS:-0}"
 
 # Обогащение: фото, характеристики, описание. Каждый воркер берёт свой шард очереди.
+if [ "$SHARDS" -gt 0 ]; then
 for i in $(seq 0 $((SHARDS - 1))); do
     (
         while true; do
@@ -24,6 +25,7 @@ for i in $(seq 0 $((SHARDS - 1))); do
         done
     ) &
 done
+fi
 
 # Полный обход: продолжает с места из sweep_state, поэтому рестарт безопасен.
 if [ "${CARCAR_WITH_SWEEP:-1}" = "1" ]; then

@@ -100,19 +100,30 @@ def discover(
             stats.updated += result.updated
             stats.unchanged += result.unchanged
             stats.rejected += result.rejected
-            if bus is not None and fresh:
-                # Событие для воркера уведомлений: новое объявление в базе.
-                try:
-                    for item in fresh:
-                        bus.publish(
-                            {
-                                "type": "listing.created",
-                                "source": settings.source,
-                                "external_id": item.id,
-                            }
-                        )
-                except Exception:
-                    pass
+            if fresh and sink is not None:
+                # Сначала догружаем карточку, потом уведомляем: иначе пользователь
+                # получает объявление без фото, описания и характеристик.
+                ready = []
+                for item in fresh:
+                    try:
+                        if fetch_detail(client, store, item, sink=sink):
+                            ready.append(item)
+                        else:
+                            log.info("карточка %s не загрузилась — уведомление отложено", item.id)
+                    except Exception as exc:  # noqa: BLE001
+                        log.warning("карточка %s: %s", item.id, exc)
+                if bus is not None and ready:
+                    try:
+                        for item in ready:
+                            bus.publish(
+                                {
+                                    "type": "listing.created",
+                                    "source": settings.source,
+                                    "external_id": item.id,
+                                }
+                            )
+                    except Exception:
+                        pass
             known_ratio = 1 - result.inserted / max(len(parsed.items), 1)
             tail = f" | обновлено {result.updated}" if result.updated else ""
             shown = f"новых {result.inserted:2}{tail}"
@@ -550,17 +561,9 @@ def watch(
                 "%d опросов подряд без новых объявлений — проверьте выдачу", zero_streak
             )
 
+        # Карточки новинок уже скачаны внутри discover (до публикации события),
+        # поэтому отдельный проход здесь не нужен.
         details_round = 0
-        for item in result.items[:details]:
-            try:
-                if fetch_detail(client, store, item, sink=sink):
-                    total.details_saved += 1
-                    details_round += 1
-                else:
-                    total.details_skipped += 1
-            except Exception as exc:  # noqa: BLE001
-                total.errors += 1
-                log.warning("карточка %s: %s", item.id, exc)
 
         if sink is not None:
             try:
