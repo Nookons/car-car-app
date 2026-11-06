@@ -301,3 +301,13 @@ create table if not exists notification (
 
 create index if not exists notification_pending_idx
     on notification (status) where status = 'pending';
+
+-- гарантии доставки: повторы и мёртвая очередь
+alter table notification add column if not exists next_attempt_at timestamptz not null default now();
+alter table notification add column if not exists last_error text;
+alter table notification add column if not exists telegram_message_id bigint;
+alter table notification drop constraint if exists notification_status_check;
+alter table notification add constraint notification_status_check
+    check (status in ('pending', 'sent', 'failed', 'held', 'dead'));
+create index if not exists notification_retry_idx
+    on notification (status, next_attempt_at) where status in ('pending', 'failed');

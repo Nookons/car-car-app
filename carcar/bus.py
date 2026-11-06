@@ -98,7 +98,24 @@ class RedisStreamBus(EventBus):
     def consume(
         self, handler: Callable[[dict[str, Any]], None], consumer: str = "worker-1"
     ) -> None:
+        counter = 0
         while True:
+            counter += 1
+            if counter % 6 == 0:
+                # Если воркер упал после чтения, но до XACK, запись висит в pending.
+                try:
+                    claimed = self.client.xautoclaim(
+                        self.stream, self.group, consumer, min_idle_time=60_000,
+                        start_id="0-0", count=20,
+                    )
+                    for entry_id, fields in claimed[1]:
+                        try:
+                            handler(json.loads(fields["payload"]))
+                            self.client.xack(self.stream, self.group, entry_id)
+                        except Exception:  # noqa: BLE001
+                            log.exception("зависшее событие %s", entry_id)
+                except Exception as exc:  # noqa: BLE001
+                    log.debug("xautoclaim: %s", exc)
             try:
                 response = self.client.xreadgroup(
                     self.group, consumer, {self.stream: ">"}, count=20, block=5000

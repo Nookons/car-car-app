@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import threading
 import time
 
 from .bus import make_bus
@@ -39,13 +40,17 @@ def run(consumer: str = "worker-1", minutes: float | None = None) -> int:
         except Exception:  # noqa: BLE001
             log.exception("ошибка обработки события")
 
-    if minutes:
-        deadline = time.monotonic() + minutes * 60
+    # Слушаем шину в фоне, а в основном цикле добиваем недоставленное из БД.
+    threading.Thread(target=bus.consume, args=(handler, consumer), daemon=True).start()
+
+    deadline = time.monotonic() + minutes * 60 if minutes else None
+    while True:
         try:
-            bus.consume(handler, consumer)
-        except KeyboardInterrupt:
+            sent = notifier.retry_due(50)
+            if sent:
+                log.info("повторная доставка: %s", sent)
+        except Exception:  # noqa: BLE001
+            log.exception("ошибка ретраев")
+        if deadline and time.monotonic() > deadline:
             return 0
-        if time.monotonic() > deadline:
-            return 0
-    bus.consume(handler, consumer)
-    return 0
+        time.sleep(20)

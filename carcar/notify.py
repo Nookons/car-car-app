@@ -19,6 +19,15 @@ from .messages import messages as msg
 
 log = logging.getLogger("carcar.notify")
 
+# Паузы между попытками: 1 мин → 5 → 15 → 1 ч → 6 ч; после 6 попыток — dead.
+BACKOFF_SECONDS = (60, 300, 900, 3600, 21600)
+MAX_ATTEMPTS = 6
+
+
+def retry_delay(attempts: int) -> int:
+    index = min(max(attempts - 1, 0), len(BACKOFF_SECONDS) - 1)
+    return BACKOFF_SECONDS[index]
+
 
 def _num(value: Any) -> int | None:
     return None if value is None else int(value)
@@ -111,16 +120,18 @@ class Notifier:
             )
             return cur.fetchall()
 
-    def remember(self, conn: psycopg.Connection, user_id: int, listing_id: int) -> bool:
+    def remember(
+        self, conn: psycopg.Connection, user_id: int, listing_id: int, status: str = "pending"
+    ) -> bool:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 insert into notification (user_id, listing_id, status)
-                values (%s, %s, 'pending')
+                values (%s, %s, %s)
                 on conflict (user_id, listing_id) do nothing
                 returning id
                 """,
-                (user_id, listing_id),
+                (user_id, listing_id, status),
             )
             inserted = cur.fetchone()
         conn.commit()
@@ -135,7 +146,9 @@ class Notifier:
         self._last_global = time.monotonic()
         self._last_chat[chat_id] = self._last_global
 
-    def send(self, chat_id: int, item: dict[str, Any], lang: str | None = "ru") -> bool:
+    def send(
+        self, chat_id: int, item: dict[str, Any], lang: str | None = "ru"
+    ) -> tuple[bool, int | None, str | None]:
         self._throttle(chat_id)
         url = f"{self.public_url}/listing/{item['id']}"
         text = msg(lang)
@@ -163,16 +176,103 @@ class Notifier:
         response = self.client.post(
             f"https://api.telegram.org/bot{self.bot_token}/{endpoint}", json=payload
         )
-        if not response.json().get("ok") and endpoint == "sendPhoto":
+        data = response.json()
+        if not data.get("ok") and endpoint == "sendPhoto":
             payload.pop("photo", None)
             response = self.client.post(
                 f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
                 json={"chat_id": chat_id, "text": caption[:1024], "reply_markup": keyboard},
             )
-        ok = bool(response.json().get("ok"))
-        if not ok:
-            log.warning("Telegram отказал: %s", response.text[:200])
-        return ok
+            data = response.json()
+        if not data.get("ok"):
+            log.warning("Telegram отказал: %s", data.get("description"))
+            return False, None, str(data.get("description") or "telegram error")[:500]
+        message_id = (data.get("result") or {}).get("message_id")
+        return True, int(message_id) if message_id else None, None
+
+    # -- фиксация результата --------------------------------------------
+    def mark_sent(
+        self,
+        conn: psycopg.Connection,
+        user_id: int,
+        listing_id: int,
+        message_id: int | None,
+    ) -> None:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                update notification
+                   set status = 'sent', sent_at = now(), attempts = attempts + 1,
+                       telegram_message_id = %s, last_error = null
+                 where user_id = %s and listing_id = %s
+                """,
+                (message_id, user_id, listing_id),
+            )
+        conn.commit()
+
+    def mark_failed(
+        self,
+        conn: psycopg.Connection,
+        user_id: int,
+        listing_id: int,
+        attempts: int,
+        error: str,
+    ) -> None:
+        next_status = "dead" if attempts + 1 >= MAX_ATTEMPTS else "failed"
+        delay = retry_delay(attempts + 1)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                update notification
+                   set status = %s, attempts = attempts + 1, last_error = %s,
+                       next_attempt_at = now() + make_interval(secs => %s)
+                 where user_id = %s and listing_id = %s
+                """,
+                (next_status, error[:500], delay, user_id, listing_id),
+            )
+        conn.commit()
+
+    def retry_due(self, limit: int = 50) -> int:
+        """Досылает всё, что не ушло: упало, не дошло, потерялось при рестарте."""
+        conn = self.connect()
+        sent = 0
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select n.id, n.user_id, n.listing_id, n.attempts,
+                           u.tg_id, u.lang,
+                           l.title, l.price, l.currency, l.year, l.mileage_km,
+                           l.city, l.thumb_url, l.url
+                    from notification n
+                    join app_user u on u.id = n.user_id
+                    join listing l on l.id = n.listing_id
+                    where n.status in ('pending', 'failed')
+                      and n.next_attempt_at <= now()
+                      and u.notify_new and not u.digest
+                    order by n.next_attempt_at
+                    limit %s
+                    """,
+                    (limit,),
+                )
+                rows = cur.fetchall()
+            for row in rows:
+                item = dict(row)
+                item["id"] = row["listing_id"]
+                try:
+                    ok, message_id, error = self.send(row["tg_id"], item, row.get("lang"))
+                except Exception as exc:  # noqa: BLE001
+                    ok, message_id, error = False, None, str(exc)
+                if ok:
+                    self.mark_sent(conn, row["user_id"], row["listing_id"], message_id)
+                    sent += 1
+                else:
+                    self.mark_failed(
+                        conn, row["user_id"], row["listing_id"], row["attempts"], error or ""
+                    )
+            return sent
+        finally:
+            conn.close()
 
     # -- обработка события ----------------------------------------------
     def handle_event(self, event: dict[str, Any]) -> int:
@@ -187,22 +287,20 @@ class Notifier:
             for sub in self.subscriptions(conn):
                 if not matches(sub["criteria"] or {}, item):
                     continue
-                if not self.remember(conn, sub["user_id"], item["id"]):
+                status = "held" if sub["digest"] else "pending"
+                if not self.remember(conn, sub["user_id"], item["id"], status):
                     continue
                 if sub["digest"]:
                     continue  # уйдёт в дайджесте
                 try:
-                    if self.send(sub["tg_id"], item, sub.get("lang")):
-                        with conn.cursor() as cur:
-                            cur.execute(
-                                "update notification set status = 'sent', sent_at = now() "
-                                "where user_id = %s and listing_id = %s",
-                                (sub["user_id"], item["id"]),
-                            )
-                        conn.commit()
-                        sent += 1
+                    ok, message_id, error = self.send(sub["tg_id"], item, sub.get("lang"))
                 except Exception as exc:  # noqa: BLE001
-                    log.warning("не отправил %s: %s", sub["tg_id"], exc)
+                    ok, message_id, error = False, None, str(exc)
+                if ok:
+                    self.mark_sent(conn, sub["user_id"], item["id"], message_id)
+                    sent += 1
+                else:
+                    self.mark_failed(conn, sub["user_id"], item["id"], 0, error or "send failed")
             return sent
         finally:
             conn.close()
