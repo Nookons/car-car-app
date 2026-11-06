@@ -43,14 +43,46 @@ def run(consumer: str = "worker-1", minutes: float | None = None) -> int:
     # Слушаем шину в фоне, а в основном цикле добиваем недоставленное из БД.
     threading.Thread(target=bus.consume, args=(handler, consumer), daemon=True).start()
 
+    admin_chat = int(os.environ.get("CARCAR_ADMIN_CHAT_ID", "0") or 0)
     deadline = time.monotonic() + minutes * 60 if minutes else None
+    last_alert: str | None = None
+    tick = 0
+
     while True:
+        tick += 1
         try:
             sent = notifier.retry_due(50)
             if sent:
                 log.info("повторная доставка: %s", sent)
         except Exception:  # noqa: BLE001
             log.exception("ошибка ретраев")
+
+        try:
+            delivered = notifier.send_digests(min_age_minutes=60)
+            if delivered:
+                log.info("дайджест отправлен: %s", delivered)
+        except Exception:  # noqa: BLE001
+            log.exception("ошибка дайджеста")
+
+        if admin_chat and tick % 15 == 0:  # раз в ~5 минут
+            try:
+                state = notifier.health()
+                problems = []
+                if state["dead"]:
+                    problems.append(f"dead-уведомлений: {state['dead']}")
+                idle = state["collector_idle_min"]
+                if idle is not None and idle > 20:
+                    problems.append(f"сборщик молчит {idle} мин")
+                text = "⚠️ CarCar: " + "; ".join(problems) if problems else ""
+                if text and text != last_alert:
+                    notifier.alert(text, admin_chat)
+                    last_alert = text
+                    log.warning("алерт админу: %s", text)
+                elif not text:
+                    last_alert = None
+            except Exception:  # noqa: BLE001
+                log.exception("ошибка алертов")
+
         if deadline and time.monotonic() > deadline:
             return 0
         time.sleep(20)

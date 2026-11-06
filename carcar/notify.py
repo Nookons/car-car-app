@@ -14,7 +14,7 @@ import httpx
 import psycopg
 from psycopg.rows import dict_row
 
-from .messages import grid_caption
+from .messages import digest, grid_caption
 from .messages import messages as msg
 
 log = logging.getLogger("carcar.notify")
@@ -22,6 +22,7 @@ log = logging.getLogger("carcar.notify")
 # Паузы между попытками: 1 мин → 5 → 15 → 1 ч → 6 ч; после 6 попыток — dead.
 BACKOFF_SECONDS = (60, 300, 900, 3600, 21600)
 MAX_ATTEMPTS = 6
+HOURLY_CAP = 10  # больше 10 сообщений в час одному человеку — перебор
 
 
 def retry_delay(attempts: int) -> int:
@@ -196,6 +197,24 @@ class Notifier:
         return True, int(message_id) if message_id else None, None
 
     # -- фиксация результата --------------------------------------------
+    def sent_last_hour(self, conn: psycopg.Connection, user_id: int) -> int:
+        with conn.cursor() as cur:
+            cur.execute(
+                "select count(*) from notification where user_id = %s "
+                "and status = 'sent' and sent_at > now() - interval '1 hour'",
+                (user_id,),
+            )
+            return int(cur.fetchone()[0])
+
+    def hold(self, conn: psycopg.Connection, user_id: int, listing_id: int) -> None:
+        with conn.cursor() as cur:
+            cur.execute(
+                "update notification set status = 'held' "
+                "where user_id = %s and listing_id = %s",
+                (user_id, listing_id),
+            )
+        conn.commit()
+
     def mark_sent(
         self,
         conn: psycopg.Connection,
@@ -279,6 +298,102 @@ class Notifier:
         finally:
             conn.close()
 
+    def send_digests(self, min_age_minutes: int = 60, limit_users: int = 50) -> int:
+        """Собирает held-уведомления в одно сообщение на пользователя."""
+        conn = self.connect()
+        sent = 0
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select u.id, u.tg_id, u.lang, count(*) as total
+                    from notification n join app_user u on u.id = n.user_id
+                    where n.status = 'held'
+                      and n.created_at < now() - make_interval(mins => %s)
+                    group by u.id, u.tg_id, u.lang
+                    limit %s
+                    """,
+                    (min_age_minutes, limit_users),
+                )
+                users = cur.fetchall()
+            for user in users:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        select l.id, l.title, l.price, l.url
+                        from notification n join listing l on l.id = n.listing_id
+                        where n.user_id = %s and n.status = 'held'
+                          and n.created_at < now() - make_interval(mins => %s)
+                        order by n.created_at limit 20
+                        """,
+                        (user["id"], min_age_minutes),
+                    )
+                    items = cur.fetchall()
+                if not items:
+                    continue
+                text = digest([dict(item) for item in items], user.get("lang"), int(user["total"]))
+                keyboard = {
+                    "inline_keyboard": [[
+                        {
+                            "text": msg(user.get("lang"))["open_app"],
+                            "web_app": {"url": f"{self.public_url}/list"},
+                        }
+                    ]]
+                }
+                response = self.client.post(
+                    f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
+                    json={
+                        "chat_id": user["tg_id"],
+                        "text": text[:4000],
+                        "parse_mode": "HTML",
+                        "reply_markup": keyboard,
+                        "disable_web_page_preview": True,
+                    },
+                )
+                data = response.json()
+                if not data.get("ok"):
+                    log.warning("дайджест не ушёл: %s", data.get("description"))
+                    continue
+                message_id = (data.get("result") or {}).get("message_id")
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        update notification set status = 'sent', sent_at = now(),
+                               attempts = attempts + 1, telegram_message_id = %s
+                        where user_id = %s and status = 'held'
+                          and created_at < now() - make_interval(mins => %s)
+                        """,
+                        (message_id, user["id"], min_age_minutes),
+                    )
+                conn.commit()
+                sent += 1
+            return sent
+        finally:
+            conn.close()
+
+    def health(self) -> dict[str, Any]:
+        conn = self.connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("select count(*) from notification where status = 'dead'")
+                dead = int(cur.fetchone()[0])
+                cur.execute(
+                    "select extract(epoch from (now() - max(heartbeat_at))) / 60 "
+                    "from collector where heartbeat_at is not null"
+                )
+                row = cur.fetchone()
+                idle = int(row[0]) if row and row[0] is not None else None
+            return {"dead": dead, "collector_idle_min": idle}
+        finally:
+            conn.close()
+
+    def alert(self, text: str, admin_chat: int) -> bool:
+        response = self.client.post(
+            f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
+            json={"chat_id": admin_chat, "text": text[:4000], "parse_mode": "HTML"},
+        )
+        return bool(response.json().get("ok"))
+
     # -- обработка события ----------------------------------------------
     def handle_event(self, event: dict[str, Any]) -> int:
         if event.get("type") != "listing.created":
@@ -297,6 +412,10 @@ class Notifier:
                     continue
                 if sub["digest"]:
                     continue  # уйдёт в дайджесте
+                if self.sent_last_hour(conn, sub["user_id"]) >= HOURLY_CAP:
+                    # Не заваливаем человека: остаток уйдёт дайджестом.
+                    self.hold(conn, sub["user_id"], item["id"])
+                    continue
                 try:
                     ok, message_id, error = self.send(sub["tg_id"], item, sub.get("lang"))
                 except Exception as exc:  # noqa: BLE001

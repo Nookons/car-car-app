@@ -24,6 +24,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "open_app": "🚗 Открыть в CarCar",
         "my_filters": "Мои фильтры",
         "km": "км",
+    "digest_title": "Новые объявления по вашим фильтрам",
+    "digest_more": "и ещё {count} — открой приложение",
     },
     "pl": {
         "start": (
@@ -40,6 +42,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "open_app": "🚗 Otwórz w CarCar",
         "my_filters": "Moje filtry",
         "km": "km",
+    "digest_title": "Nowe ogłoszenia według Twoich filtrów",
+    "digest_more": "i jeszcze {count} — otwórz aplikację",
     },
     "en": {
         "start": (
@@ -56,6 +60,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "open_app": "🚗 Open in CarCar",
         "my_filters": "My filters",
         "km": "km",
+    "digest_title": "New listings matching your filters",
+    "digest_more": "{count} more — open the app",
     },
     "uk": {
         "start": (
@@ -72,6 +78,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "open_app": "🚗 Відкрити в CarCar",
         "my_filters": "Мої фільтри",
         "km": "км",
+    "digest_title": "Нові оголошення за вашими фільтрами",
+    "digest_more": "і ще {count} — відкрий застосунок",
     },
 }
 
@@ -263,6 +271,19 @@ def article(item: dict, lang: str | None) -> str:
         f"{text['notify_ok']}\n\n"
         f"<blockquote expandable><pre>{table}</pre></blockquote>"
     )
+
+
+def digest(items: list[dict], lang: str | None, total: int = 0) -> str:
+    text = messages(lang)
+    lines = [f"<b>{text.get('digest_title') or 'Новые объявления'}</b>", ""]
+    for item in items[:10]:
+        price = f"{item['price']:,}".replace(",", " ") if item.get("price") else ""
+        title = _escape(str(item.get("title") or ""))[:60]
+        lines.append(f'<a href="{item["url"]}">{title}</a> — {price} zł')
+    if total > len(items[:10]):
+        lines.append("")
+        lines.append((text.get("digest_more") or "и ещё {count}").format(count=total - 10))
+    return "\n".join(lines)
 
 
 def messages(lang: str | None) -> dict[str, str]:
