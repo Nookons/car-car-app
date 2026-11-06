@@ -14,8 +14,7 @@ import httpx
 import psycopg
 from psycopg.rows import dict_row
 
-from .messages import SPEC_LABELS
-from .messages import caption as localized_caption
+from .messages import article
 from .messages import messages as msg
 
 log = logging.getLogger("carcar.notify")
@@ -100,6 +99,9 @@ class Notifier:
                 select l.id, l.external_id, l.title, l.price, l.currency, l.year,
                        l.mileage_km, l.city, l.make, l.model,
                        l.fuel, l.gearbox, l.body, l.thumb_url, l.url,
+                       l.engine_cm3, l.power_hp, l.drive, l.color, l.doors, l.seats,
+                       l.condition, l.co2_gkm, l.consumption_urban, l.consumption_extra,
+                       l.seller_name,
                        s.code as source_code
                 from listing l join source s on s.id = l.source_id
                 where s.code = %s and l.external_id = %s and l.status = 'active'
@@ -153,42 +155,29 @@ class Notifier:
         self._throttle(chat_id)
         url = f"{self.public_url}/listing/{item['id']}"
         text = msg(lang)
-        caption = localized_caption(item, lang)
+        body = article(item, lang)
         keyboard = {
             "inline_keyboard": [
                 [{"text": text["open_app"], "web_app": {"url": url}}],
-                [{
-                    "text": SPEC_LABELS.get(lang or "ru", SPEC_LABELS["ru"])["specs_button"],
-                    "callback_data": f"specs:{item['id']}",
-                }],
-                [
-                    {"text": text["my_filters"], "web_app": {"url": f"{self.public_url}/account"}},
-                ],
+                [{"text": text["my_filters"], "web_app": {"url": f"{self.public_url}/account"}}],
             ]
         }
         payload: dict[str, Any] = {
             "chat_id": chat_id,
-            "caption": caption[:1024],
+            "text": body[:4000],
+            "parse_mode": "HTML",
             "reply_markup": keyboard,
+            # Большой превью-блок с фото: Telegram берёт OpenGraph нашей страницы
+            "link_preview_options": {
+                "url": url,
+                "prefer_large_media": True,
+                "show_above_text": False,
+            },
         }
-        endpoint = "sendPhoto"
-        if item.get("thumb_url"):
-            payload["photo"] = item["thumb_url"]
-        else:
-            endpoint = "sendMessage"
-            payload["text"] = payload.pop("caption")
-
         response = self.client.post(
-            f"https://api.telegram.org/bot{self.bot_token}/{endpoint}", json=payload
+            f"https://api.telegram.org/bot{self.bot_token}/sendMessage", json=payload
         )
         data = response.json()
-        if not data.get("ok") and endpoint == "sendPhoto":
-            payload.pop("photo", None)
-            response = self.client.post(
-                f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
-                json={"chat_id": chat_id, "text": caption[:1024], "reply_markup": keyboard},
-            )
-            data = response.json()
         if not data.get("ok"):
             log.warning("Telegram отказал: %s", data.get("description"))
             return False, None, str(data.get("description") or "telegram error")[:500]

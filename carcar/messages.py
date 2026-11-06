@@ -145,6 +145,73 @@ def specs(lang: str | None) -> dict[str, str]:
     return SPEC_LABELS.get((lang or "ru").lower(), SPEC_LABELS["ru"])
 
 
+def _escape(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def article(item: dict, lang: str | None) -> str:
+    """Одно сообщение-статья: заголовок, факты, сворачиваемая таблица."""
+    text = messages(lang)
+    labels = specs(lang)
+    fuel = FUEL_LABELS.get(lang, {}).get(item.get("fuel") or "", item.get("fuel") or "")
+    gearbox = GEARBOX_LABELS.get(lang, {}).get(
+        item.get("gearbox") or "", item.get("gearbox") or ""
+    )
+    drive = DRIVE_LABELS.get(lang, {}).get(item.get("drive") or "", item.get("drive") or "")
+
+    def number(value):
+        return f"{value:,}".replace(",", " ") if value else ""
+
+    price = f"{number(item.get('price'))} zł"
+    facts = " · ".join(
+        str(part)
+        for part in [
+            item.get("year"),
+            f"{number(item.get('mileage_km'))} {text['km']}" if item.get("mileage_km") else None,
+            fuel,
+            gearbox,
+        ]
+        if part
+    )
+    rows = [
+        (labels["year"], item.get("year")),
+        (
+            labels["mileage"],
+            f"{number(item.get('mileage_km'))} {text['km']}" if item.get("mileage_km") else "",
+        ),
+        (labels["engine"], f"{item.get('engine_cm3')} cm³" if item.get("engine_cm3") else ""),
+        (labels["power"], f"{item.get('power_hp')} KM" if item.get("power_hp") else ""),
+        (labels["fuel"], fuel),
+        (labels["gearbox"], gearbox),
+        (labels["body"], item.get("body") or ""),
+        (labels["drive"], drive),
+        (labels["color"], item.get("color") or ""),
+        (labels["doors"], item.get("doors") or ""),
+        (labels["seats"], item.get("seats") or ""),
+        (labels["condition"], item.get("condition") or ""),
+        (labels["co2"], f"{item.get('co2_gkm')} g/km" if item.get("co2_gkm") else ""),
+        (
+            labels["urban"],
+            f"{item.get('consumption_urban')} l/100" if item.get("consumption_urban") else "",
+        ),
+        (
+            labels["extra"],
+            f"{item.get('consumption_extra')} l/100" if item.get("consumption_extra") else "",
+        ),
+        (labels["city"], item.get("city") or ""),
+        (labels["seller"], item.get("seller_name") or ""),
+    ]
+    table = "\n".join(f"{label:<20}{value}" for label, value in rows if value)
+    return (
+        f"<b>{_escape(str(item.get('title') or ''))}</b>\n"
+        f"<b>{price}</b>\n"
+        f"{_escape(facts)}\n"
+        f"📍 {_escape(str(item.get('city') or '—'))}\n"
+        f"{text['notify_ok']}\n\n"
+        f"<blockquote expandable><pre>{table}</pre></blockquote>"
+    )
+
+
 def messages(lang: str | None) -> dict[str, str]:
     return MESSAGES.get((lang or "ru").lower(), MESSAGES["ru"])
 
