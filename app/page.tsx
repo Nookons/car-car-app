@@ -34,9 +34,8 @@ export default function HomePage() {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    if (!token) return;
     let cancelled = false;
-    api<{ items: Listing[] }>("/listings?limit=6&sort=new", { token })
+    api<{ items: Listing[] }>("/listings?limit=6&sort=new", token ? { token } : {})
       .then((data) => !cancelled && setItems(data.items))
       .finally(() => !cancelled && setLoading(false));
     return () => {

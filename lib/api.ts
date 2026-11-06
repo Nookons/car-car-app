@@ -25,11 +25,14 @@ export async function api<T>(
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
 
+  const method = options.method ?? "GET";
+  const isPublicGet = method === "GET" && !options.token;
   const response = await fetch(`${API_URL}/api${path}`, {
-    method: options.method ?? "GET",
+    method,
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    cache: "no-store",
+    // Публичные GET можно кэшировать браузеру; персональные — никогда.
+    cache: isPublicGet ? "default" : "no-store",
     signal: options.signal,
   });
 

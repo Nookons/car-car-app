@@ -7,6 +7,7 @@ import { BodyIcon } from "@/components/body-icon";
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { cacheGet, cacheSet } from "@/lib/cache";
 import { filtersToQuery } from "@/lib/filters";
 import { num } from "@/lib/format";
 import { labelFor, useI18n } from "@/lib/i18n";
@@ -61,16 +62,26 @@ export function FilterPanel({
     setDraft((prev) => ({ ...prev, [key]: value }));
 
   React.useEffect(() => {
-    api<{ items: Option[] }>("/filters/makes").then((d) => setMakes(d.items)).catch(() => {});
-    api<{
-      gearboxes: Option[];
-      fuels: Option[];
-      bodies: Option[];
-      drives: Option[];
-      colors: Option[];
-    }>("/filters/options")
-      .then(setOptions)
-      .catch(() => {});
+    const cachedMakes = cacheGet<Option[]>("makes", 60 * 60_000);
+    if (cachedMakes) setMakes(cachedMakes);
+    else
+      api<{ items: Option[] }>("/filters/makes")
+        .then((d) => {
+          setMakes(d.items);
+          cacheSet("makes", d.items);
+        })
+        .catch(() => {});
+
+    type Options = { gearboxes: Option[]; fuels: Option[]; bodies: Option[]; drives: Option[]; colors: Option[] };
+    const cachedOptions = cacheGet<Options>("options", 60 * 60_000);
+    if (cachedOptions) setOptions(cachedOptions);
+    else
+      api<Options>("/filters/options")
+        .then((d) => {
+          setOptions(d);
+          cacheSet("options", d);
+        })
+        .catch(() => {});
   }, []);
 
   React.useEffect(() => {
@@ -78,8 +89,17 @@ export function FilterPanel({
       setModels([]);
       return;
     }
+    const key = `models:${draft.make}`;
+    const cached = cacheGet<Option[]>(key, 60 * 60_000);
+    if (cached) {
+      setModels(cached);
+      return;
+    }
     api<{ items: Option[] }>(`/filters/models?make=${encodeURIComponent(draft.make)}`)
-      .then((d) => setModels(d.items))
+      .then((d) => {
+        setModels(d.items);
+        cacheSet(key, d.items);
+      })
       .catch(() => setModels([]));
   }, [draft.make]);
 
@@ -87,15 +107,25 @@ export function FilterPanel({
   React.useEffect(() => {
     const id = ++countSeq.current;
     const controller = new AbortController();
-    setCountLoading(true);
+    const query = filtersToQuery(draft, 0, 1);
+    const cached = cacheGet<number>(`count:${query}`, 60_000);
+    if (cached != null) {
+      setTotal(cached);
+      setCountLoading(false);
+    } else {
+      setCountLoading(true);
+    }
     const timer = setTimeout(async () => {
       try {
-        const data = await api<{ total: number }>(`/listings?${filtersToQuery(draft, 0, 1)}`, {
+        const data = await api<{ total: number }>(`/listings?${query}`, {
           signal: controller.signal,
         });
-        if (id === countSeq.current) setTotal(data.total);
+        if (id === countSeq.current) {
+          setTotal(data.total);
+          cacheSet(`count:${query}`, data.total);
+        }
       } catch {
-        if (id === countSeq.current) setTotal(null);
+        if (id === countSeq.current && cached == null) setTotal(null);
       } finally {
         if (id === countSeq.current) setCountLoading(false);
       }

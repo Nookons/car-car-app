@@ -27,6 +27,7 @@ export default function AccountPage() {
   const [saving, setSaving] = React.useState(false);
   const [nameOpen, setNameOpen] = React.useState(false);
   const [name, setName] = React.useState("");
+  const [signupOpen, setSignupOpen] = React.useState(false);
 
   const load = React.useCallback(async () => {
     if (!token) return;
@@ -87,7 +88,33 @@ export default function AccountPage() {
       .catch(() => setSubs((prev) => prev.filter((item) => item.id !== draft.id)));
   };
 
-  if (!ready || loading) {
+  if (!ready) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-24" />
+        <Skeleton className="h-48" />
+      </div>
+    );
+  }
+
+  if (!token) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-lg font-semibold">{t("nav.account")}</h1>
+        <Card className="space-y-4 p-6 text-center">
+          <p className="text-sm text-muted-foreground">{t("account.guestHint")}</p>
+          <Button className="w-full" onClick={() => setSignupOpen(true)}>
+            {t("account.create")}
+          </Button>
+        </Card>
+        <Dialog open={signupOpen} onOpenChange={setSignupOpen} title={t("account.create")}>
+          <p className="text-sm text-muted-foreground">{t("account.comingSoon")}</p>
+        </Dialog>
+      </div>
+    );
+  }
+
+  if (loading) {
     return (
       <div className="space-y-3">
         <Skeleton className="h-24" />

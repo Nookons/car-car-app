@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowsOut, ChatCircle, Eye, Heart, PaperPlaneTilt } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
 import { CommentsSheet } from "@/components/comments-sheet";
@@ -32,7 +33,8 @@ type FeedItem = {
 };
 
 export default function FeedPage() {
-  const { token, ready } = useAuth();
+  const { token, ready, guest } = useAuth();
+  const router = useRouter();
   const { t } = useI18n();
   const [mode, setMode] = React.useState<"for_you" | "popular">("for_you");
   const [items, setItems] = React.useState<FeedItem[]>([]);
@@ -109,7 +111,10 @@ export default function FeedPage() {
   }, [items, token]);
 
   const toggleLike = async (item: FeedItem, on?: boolean) => {
-    if (!token) return;
+    if (!token) {
+      if (guest) router.push("/account");
+      return;
+    }
     const next = on ?? !liked.has(item.id);
     setLiked((prev) => {
       const copy = new Set(prev);
@@ -137,7 +142,10 @@ export default function FeedPage() {
   };
 
   const share = async (item: FeedItem) => {
-    if (!token) return;
+    if (!token) {
+      if (guest) router.push("/account");
+      return;
+    }
     void api(`/listings/${item.id}/repost`, { method: "POST", token })
       .then(() =>
         setCounts((prev) => ({

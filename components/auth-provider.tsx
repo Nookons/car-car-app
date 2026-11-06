@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ApiError, api } from "@/lib/api";
+import { api } from "@/lib/api";
 import { getInitData, initTelegram } from "@/lib/telegram";
 import type { Listing, User } from "@/lib/types";
 
@@ -9,6 +9,7 @@ type AuthState = {
   token: string | null;
   user: User | null;
   ready: boolean;
+  guest: boolean;
   error: string | null;
   favorites: Set<number>;
   toggleFavorite: (id: number) => Promise<void>;
@@ -21,20 +22,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = React.useState<string | null>(null);
   const [user, setUser] = React.useState<User | null>(null);
   const [ready, setReady] = React.useState(false);
+  const [guest, setGuest] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [favorites, setFavorites] = React.useState<Set<number>>(new Set());
 
   React.useEffect(() => {
     let cancelled = false;
+    initTelegram();
 
-    async function login() {
-      initTelegram();
-      const initData = getInitData();
-      if (!initData) {
-        setError("Открой приложение внутри Telegram");
-        setReady(true);
-        return;
-      }
+    // Повторный заход: сразу работаем с сохранённым токеном, вход — в фоне.
+    const stored = typeof window !== "undefined" ? localStorage.getItem("carcar.token") : null;
+    if (stored) {
+      setToken(stored);
+      setGuest(false);
+      setReady(true);
+    }
+
+    const initData = getInitData();
+    if (!initData) {
+      // Обычный браузер: полноценный просмотр без аккаунта.
+      setGuest(true);
+      setReady(true);
+      return;
+    }
+
+    (async () => {
       try {
         const data = await api<{ token: string; user: User }>("/auth", {
           method: "POST",
@@ -43,20 +55,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         setToken(data.token);
         setUser(data.user);
+        setGuest(false);
         localStorage.setItem("carcar.token", data.token);
 
-        const favoritesData = await api<{ items: Listing[] }>("/favorites", {
-          token: data.token,
-        });
-        if (!cancelled) setFavorites(new Set(favoritesData.items.map((item) => item.id)));
-      } catch (err) {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Ошибка авторизации");
+        // Любимое догружаем параллельно, не задерживая список.
+        api<{ items: Listing[] }>("/favorites", { token: data.token })
+          .then((res) => !cancelled && setFavorites(new Set(res.items.map((item) => item.id))))
+          .catch(() => {});
+      } catch {
+        if (cancelled) return;
+        // токен невалиден — работаем как гость, без экрана ошибки
+        localStorage.removeItem("carcar.token");
+        setToken(null);
+        setUser(null);
+        setGuest(true);
+        setError(null);
       } finally {
         if (!cancelled) setReady(true);
       }
-    }
+    })();
 
-    void login();
     return () => {
       cancelled = true;
     };
@@ -66,19 +84,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (id: number) => {
       if (!token) return;
       const isFav = favorites.has(id);
-
-      // Сначала переключаем UI, потом уходим в сеть — кнопка реагирует мгновенно.
       setFavorites((prev) => {
         const next = new Set(prev);
         if (isFav) next.delete(id);
         else next.add(id);
         return next;
       });
-
       try {
         await api(`/favorites/${id}`, { method: isFav ? "DELETE" : "POST", token });
       } catch {
-        // не получилось — возвращаем как было
         setFavorites((prev) => {
           const next = new Set(prev);
           if (isFav) next.add(id);
@@ -98,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ token, user, ready, error, favorites, toggleFavorite, refreshUser }}
+      value={{ token, user, ready, guest, error, favorites, toggleFavorite, refreshUser }}
     >
       {children}
     </AuthContext.Provider>

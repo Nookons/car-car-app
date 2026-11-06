@@ -179,6 +179,10 @@ const ru = {
   "common.from": "от",
   "common.retry": "Повторить",
   "account.iconCredit": "Иконки кузовов: MesserWoland / Wikimedia Commons, CC BY-SA 3.0",
+  "account.guestHint": "Вы смотрите CarCar без аккаунта. Сохранение фильтров, избранное и уведомления появятся после регистрации.",
+  "account.create": "Создать аккаунт",
+  "account.comingSoon": "Регистрация скоро появится — пока можно пользоваться поиском и лентой.",
+
 
 
   "common.to": "до",
@@ -382,6 +386,10 @@ const pl: Record<Key, string> = {
   "common.from": "od",
   "common.retry": "Spróbuj ponownie",
   "account.iconCredit": "Ikony nadwozi: MesserWoland / Wikimedia Commons, CC BY-SA 3.0",
+  "account.guestHint": "Przeglądasz CarCar bez konta. Zapisane filtry, ulubione i powiadomienia będą po rejestracji.",
+  "account.create": "Utwórz konto",
+  "account.comingSoon": "Rejestracja wkrótce — na razie korzystaj z wyszukiwania i feedu.",
+
 
 
   "common.to": "do",
@@ -583,6 +591,10 @@ const en: Record<Key, string> = {
   "common.from": "from",
   "common.retry": "Retry",
   "account.iconCredit": "Body icons: MesserWoland / Wikimedia Commons, CC BY-SA 3.0",
+  "account.guestHint": "You are browsing CarCar without an account. Saved filters, favorites and alerts come after sign-up.",
+  "account.create": "Create account",
+  "account.comingSoon": "Sign-up is coming soon — for now search and feed are fully available.",
+
 
 
   "common.to": "to",
@@ -785,6 +797,10 @@ const uk: Record<Key, string> = {
   "common.from": "від",
   "common.retry": "Повторити",
   "account.iconCredit": "Іконки кузовів: MesserWoland / Wikimedia Commons, CC BY-SA 3.0",
+  "account.guestHint": "Ви переглядаєте CarCar без акаунта. Збережені фільтри, обране й сповіщення з’являться після реєстрації.",
+  "account.create": "Створити акаунт",
+  "account.comingSoon": "Реєстрація скоро з’явиться — поки доступні пошук і стрічка.",
+
 
 
   "common.to": "до",
