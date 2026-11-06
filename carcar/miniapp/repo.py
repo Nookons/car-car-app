@@ -530,7 +530,7 @@ class MiniAppRepo:
                     """,
                     (listing_id,),
                 )
-                views = int(cur.fetchone()[0])
+                views = int(cur.fetchone()["views"])
             else:
                 cur.execute(
                     "select views from listing_stat where listing_id = %s", (listing_id,)
