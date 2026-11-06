@@ -26,6 +26,8 @@ const ru = {
   "feed.commentPlaceholder": "Написать комментарий",
   "feed.send": "Отправить",
   "feed.empty": "Пока нет объявлений",
+  "feed.noComments": "Пока нет комментариев",
+
   "feed.views": "просмотров",
   "feed.repost": "Репост",
   "home.forYou": "Подобрано для вас",
@@ -227,6 +229,8 @@ const pl: Record<Key, string> = {
   "feed.commentPlaceholder": "Napisz komentarz",
   "feed.send": "Wyślij",
   "feed.empty": "Na razie brak ogłoszeń",
+  "feed.noComments": "Na razie brak komentarzy",
+
   "feed.views": "wyświetleń",
   "feed.repost": "Repost",
   "home.forYou": "Dla Ciebie",
@@ -426,6 +430,8 @@ const en: Record<Key, string> = {
   "feed.commentPlaceholder": "Write a comment",
   "feed.send": "Send",
   "feed.empty": "No listings yet",
+  "feed.noComments": "No comments yet",
+
   "feed.views": "views",
   "feed.repost": "Repost",
   "home.forYou": "Picked for you",
@@ -626,6 +632,8 @@ const uk: Record<Key, string> = {
   "feed.commentPlaceholder": "Написати коментар",
   "feed.send": "Надіслати",
   "feed.empty": "Поки немає оголошень",
+  "feed.noComments": "Поки немає коментарів",
+
   "feed.views": "переглядів",
   "feed.repost": "Репост",
   "home.forYou": "Підібрано для вас",

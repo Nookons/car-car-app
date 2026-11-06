@@ -67,7 +67,7 @@ export function CommentsSheet({
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
           {items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">{t("feed.empty")}</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">{t("feed.noComments")}</p>
           ) : (
             items.map((comment) => (
               <div key={comment.id} className="rounded-xl bg-secondary px-3 py-2">
