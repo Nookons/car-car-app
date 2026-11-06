@@ -311,3 +311,46 @@ alter table notification add constraint notification_status_check
     check (status in ('pending', 'sent', 'failed', 'held', 'dead'));
 create index if not exists notification_retry_idx
     on notification (status, next_attempt_at) where status in ('pending', 'failed');
+
+-- ---------------------------------------------------------------------------
+-- Просмотры, реакции, комментарии и популярность
+-- ---------------------------------------------------------------------------
+
+create table if not exists listing_stat (
+    listing_id bigint primary key references listing(id) on delete cascade,
+    views      integer not null default 0,
+    likes      integer not null default 0,
+    reposts    integer not null default 0,
+    comments   integer not null default 0,
+    score      numeric not null default 0,
+    updated_at timestamptz not null default now()
+);
+
+create index if not exists listing_stat_score_idx on listing_stat (score desc);
+
+create table if not exists listing_view (
+    user_id    bigint not null references app_user(id) on delete cascade,
+    listing_id bigint not null references listing(id) on delete cascade,
+    day        date not null default current_date,
+    created_at timestamptz not null default now(),
+    primary key (user_id, listing_id, day)
+);
+
+create table if not exists listing_reaction (
+    user_id    bigint not null references app_user(id) on delete cascade,
+    listing_id bigint not null references listing(id) on delete cascade,
+    kind       text not null check (kind in ('like', 'repost')),
+    created_at timestamptz not null default now(),
+    primary key (user_id, listing_id, kind)
+);
+
+create table if not exists listing_comment (
+    id         bigint generated always as identity primary key,
+    user_id    bigint not null references app_user(id) on delete cascade,
+    listing_id bigint not null references listing(id) on delete cascade,
+    text       text not null check (char_length(text) between 1 and 1000),
+    created_at timestamptz not null default now()
+);
+
+create index if not exists listing_comment_listing_idx
+    on listing_comment (listing_id, created_at desc);

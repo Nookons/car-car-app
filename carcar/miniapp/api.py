@@ -8,6 +8,7 @@ from __future__ import annotations
 import hmac
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
@@ -26,6 +27,14 @@ STATIC = __import__("pathlib").Path(__file__).parent / "static"
 
 class AuthIn(BaseModel):
     init_data: str = Field(min_length=1, max_length=8192)
+
+
+class LikeIn(BaseModel):
+    on: bool = True
+
+
+class CommentIn(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
 
 
 class UserPatch(BaseModel):
@@ -82,6 +91,17 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        # Одноразовая миграция: включает CARCAR_AUTO_MIGRATE=1.
+        if os.environ.get("CARCAR_AUTO_MIGRATE") == "1":
+            try:
+                schema = (Path(__file__).resolve().parent.parent / "schema.sql").read_text()
+                with repo.pool.connection() as conn, conn.cursor() as cur:
+                    cur.execute(schema)
+                conn.commit()
+                print("схема применена при старте")
+            except Exception as exc:  # noqa: BLE001
+                print(f"автомиграция не удалась: {exc}")
+
         # Бот работает через вебхук: поллинг с двух машин конфликтует.
         if bot_token and api_url:
             from ..bot import Bot
@@ -366,6 +386,57 @@ def create_app(
         payload = repo.filter_options(make, model)
         cache.set(key, payload, ttl=300)
         return payload
+
+    # -- просмотры и реакции -----------------------------------------------
+    def optional_user(authorization: str | None = Header(default=None)) -> dict | None:
+        if not authorization or not authorization.startswith("Bearer "):
+            return None
+        try:
+            return repo.get_user(verify_token(authorization[7:], jwt_secret))
+        except AuthError:
+            return None
+
+    @app.post("/api/listings/{listing_id}/view")
+    def record_view(listing_id: int, user: dict = Depends(current_user)) -> dict:
+        return {"views": repo.record_view(user["id"], listing_id)}
+
+    @app.post("/api/listings/{listing_id}/like")
+    def like(listing_id: int, payload: LikeIn, user: dict = Depends(current_user)) -> dict:
+        return repo.like(user["id"], listing_id, payload.on)
+
+    @app.post("/api/listings/{listing_id}/repost")
+    def repost(listing_id: int, user: dict = Depends(current_user)) -> dict:
+        return repo.repost(user["id"], listing_id)
+
+    @app.get("/api/listings/{listing_id}/comments")
+    def comments(listing_id: int, limit: int = Query(default=50, ge=1, le=100)) -> dict:
+        return {"items": repo.comments(listing_id, limit)}
+
+    @app.post("/api/listings/{listing_id}/comments")
+    def add_comment(
+        listing_id: int, payload: CommentIn, user: dict = Depends(current_user)
+    ) -> dict:
+        return repo.add_comment(user["id"], listing_id, payload.text.strip())
+
+    # -- лента и рекомендации ----------------------------------------------
+    @app.get("/api/feed")
+    def feed(
+        mode: str = Query(default="for_you", pattern="^(for_you|popular)$"),
+        limit: int = Query(default=10, ge=1, le=30),
+        offset: int = Query(default=0, ge=0, le=5000),
+        user: dict | None = Depends(optional_user),
+    ) -> dict:
+        items = repo.feed(
+            user["id"] if user else None, mode=mode, limit=limit, offset=offset
+        )
+        return {"items": items, "mode": mode}
+
+    @app.get("/api/recommendations")
+    def recommendations(
+        limit: int = Query(default=6, ge=1, le=20),
+        user: dict = Depends(current_user),
+    ) -> dict:
+        return {"items": repo.feed(user["id"], mode="for_you", limit=limit)}
 
     # -- подписки ----------------------------------------------------------
     @app.get("/api/subscriptions")

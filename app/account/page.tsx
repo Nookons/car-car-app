@@ -251,6 +251,17 @@ export default function AccountPage() {
         )}
       </Card>
 
+      <p className="pb-2 text-center text-[11px] text-muted-foreground">
+        <a
+          href="https://commons.wikimedia.org/wiki/Category:Line_drawings_of_automobile_bodies"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline"
+        >
+          {t("account.iconCredit")}
+        </a>
+      </p>
+
       <Dialog
         open={nameOpen}
         onClose={() => setNameOpen(false)}

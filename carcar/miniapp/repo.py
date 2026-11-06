@@ -504,6 +504,325 @@ class MiniAppRepo:
 
         return _card(row, events, analysis)
 
+    # -- просмотры, реакции, популярность -----------------------------------
+    def record_view(self, user_id: int, listing_id: int) -> int:
+        """Один просмотр в день на пользователя; возвращает всего просмотров."""
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "insert into listing_view (user_id, listing_id) values (%s, %s) "
+                "on conflict do nothing returning 1",
+                (user_id, listing_id),
+            )
+            fresh = cur.fetchone()
+            if fresh:
+                cur.execute(
+                    """
+                    insert into listing_stat (listing_id, views, score)
+                    values (%s, 1, 1)
+                    on conflict (listing_id) do update set
+                        views = listing_stat.views + 1,
+                        score = (listing_stat.views + 1)
+                              + 3 * listing_stat.likes
+                              + 5 * listing_stat.comments
+                              + 2 * listing_stat.reposts,
+                        updated_at = now()
+                    returning views
+                    """,
+                    (listing_id,),
+                )
+                views = int(cur.fetchone()[0])
+            else:
+                cur.execute(
+                    "select views from listing_stat where listing_id = %s", (listing_id,)
+                )
+                row = cur.fetchone()
+                views = int(row["views"]) if row else 0
+        conn.commit()
+        return views
+
+    def like(self, user_id: int, listing_id: int, on: bool) -> dict[str, Any]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            if on:
+                cur.execute(
+                    "insert into listing_reaction (user_id, listing_id, kind) "
+                    "values (%s, %s, 'like') on conflict do nothing returning 1",
+                    (user_id, listing_id),
+                )
+                fresh = cur.fetchone()
+                if fresh:
+                    cur.execute(
+                        """
+                        insert into listing_stat (listing_id, likes, score)
+                        values (%s, 1, 3)
+                        on conflict (listing_id) do update set
+                            likes = listing_stat.likes + 1,
+                            score = listing_stat.views
+                                  + 3 * (listing_stat.likes + 1)
+                                  + 5 * listing_stat.comments
+                                  + 2 * listing_stat.reposts,
+                            updated_at = now()
+                        """,
+                        (listing_id,),
+                    )
+            else:
+                cur.execute(
+                    "delete from listing_reaction where user_id = %s and listing_id = %s "
+                    "and kind = 'like'",
+                    (user_id, listing_id),
+                )
+                if cur.rowcount:
+                    cur.execute(
+                        """
+                        update listing_stat set
+                            likes = greatest(likes - 1, 0),
+                            score = views
+                                  + 3 * greatest(likes - 1, 0)
+                                  + 5 * comments
+                                  + 2 * reposts,
+                            updated_at = now()
+                        where listing_id = %s
+                        """,
+                        (listing_id,),
+                    )
+            cur.execute(
+                "select likes from listing_stat where listing_id = %s", (listing_id,)
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return {"likes": int(row["likes"]) if row else 0, "liked": on}
+
+    def repost(self, user_id: int, listing_id: int) -> dict[str, Any]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "insert into listing_reaction (user_id, listing_id, kind) "
+                "values (%s, %s, 'repost') on conflict do nothing returning 1",
+                (user_id, listing_id),
+            )
+            fresh = cur.fetchone()
+            if fresh:
+                cur.execute(
+                    """
+                    insert into listing_stat (listing_id, reposts, score)
+                    values (%s, 1, 2)
+                    on conflict (listing_id) do update set
+                        reposts = listing_stat.reposts + 1,
+                        score = listing_stat.views
+                              + 3 * listing_stat.likes
+                              + 5 * listing_stat.comments
+                              + 2 * (listing_stat.reposts + 1),
+                        updated_at = now()
+                    """,
+                    (listing_id,),
+                )
+            cur.execute(
+                "select reposts from listing_stat where listing_id = %s", (listing_id,)
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return {"reposts": int(row["reposts"]) if row else 0}
+
+    def add_comment(self, user_id: int, listing_id: int, text: str) -> dict[str, Any]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "insert into listing_comment (user_id, listing_id, text) "
+                "values (%s, %s, %s) returning id, created_at",
+                (user_id, listing_id, text[:1000]),
+            )
+            row = cur.fetchone()
+            cur.execute(
+                """
+                insert into listing_stat (listing_id, comments, score)
+                values (%s, 1, 5)
+                on conflict (listing_id) do update set
+                    comments = listing_stat.comments + 1,
+                    score = listing_stat.views
+                          + 3 * listing_stat.likes
+                          + 5 * (listing_stat.comments + 1)
+                          + 2 * listing_stat.reposts,
+                    updated_at = now()
+                """,
+                (listing_id,),
+            )
+            cur.execute(
+                "select coalesce(first_name, username, '') as name from app_user where id = %s",
+                (user_id,),
+            )
+            who = cur.fetchone()
+        conn.commit()
+        return {
+            "id": row["id"],
+            "text": text[:1000],
+            "author": (who["name"] if who else "") or "",
+            "created_at": _iso(row["created_at"]),
+        }
+
+    def comments(self, listing_id: int, limit: int = 50) -> list[dict[str, Any]]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select c.id, c.text, c.created_at,
+                       coalesce(u.first_name, u.username, '') as author
+                from listing_comment c join app_user u on u.id = c.user_id
+                where c.listing_id = %s order by c.created_at desc limit %s
+                """,
+                (listing_id, min(limit, 100)),
+            )
+            rows = cur.fetchall()
+        return [
+            {
+                "id": r["id"],
+                "text": r["text"],
+                "author": r["author"] or "",
+                "created_at": _iso(r["created_at"]),
+            }
+            for r in rows
+        ]
+
+    def _taste(self, conn, user_id: int) -> dict[str, Any]:
+        """Вкус пользователя: сохранённые фильтры + просмотры + лайки."""
+        makes: dict[str, int] = {}
+        bodies: dict[str, int] = {}
+        fuels: dict[str, int] = {}
+        price_min: int | None = None
+        price_max: int | None = None
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "select criteria from subscription where user_id = %s and active", (user_id,)
+            )
+            for row in cur.fetchall():
+                criteria = row["criteria"] or {}
+                if criteria.get("make"):
+                    makes[criteria["make"]] = makes.get(criteria["make"], 0) + 3
+                if criteria.get("body"):
+                    bodies[criteria["body"]] = bodies.get(criteria["body"], 0) + 3
+                if criteria.get("fuel"):
+                    fuels[criteria["fuel"]] = fuels.get(criteria["fuel"], 0) + 2
+                if criteria.get("price_min") is not None:
+                    price_min = max(price_min or 0, int(criteria["price_min"]))
+                if criteria.get("price_max") is not None:
+                    price_max = int(criteria["price_max"]) if price_max is None else max(price_max, int(criteria["price_max"]))
+
+            cur.execute(
+                """
+                select l.make, l.body, l.fuel
+                from listing_view v join listing l on l.id = v.listing_id
+                where v.user_id = %s order by v.created_at desc limit 80
+                """,
+                (user_id,),
+            )
+            for row in cur.fetchall():
+                if row["make"]:
+                    makes[row["make"]] = makes.get(row["make"], 0) + 2
+                if row["body"]:
+                    bodies[row["body"]] = bodies.get(row["body"], 0) + 2
+                if row["fuel"]:
+                    fuels[row["fuel"]] = fuels.get(row["fuel"], 0) + 1
+
+            cur.execute(
+                """
+                select l.make, l.body, l.fuel
+                from listing_reaction r join listing l on l.id = r.listing_id
+                where r.user_id = %s and r.kind = 'like'
+                order by r.created_at desc limit 50
+                """,
+                (user_id,),
+            )
+            for row in cur.fetchall():
+                if row["make"]:
+                    makes[row["make"]] = makes.get(row["make"], 0) + 4
+                if row["body"]:
+                    bodies[row["body"]] = bodies.get(row["body"], 0) + 3
+                if row["fuel"]:
+                    fuels[row["fuel"]] = fuels.get(row["fuel"], 0) + 2
+
+        top_makes = [m for m, _ in sorted(makes.items(), key=lambda kv: -kv[1])[:6]]
+        top_bodies = [b for b, _ in sorted(bodies.items(), key=lambda kv: -kv[1])[:3]]
+        top_fuels = [f for f, _ in sorted(fuels.items(), key=lambda kv: -kv[1])[:2]]
+        return {
+            "makes": top_makes,
+            "bodies": top_bodies,
+            "fuels": top_fuels,
+            "price_min": price_min,
+            "price_max": price_max,
+        }
+
+    def feed(
+        self,
+        user_id: int | None = None,
+        *,
+        mode: str = "for_you",
+        limit: int = 10,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        limit = max(1, min(limit, 30))
+        conn = self.pool.connection()
+        with conn, conn.cursor() as cur:
+            params: dict[str, Any] = {"limit": limit, "offset": max(0, offset)}
+            conds = ["l.status = 'active'", "l.thumb_url is not null"]
+            taste = None
+            if mode == "for_you" and user_id:
+                taste = self._taste(conn, user_id)
+                if taste["makes"]:
+                    conds.append("l.make = ANY(%(makes)s)")
+                    params["makes"] = taste["makes"]
+                elif taste["bodies"]:
+                    conds.append("l.body = ANY(%(bodies)s)")
+                    params["bodies"] = taste["bodies"]
+                if taste["price_min"] or taste["price_max"]:
+                    lo = taste["price_min"] or 0
+                    hi = taste["price_max"] or 10_000_000
+                    conds.append("l.price between %(lo)s and %(hi)s")
+                    params["lo"] = lo
+                    params["hi"] = hi
+                if user_id:
+                    conds.append(
+                        "not exists (select 1 from listing_view v "
+                        "where v.user_id = %(uid)s and v.listing_id = l.id)"
+                    )
+                    params["uid"] = user_id
+            order = (
+                "coalesce(st.score, 0) desc, l.published_at desc nulls last"
+                if mode == "popular" or not taste or not (taste["makes"] or taste["bodies"])
+                else "l.published_at desc nulls last, coalesce(st.score, 0) desc"
+            )
+            sql = f"""
+                select l.id, l.title, l.price, l.currency, l.year, l.mileage_km,
+                       l.city, l.make, l.model, l.thumb_url, l.fuel, l.gearbox,
+                       l.published_at, coalesce(st.views, 0) views,
+                       coalesce(st.likes, 0) likes, coalesce(st.comments, 0) comments,
+                       coalesce(st.reposts, 0) reposts
+                from listing l
+                left join listing_stat st on st.listing_id = l.id
+                where {' and '.join(conds)}
+                order by {order}
+                limit %(limit)s offset %(offset)s
+            """
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+        return [
+            {
+                "id": r["id"],
+                "title": r["title"],
+                "price": _num(r["price"]),
+                "currency": (r["currency"] or "PLN").strip(),
+                "year": r["year"],
+                "mileage_km": r["mileage_km"],
+                "city": r["city"] or "",
+                "make": r["make"] or "",
+                "model": r["model"] or "",
+                "thumbnail": r["thumb_url"],
+                "fuel": r["fuel"],
+                "gearbox": r["gearbox"],
+                "published_at": _iso(r["published_at"]),
+                "views": int(r["views"]),
+                "likes": int(r["likes"]),
+                "comments": int(r["comments"]),
+                "reposts": int(r["reposts"]),
+            }
+            for r in rows
+        ]
+
     # -- справочник для фильтров --------------------------------------------
     def filter_makes(self) -> list[dict[str, Any]]:
         with self.pool.connection() as conn, conn.cursor() as cur:

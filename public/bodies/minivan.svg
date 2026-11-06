@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://web.resource.org/cc/"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   height="149.83"
+   width="322.95001"
+   id="svg2"
+   sodipodi:version="0.32"
+   inkscape:version="0.44"
+   sodipodi:docbase="D:\dokumenty\kot\do wiki"
+   sodipodi:docname="samochód nadwozie minivan.svg"
+   version="1.0">
+  <defs
+     id="defs4" />
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:cx="132.66611"
+     inkscape:cy="45.323618"
+     inkscape:zoom="2.0847096"
+     inkscape:document-units="px"
+     inkscape:current-layer="layer1"
+     inkscape:window-width="1024"
+     inkscape:window-height="682"
+     inkscape:window-x="-4"
+     inkscape:window-y="-4"
+     width="322.95px"
+     height="149.83px" />
+  <metadata
+     id="metadata7">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:groupmode="layer"
+     inkscape:label="Warstwa 1"
+     id="layer1"
+     transform="translate(-33.03449,-24.95352)">
+    <path
+       style="fill:#edffb0;fill-opacity:1;fill-rule:evenodd;stroke:black;stroke-width:2.16256237;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       d="M 99.001377,105.48369 L 99.001377,146.65171 L 351.75388,146.65171 L 351.75388,104.52629 L 310.73185,65.386172 L 115.35032,65.662555 L 99.001377,105.48369 z "
+       id="path8280"
+       sodipodi:nodetypes="ccccccc" />
+    <path
+       transform="matrix(1.081282,0,0,1.081282,212.0455,22.53601)"
+       d="M 111.1008 115.51798 A 14.819004 14.819004 0 1 1  81.462788,115.51798 A 14.819004 14.819004 0 1 1  111.1008 115.51798 z"
+       sodipodi:ry="14.819004"
+       sodipodi:rx="14.819004"
+       sodipodi:cy="115.51798"
+       sodipodi:cx="96.281792"
+       id="path8278"
+       style="fill:#d4d4d4;fill-opacity:1;fill-rule:evenodd;stroke:black;stroke-width:15.19999981;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       sodipodi:type="arc" />
+    <path
+       sodipodi:type="arc"
+       style="fill:#d4d4d4;fill-opacity:1;fill-rule:evenodd;stroke:black;stroke-width:15.19999981;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="path1948"
+       sodipodi:cx="96.281792"
+       sodipodi:cy="115.51798"
+       sodipodi:rx="14.819004"
+       sodipodi:ry="14.819004"
+       d="M 111.1008 115.51798 A 14.819004 14.819004 0 1 1  81.462788,115.51798 A 14.819004 14.819004 0 1 1  111.1008 115.51798 z"
+       transform="matrix(1.081282,0,0,1.081282,51.20296,22.53601)" />
+    <path
+       style="fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:black;stroke-width:2;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       d="M 116.18191,65.680574 L 83.196233,38.611371 L 44.692606,26.755681"
+       id="path11102" />
+  </g>
+</svg>

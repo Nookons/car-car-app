@@ -1,12 +1,20 @@
 # Иконки кузовов
 
-Источник: [IconPacks — Free Car Types Icons](https://www.iconpacks.net/free-icon-pack/car-types-180.html)
-(28 иконок типов авто).
+## SVG-серия (Wikimedia Commons)
 
-Условия использования по [лицензии IconPacks](https://www.iconpacks.net/terms/):
-бесплатно для коммерческого и личного использования, изменять можно;
-указывать автора не обязательно (но приятно). Нельзя перепродавать иконки
-как набор и распространять их отдельно как иконки.
+Автор: **MesserWoland**, лицензия **CC BY-SA 3.0**:
+[sedan](https://commons.wikimedia.org/wiki/File:Samoch%C3%B3d_nadwozie_sedan.svg),
+[hatchback](https://commons.wikimedia.org/wiki/File:Samoch%C3%B3d_nadwozie_hatch-back.svg),
+[wagon](https://commons.wikimedia.org/wiki/File:Samoch%C3%B3d_nadwozie_kombi.svg),
+[convertible](https://commons.wikimedia.org/wiki/File:Samoch%C3%B3d_nadwozie_kabriolet.svg),
+[minivan](https://commons.wikimedia.org/wiki/File:Samoch%C3%B3d_nadwozie_minivan.svg),
+[pickup](https://commons.wikimedia.org/wiki/File:Samoch%C3%B3d_nadwozie_pick-up.svg),
+[coupe](https://commons.wikimedia.org/wiki/File:Samoch%C3%B3d_nadwozie_lift-back.svg).
 
-Файлы: sedan, hatchback, station (универсал), suv, coupe, cabriolet,
-minivan, pickup — PNG 90×90, отдаются из `/bodies/*.png`.
+Атрибуция отображается в приложении (Аккаунт → «Иконки кузовов»).
+Производных изменений в этих файлах нет; они распространяются под CC BY-SA 3.0.
+
+## SUV
+
+`suv.svg` — собственная работа CarCar, лицензия CC0 (public domain).
+SVG-файлы масштабируются без потерь, в отличие от PNG.

@@ -25,7 +25,7 @@ export function BodyIcon({ body, className }: { body: string; className?: string
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={`/bodies/${file}.png`}
+        src={`/bodies/${file}.svg`}
         alt=""
         loading="lazy"
         decoding="async"

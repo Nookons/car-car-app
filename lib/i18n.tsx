@@ -162,6 +162,8 @@ const ru = {
   "filter.engineToL": "до, л",
   "common.from": "от",
   "common.retry": "Повторить",
+  "account.iconCredit": "Иконки кузовов: MesserWoland / Wikimedia Commons, CC BY-SA 3.0",
+
 
   "common.to": "до",
 
@@ -347,6 +349,8 @@ const pl: Record<Key, string> = {
   "filter.engineToL": "do, l",
   "common.from": "od",
   "common.retry": "Spróbuj ponownie",
+  "account.iconCredit": "Ikony nadwozi: MesserWoland / Wikimedia Commons, CC BY-SA 3.0",
+
 
   "common.to": "do",
 
@@ -530,6 +534,8 @@ const en: Record<Key, string> = {
   "filter.engineToL": "to, l",
   "common.from": "from",
   "common.retry": "Retry",
+  "account.iconCredit": "Body icons: MesserWoland / Wikimedia Commons, CC BY-SA 3.0",
+
 
   "common.to": "to",
 
@@ -714,6 +720,8 @@ const uk: Record<Key, string> = {
   "filter.engineToL": "до, л",
   "common.from": "від",
   "common.retry": "Повторити",
+  "account.iconCredit": "Іконки кузовів: MesserWoland / Wikimedia Commons, CC BY-SA 3.0",
+
 
   "common.to": "до",
 
