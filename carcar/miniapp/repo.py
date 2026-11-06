@@ -756,8 +756,7 @@ class MiniAppRepo:
         offset: int = 0,
     ) -> list[dict[str, Any]]:
         limit = max(1, min(limit, 30))
-        conn = self.pool.connection()
-        with conn, conn.cursor() as cur:
+        with self.pool.connection() as conn, conn.cursor() as cur:
             params: dict[str, Any] = {"limit": limit, "offset": max(0, offset)}
             conds = ["l.status = 'active'", "l.thumb_url is not null"]
             taste = None

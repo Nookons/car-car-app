@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n";
 
 const links = [
   { href: "/", key: "nav.home" },
+  { href: "/feed", key: "nav.feed" },
   { href: "/list", key: "nav.list" },
   { href: "/account", key: "nav.account" },
 ] as const;

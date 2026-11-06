@@ -10,6 +10,15 @@ import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import type { Listing } from "@/lib/types";
 
+type Rec = {
+  id: number;
+  title: string;
+  price: number | null;
+  currency: string;
+  city: string;
+  thumbnail: string;
+};
+
 const QUICK = [
   { key: "home.cheap", href: "/list?price_max=30000" },
   { key: "home.low", href: "/list?mileage_max=100000" },
@@ -21,6 +30,7 @@ export default function HomePage() {
   const { token, user, ready, error } = useAuth();
   const { t } = useI18n();
   const [items, setItems] = React.useState<Listing[]>([]);
+  const [recs, setRecs] = React.useState<Rec[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -32,6 +42,13 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
+  }, [token]);
+
+  React.useEffect(() => {
+    if (!token) return;
+    api<{ items: Rec[] }>("/recommendations?limit=8", { token })
+      .then((data) => setRecs(data.items))
+      .catch(() => setRecs([]));
   }, [token]);
 
   if (!ready) return <HomeSkeleton />;
@@ -58,6 +75,38 @@ export default function HomePage() {
           </Link>
         ))}
       </div>
+
+      {recs.length > 0 ? (
+        <section className="space-y-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-base font-semibold">{t("home.forYou")}</h2>
+            <Link href="/feed" className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+              {t("feed.forYou")} <ArrowRight size={16} />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {recs.map((item) => (
+              <Link
+                key={item.id}
+                href={`/listing/${item.id}`}
+                className="min-w-0 overflow-hidden rounded-2xl border bg-card"
+              >
+                <div className="aspect-[4/3] bg-secondary">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={item.thumbnail} alt="" className="h-full w-full object-cover" loading="lazy" />
+                </div>
+                <div className="space-y-1 p-2">
+                  <p className="line-clamp-2 text-sm font-medium">{item.title}</p>
+                  <p className="text-sm font-semibold">
+                    {(item.price ?? 0).toLocaleString("pl-PL")} {item.currency}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">{item.city}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">

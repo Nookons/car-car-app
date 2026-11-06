@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, MagnifyingGlass, UserCircle } from "@phosphor-icons/react";
+import { House, MagnifyingGlass, Play, UserCircle } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 
 const tabs = [
   { href: "/", key: "nav.home", icon: House },
+  { href: "/feed", key: "nav.feed", icon: Play },
   { href: "/list", key: "nav.list", icon: MagnifyingGlass },
   { href: "/account", key: "nav.account", icon: UserCircle },
 ] as const;
@@ -17,7 +18,7 @@ export function BottomNav() {
   const { t } = useI18n();
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 backdrop-blur safe-bottom md:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-3">
+      <div className="mx-auto grid max-w-md grid-cols-4">
         {tabs.map(({ href, key, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
