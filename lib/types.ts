@@ -79,6 +79,7 @@ export type Filters = {
   price_max?: number;
   year_min?: number;
   year_max?: number;
+  mileage_min?: number;
   mileage_max?: number;
   fuel?: string;
   gearbox?: string;

@@ -1,16 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { SlidersHorizontal } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
-import { FilterDialog } from "@/components/filter-dialog";
+import { FilterPanel } from "@/components/filter-panel";
 import { ListingCard } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { filtersToQuery, loadFilters, saveFilters } from "@/lib/filters";
 import { num } from "@/lib/format";
-import { labelFor, useI18n, type Key } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n";
 import type { Filters, Listing } from "@/lib/types";
 
 export default function ListPage() {
@@ -20,15 +19,14 @@ export default function ListPage() {
   const [items, setItems] = React.useState<Listing[]>([]);
   const [total, setTotal] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
-  const [open, setOpen] = React.useState(false);
 
   const fetchPage = React.useCallback(
-    async (nextFilters: Filters, offset = 0) => {
+    async (next: Filters, offset = 0) => {
       if (!token) return;
       setLoading(true);
       try {
         const data = await api<{ items: Listing[]; total: number }>(
-          `/listings?${filtersToQuery(nextFilters, offset)}`,
+          `/listings?${filtersToQuery(next, offset)}`,
           { token },
         );
         setTotal(data.total);
@@ -57,8 +55,6 @@ export default function ListPage() {
   const apply = (next: Filters) => {
     setFilters(next);
     saveFilters(next);
-    setOpen(false);
-    // Сразу убираем старую выдачу и показываем скелетон: видно, что фильтр сработал.
     setItems([]);
     setTotal(0);
     setLoading(true);
@@ -69,34 +65,25 @@ export default function ListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-semibold">{t("list.title")}</h1>
-            <p className="text-xs text-muted-foreground">{summary(filters, t)}</p>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-            <SlidersHorizontal size={16} />
-            {t("list.filters")}
-          </Button>
-        </div>
+      <div className="flex items-baseline justify-between">
+        <h1 className="text-lg font-semibold">{t("list.title")}</h1>
         {total > 0 ? (
-          <p className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {t("list.found")}: {num(total)}
-          </p>
+          </span>
         ) : null}
       </div>
 
+      <FilterPanel initial={filters} onApply={apply} />
+
       {loading ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-          {Array.from({ length: 6 }).map((_, index) => (
+          {Array.from({ length: 8 }).map((_, index) => (
             <Skeleton key={index} className="h-56" />
           ))}
         </div>
       ) : items.length === 0 ? (
-        <p className="py-12 text-center text-sm text-muted-foreground">
-          {t("list.empty")}
-        </p>
+        <p className="py-12 text-center text-sm text-muted-foreground">{t("list.empty")}</p>
       ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {items.map((item) => (
@@ -115,20 +102,6 @@ export default function ListPage() {
           {loading ? t("list.loading") : `${t("list.more")} (${num(total - items.length)})`}
         </Button>
       ) : null}
-
-      <FilterDialog open={open} initial={filters} onClose={() => setOpen(false)} onApply={apply} />
     </div>
   );
-}
-
-function summary(filters: Filters, t: (key: Key) => string): string {
-  const parts = [
-    filters.make,
-    filters.price_max ? `≤ ${num(filters.price_max)} zł` : null,
-    filters.year_min ? `≥ ${filters.year_min}` : null,
-    filters.mileage_max ? `≤ ${num(filters.mileage_max)} km` : null,
-    filters.gearbox ? labelFor(t, "gearbox", filters.gearbox) : null,
-    filters.radius_km ? `${filters.radius_km} km` : null,
-  ].filter(Boolean);
-  return parts.join(" · ");
 }

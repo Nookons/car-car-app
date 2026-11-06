@@ -222,6 +222,7 @@ class MiniAppRepo:
         price_max: int | None = None,
         year_min: int | None = None,
         year_max: int | None = None,
+        mileage_min: int | None = None,
         mileage_max: int | None = None,
         fuel: str | None = None,
         gearbox: str | None = None,
@@ -269,6 +270,9 @@ class MiniAppRepo:
         if year_max is not None:
             conds.append("l.year <= %(year_max)s")
             params["year_max"] = year_max
+        if mileage_min is not None:
+            conds.append("l.mileage_km >= %(mileage_min)s")
+            params["mileage_min"] = mileage_min
         if mileage_max is not None:
             conds.append("l.mileage_km <= %(mileage_max)s")
             params["mileage_max"] = mileage_max
