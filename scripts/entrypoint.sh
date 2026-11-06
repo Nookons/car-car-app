@@ -19,9 +19,16 @@ case "$MODE" in
             --minutes 100000
         ;;
     enrich)
-        exec python -m carcar enrich \
-            --limit "${CARCAR_ENRICH_LIMIT:-500}" \
-            --minutes 30
+        # Бесконечный догруз карточек: после 30 минут процесс сам перезапускается.
+        while true; do
+            python -m carcar enrich \
+                --limit "${CARCAR_ENRICH_LIMIT:-100000}" \
+                --minutes 30 \
+                --rps "${CARCAR_RPS:-0.5}" \
+                --shard "${CARCAR_SHARD:-0}" \
+                --shards "${CARCAR_SHARDS:-1}"
+            sleep 10
+        done
         ;;
     sweep)
         exec python -m carcar sweep \

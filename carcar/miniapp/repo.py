@@ -462,7 +462,15 @@ class MiniAppRepo:
                         "diff_pct": diff,
                         "verdict": "below" if diff <= -5 else ("above" if diff >= 5 else "fair"),
                     }
-        if (not row.get("description") or not row.get("equipment")) and row.get("url"):
+        needs_details = (
+            not row.get("description")
+            or not row.get("equipment")
+            or not row.get("drive")
+            or not row.get("condition")
+            or not row.get("doors")
+            or not row.get("color")
+        )
+        if needs_details and row.get("url"):
             # Карточка скачана раньше без полного набора полей — добираем лениво.
             try:
                 from ..client import Client
