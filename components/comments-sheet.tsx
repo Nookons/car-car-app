@@ -13,10 +13,12 @@ export function CommentsSheet({
   listingId,
   open,
   onClose,
+  onCreated,
 }: {
   listingId: number | null;
   open: boolean;
   onClose: () => void;
+  onCreated?: () => void;
 }) {
   const { token } = useAuth();
   const { t, lang } = useI18n();
@@ -44,6 +46,7 @@ export function CommentsSheet({
       });
       setItems((prev) => [created, ...prev]);
       setText("");
+      onCreated?.();
     } finally {
       setSending(false);
     }

@@ -40,6 +40,7 @@ export default function FeedPage() {
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [liked, setLiked] = React.useState<Set<number>>(new Set());
   const [commentsFor, setCommentsFor] = React.useState<number | null>(null);
+  const [counts, setCounts] = React.useState<Record<number, { likes: number; comments: number; reposts: number; views: number }>>({});
   const viewed = React.useRef<Set<number>>(new Set());
   const seq = React.useRef(0);
 
@@ -55,6 +56,18 @@ export default function FeedPage() {
         );
         if (id !== seq.current) return;
         setItems((prev) => (offset === 0 ? data.items : [...prev, ...data.items]));
+        setCounts((prev) => {
+          const next = { ...prev };
+          for (const item of data.items) {
+            next[item.id] = next[item.id] ?? {
+              likes: item.likes,
+              comments: item.comments,
+              reposts: item.reposts,
+              views: item.views,
+            };
+          }
+          return next;
+        });
       } finally {
         if (id === seq.current) {
           setLoading(false);
@@ -79,7 +92,14 @@ export default function FeedPage() {
           const id = Number((entry.target as HTMLElement).dataset.listing);
           if (!id || viewed.current.has(id)) continue;
           viewed.current.add(id);
-          void api(`/listings/${id}/view`, { method: "POST", token }).catch(() => {});
+          void api<{ views: number }>(`/listings/${id}/view`, { method: "POST", token })
+            .then((res) =>
+              setCounts((prev) => ({
+                ...prev,
+                [id]: { ...(prev[id] ?? { likes: 0, comments: 0, reposts: 0, views: 0 }), views: res.views },
+              })),
+            )
+            .catch(() => {});
         }
       },
       { threshold: 0.6 },
@@ -97,6 +117,13 @@ export default function FeedPage() {
       else copy.delete(item.id);
       return copy;
     });
+    setCounts((prev) => ({
+      ...prev,
+      [item.id]: {
+        ...(prev[item.id] ?? { likes: item.likes, comments: item.comments, reposts: item.reposts, views: item.views }),
+        likes: Math.max(0, (prev[item.id]?.likes ?? item.likes) + (next ? 1 : -1)),
+      },
+    }));
     try {
       await api(`/listings/${item.id}/like`, { method: "POST", token, body: { on: next } });
     } catch {
@@ -111,7 +138,17 @@ export default function FeedPage() {
 
   const share = async (item: FeedItem) => {
     if (!token) return;
-    void api(`/listings/${item.id}/repost`, { method: "POST", token }).catch(() => {});
+    void api(`/listings/${item.id}/repost`, { method: "POST", token })
+      .then(() =>
+        setCounts((prev) => ({
+          ...prev,
+          [item.id]: {
+            ...(prev[item.id] ?? { likes: item.likes, comments: item.comments, reposts: item.reposts, views: item.views }),
+            reposts: (prev[item.id]?.reposts ?? item.reposts) + 1,
+          },
+        })),
+      )
+      .catch(() => {});
     const url = `${window.location.origin}/listing/${item.id}`;
     const text = `${item.title} — ${num(item.price ?? 0)} ${item.currency}`;
     if (navigator.share) {
@@ -160,7 +197,7 @@ export default function FeedPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={item.thumbnail} alt="" className="h-full w-full object-cover" loading="lazy" />
                 <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] text-white">
-                  <Eye size={12} /> {num(item.views)}
+                  <Eye size={12} /> {num(counts[item.id]?.views ?? item.views)}
                 </span>
               </div>
               <div className="space-y-1 p-2">
@@ -178,7 +215,7 @@ export default function FeedPage() {
           ))}
         </div>
       ) : (
-        <div className="h-[calc(100dvh-10.5rem)] snap-y snap-mandatory overflow-y-auto rounded-2xl">
+        <div className="h-[calc(100dvh-12.5rem)] snap-y snap-mandatory overflow-y-auto rounded-2xl">
           {items.map((item) => {
             const isLiked = liked.has(item.id);
             return (
@@ -194,14 +231,14 @@ export default function FeedPage() {
 
                 <div className="absolute left-3 top-3 flex gap-2 text-[11px] text-white/90">
                   <span className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2 py-1">
-                    <Eye size={12} /> {num(item.views)}
+                    <Eye size={12} /> {num(counts[item.id]?.views ?? item.views)}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2 py-1">
-                    <Heart size={12} /> {num(item.likes)}
+                    <Heart size={12} /> {num(counts[item.id]?.likes ?? item.likes)}
                   </span>
                 </div>
 
-                <div className="absolute bottom-4 left-3 right-16 space-y-1 text-white">
+                <div className="absolute bottom-5 left-3 right-16 space-y-1 pb-2 text-white">
                   <p className="text-lg font-semibold">
                     {num(item.price ?? 0)} {item.currency}
                   </p>
@@ -226,7 +263,7 @@ export default function FeedPage() {
                   </Link>
                 </div>
 
-                <div className="absolute bottom-4 right-2 flex flex-col items-center gap-3 text-white">
+                <div className="absolute bottom-5 right-2 flex flex-col items-center gap-3 text-white">
                   <button
                     onClick={() => void toggleLike(item)}
                     className="flex flex-col items-center gap-0.5 text-[10px]"
@@ -238,7 +275,7 @@ export default function FeedPage() {
                         className={isLiked ? "text-rose-500" : ""}
                       />
                     </span>
-                    {num(item.likes)}
+                    {num(counts[item.id]?.likes ?? item.likes)}
                   </button>
                   <button
                     onClick={() => setCommentsFor(item.id)}
@@ -247,7 +284,7 @@ export default function FeedPage() {
                     <span className="grid h-11 w-11 place-items-center rounded-full bg-white/15 backdrop-blur">
                       <ChatCircle size={22} />
                     </span>
-                    {num(item.comments)}
+                    {num(counts[item.id]?.comments ?? item.comments)}
                   </button>
                   <button
                     onClick={() => void share(item)}
@@ -256,7 +293,7 @@ export default function FeedPage() {
                     <span className="grid h-11 w-11 place-items-center rounded-full bg-white/15 backdrop-blur">
                       <PaperPlaneTilt size={21} />
                     </span>
-                    {num(item.reposts)}
+                    {num(counts[item.id]?.reposts ?? item.reposts)}
                   </button>
                 </div>
               </article>
@@ -280,6 +317,16 @@ export default function FeedPage() {
         listingId={commentsFor}
         open={commentsFor !== null}
         onClose={() => setCommentsFor(null)}
+        onCreated={() => {
+          if (commentsFor === null) return;
+          setCounts((prev) => ({
+            ...prev,
+            [commentsFor]: {
+              ...(prev[commentsFor] ?? { likes: 0, comments: 0, reposts: 0, views: 0 }),
+              comments: (prev[commentsFor]?.comments ?? 0) + 1,
+            },
+          }));
+        }}
       />
     </div>
   );
