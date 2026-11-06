@@ -5,12 +5,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -89,6 +91,32 @@ def create_app(
     api_url = os.environ.get("CARCAR_API_URL", "").rstrip("/")
     webhook_secret = os.environ.get("CARCAR_WEBHOOK_SECRET", "")
 
+    WARM_QUERIES = [
+        "limit=20&offset=0&sort=new",
+        "limit=1&offset=0&sort=new",
+        "limit=20&offset=0&sort=new&body=sedan",
+        "limit=20&offset=0&sort=new&body=suv",
+        "limit=20&offset=0&sort=new&make=BMW",
+        "limit=20&offset=0&sort=new&make=Audi",
+        "limit=20&offset=0&sort=new&make=Volkswagen",
+        "limit=20&offset=0&sort=new&make=Toyota",
+        "limit=20&offset=0&sort=new&make=Skoda",
+        "limit=20&offset=0&sort=new&gearbox=automatic",
+    ]
+
+    async def warm_loop() -> None:
+        """Держит кэш популярных выдач горячим: первый пользователь не ждёт БД."""
+        port = os.environ.get("PORT", "8080")
+        await asyncio.sleep(5)
+        while True:
+            async with httpx.AsyncClient(timeout=45) as client:
+                for query in WARM_QUERIES:
+                    try:
+                        await client.get(f"http://127.0.0.1:{port}/api/listings?{query}")
+                    except Exception:  # noqa: BLE001
+                        break
+            await asyncio.sleep(45)
+
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         # Одноразовая миграция: включает CARCAR_AUTO_MIGRATE=1.
@@ -102,6 +130,10 @@ def create_app(
             except Exception as exc:  # noqa: BLE001
                 print(f"автомиграция не удалась: {exc}")
 
+        warm_task = None
+        if os.environ.get("CARCAR_WARM", "1") == "1":
+            warm_task = asyncio.create_task(warm_loop())
+
         # Бот работает через вебхук: поллинг с двух машин конфликтует.
         if bot_token and api_url:
             from ..bot import Bot
@@ -112,7 +144,11 @@ def create_app(
                 )
             except Exception as exc:  # noqa: BLE001
                 print(f"не удалось поставить вебхук: {exc}")
-        yield
+        try:
+            yield
+        finally:
+            if warm_task is not None:
+                warm_task.cancel()
         repo.close()
 
     app = FastAPI(
@@ -300,7 +336,14 @@ def create_app(
         cached = cache.get(key)
         if cached is not None:
             return cached
+        total_key = "total:" + "&".join(
+            part
+            for part in request.url.query.split("&")
+            if part and not part.startswith(("limit=", "offset="))
+        )
+        known_total = cache.get(total_key)
         items, total = repo.search(
+            known_total=known_total,
             limit=limit,
             offset=offset,
             q=q,
@@ -332,7 +375,8 @@ def create_app(
             sort=sort,
         )
         payload = {"items": items, "total": total, "limit": limit, "offset": offset}
-        cache.set(key, payload, ttl=30)
+        cache.set(key, payload, ttl=120)
+        cache.set(total_key, total, ttl=300)
         return payload
 
     @app.get("/api/listings/{listing_id}")

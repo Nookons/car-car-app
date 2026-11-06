@@ -25,6 +25,16 @@ FIELDS = """
     l.last_seen_at, l.status
 """
 
+# Для выдачи не тащим описание и оборудование: это мегабайты лишнего I/O.
+LIST_FIELDS = """
+    l.id, l.external_id, l.url, l.title, l.price, l.currency, l.make, l.model,
+    l.year, l.mileage_km, l.fuel, l.gearbox, l.body, l.power_hp, l.engine_cm3,
+    l.color, l.vin, l.city, l.region, l.lat, l.lon, l.seller_type, l.seller_name,
+    l.version, l.generation, l.doors, l.seats, l.drive, l.condition,
+    l.thumb_url, l.photos_count, l.published_at, l.first_seen_at,
+    l.last_seen_at, l.status
+"""
+
 
 def _flt(value: Any) -> float | None:
     return float(value) if value is not None else None
@@ -242,6 +252,7 @@ class MiniAppRepo:
         lon: float | None = None,
         radius_km: float | None = None,
         sort: str = "new",
+        known_total: int | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
         limit = max(1, min(limit, 50))
         offset = max(0, offset)
@@ -253,11 +264,12 @@ class MiniAppRepo:
             conds.append("(l.title ILIKE %(q)s OR l.make ILIKE %(q)s OR l.model ILIKE %(q)s)")
             params["q"] = f"%{q}%"
         if make:
-            conds.append("l.make ILIKE %(make)s")
-            params["make"] = f"%{make}%"
+            # Значение приходит из выпадающего списка — сравниваем точно, индекс работает.
+            conds.append("l.make = %(make)s")
+            params["make"] = make
         if model:
-            conds.append("l.model ILIKE %(model)s")
-            params["model"] = f"%{model}%"
+            conds.append("l.model = %(model)s")
+            params["model"] = model
         if price_min is not None:
             conds.append("l.price >= %(price_min)s")
             params["price_min"] = price_min
@@ -345,24 +357,31 @@ class MiniAppRepo:
             "distance": "distance_km nulls last",
         }.get(sort, "published_at desc nulls last")
 
-        base = f"""
-            select {FIELDS}, s.code as source_code, {distance} as distance_km
-            from listing l join source s on s.id = l.source_id
-            where {' and '.join(conds)}
-        """
-        sql = f"""
-            with base as ({base})
-            select *, count(*) over() as total
-            from base
+        where = " and ".join(conds)
+        count_sql = f"""
+            select count(*) as total from (
+                select {distance} as distance_km
+                from listing l join source s on s.id = l.source_id
+                where {where}
+            ) t
             where %(radius)s::float8 is null or distance_km <= %(radius)s::float8
+        """
+        items_sql = f"""
+            select {LIST_FIELDS}, s.code as source_code, {distance} as distance_km
+            from listing l join source s on s.id = l.source_id
+            where {where}
             order by {order}
             limit %(limit)s offset %(offset)s
         """
         with self.pool.connection() as conn, conn.cursor() as cur:
-            cur.execute(sql, params)
+            if known_total is not None:
+                total = known_total
+            else:
+                cur.execute(count_sql, params)
+                total = int(cur.fetchone()["total"])
+            cur.execute(items_sql, params)
             rows = cur.fetchall()
 
-        total = int(rows[0]["total"]) if rows else 0
         return [_item(row) for row in rows], total
 
     def apply_detail(self, listing_id: int, values: dict[str, Any]) -> None:
