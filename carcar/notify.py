@@ -14,7 +14,7 @@ import httpx
 import psycopg
 from psycopg.rows import dict_row
 
-from .messages import article
+from .messages import grid_caption
 from .messages import messages as msg
 
 log = logging.getLogger("carcar.notify")
@@ -155,30 +155,40 @@ class Notifier:
         self._throttle(chat_id)
         url = f"{self.public_url}/listing/{item['id']}"
         text = msg(lang)
-        body = article(item, lang)
+        caption = grid_caption(item, lang)
         keyboard = {
             "inline_keyboard": [
                 [{"text": text["open_app"], "web_app": {"url": url}}],
                 [{"text": text["my_filters"], "web_app": {"url": f"{self.public_url}/account"}}],
             ]
         }
-        payload: dict[str, Any] = {
-            "chat_id": chat_id,
-            # URL в тексте нужен Telegram, чтобы построить превью-карточку
-            "text": f"{body[:3900]}\n\n{url}",
-            "parse_mode": "HTML",
-            "reply_markup": keyboard,
-            # Большой превью-блок с фото: Telegram берёт OpenGraph нашей страницы
-            "link_preview_options": {
-                "url": url,
-                "prefer_large_media": True,
-                "show_above_text": False,
-            },
-        }
-        response = self.client.post(
-            f"https://api.telegram.org/bot{self.bot_token}/sendMessage", json=payload
-        )
-        data = response.json()
+        # Фото-сообщение: ссылки в тексте нет, переход только по кнопке.
+        photo = item.get("thumb_url")
+        if photo:
+            response = self.client.post(
+                f"https://api.telegram.org/bot{self.bot_token}/sendPhoto",
+                json={
+                    "chat_id": chat_id,
+                    "photo": photo,
+                    "caption": caption,
+                    "parse_mode": "HTML",
+                    "reply_markup": keyboard,
+                },
+            )
+            data = response.json()
+        else:
+            data = {"ok": False}
+        if not data.get("ok"):
+            response = self.client.post(
+                f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
+                json={
+                    "chat_id": chat_id,
+                    "text": caption,
+                    "parse_mode": "HTML",
+                    "reply_markup": keyboard,
+                },
+            )
+            data = response.json()
         if not data.get("ok"):
             log.warning("Telegram отказал: %s", data.get("description"))
             return False, None, str(data.get("description") or "telegram error")[:500]

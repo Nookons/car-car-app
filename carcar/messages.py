@@ -149,6 +149,59 @@ def _escape(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def grid_caption(item: dict, lang: str | None) -> str:
+    """Подпись к фото: ключевые факты и характеристики сеткой по две в строке."""
+    text = messages(lang)
+    labels = specs(lang)
+    fuel = FUEL_LABELS.get(lang, {}).get(item.get("fuel") or "", item.get("fuel") or "")
+    gearbox = GEARBOX_LABELS.get(lang, {}).get(
+        item.get("gearbox") or "", item.get("gearbox") or ""
+    )
+    drive = DRIVE_LABELS.get(lang, {}).get(item.get("drive") or "", item.get("drive") or "")
+
+    def number(value):
+        return f"{value:,}".replace(",", " ") if value else ""
+
+    pairs = [
+        (labels["year"], item.get("year")),
+        (
+            labels["mileage"],
+            f"{number(item.get('mileage_km'))} {text['km']}" if item.get("mileage_km") else "",
+        ),
+        (labels["engine"], f"{item.get('engine_cm3')} cm³" if item.get("engine_cm3") else ""),
+        (labels["power"], f"{item.get('power_hp')} KM" if item.get("power_hp") else ""),
+        (labels["fuel"], fuel),
+        (labels["gearbox"], gearbox),
+        (labels["body"], item.get("body") or ""),
+        (labels["drive"], drive),
+        (labels["color"], item.get("color") or ""),
+    ]
+    pairs = [(label, value) for label, value in pairs if value]
+    lines = []
+    for index in range(0, len(pairs), 2):
+        chunk = pairs[index:index + 2]
+        lines.append("   ".join(f"{label} <b>{_escape(str(value))}</b>" for label, value in chunk))
+    grid = "\n".join(lines)
+
+    price = f"{number(item.get('price'))} zł"
+    facts = " · ".join(
+        str(part)
+        for part in [
+            item.get("year"),
+            f"{number(item.get('mileage_km'))} {text['km']}" if item.get("mileage_km") else None,
+            item.get("city"),
+        ]
+        if part
+    )
+    return (
+        f"<b>{_escape(str(item.get('title') or ''))}</b>\n"
+        f"<b>{price}</b>\n"
+        f"{_escape(facts)}\n\n"
+        f"{grid}\n\n"
+        f"{text['notify_ok']}"
+    )[:1024]
+
+
 def article(item: dict, lang: str | None) -> str:
     """Одно сообщение-статья: заголовок, факты, сворачиваемая таблица."""
     text = messages(lang)
