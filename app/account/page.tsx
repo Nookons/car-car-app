@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { ThemeSwitch } from "@/components/theme-switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { loadFilters, saveFilters } from "@/lib/filters";
@@ -102,6 +103,7 @@ export default function AccountPage() {
       <div className="space-y-4">
         <h1 className="text-lg font-semibold">{t("nav.account")}</h1>
         <Card className="space-y-4 p-6 text-center">
+          <ThemeSwitch />
           <p className="text-sm text-muted-foreground">{t("account.guestHint")}</p>
           <Button className="w-full" onClick={() => setSignupOpen(true)}>
             {t("account.create")}
@@ -161,6 +163,8 @@ export default function AccountPage() {
             ))}
           </select>
         </label>
+
+        <ThemeSwitch />
 
         <div className="flex items-center justify-between gap-3 py-1">
           <span className="flex items-center gap-2 text-sm">

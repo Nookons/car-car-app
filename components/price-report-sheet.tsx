@@ -87,10 +87,10 @@ export function PriceReportSheet({
 
   const tone =
     analysis.verdict === "below"
-      ? "text-emerald-600"
+      ? "text-emerald-600 dark:text-emerald-400"
       : analysis.verdict === "above"
-        ? "text-red-600"
-        : "text-amber-600";
+        ? "text-red-600 dark:text-red-400"
+        : "text-amber-600 dark:text-amber-400";
   const label =
     analysis.verdict === "below"
       ? t("market.below")

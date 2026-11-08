@@ -24,6 +24,29 @@
     --radius: 0.9rem;
   }
 
+  .dark {
+    --background: 222 28% 8%;
+    --foreground: 210 20% 96%;
+    --card: 222 25% 11%;
+    --card-foreground: 210 20% 96%;
+    --primary: 210 20% 96%;
+    --primary-foreground: 222 28% 8%;
+    --secondary: 222 20% 16%;
+    --secondary-foreground: 210 20% 96%;
+    --muted: 222 20% 16%;
+    --muted-foreground: 215 16% 66%;
+    --accent: 222 20% 19%;
+    --accent-foreground: 210 20% 96%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 222 18% 22%;
+    --input: 222 18% 25%;
+    --ring: 210 20% 80%;
+  }
+
+  html { color-scheme: light; }
+  html.dark { color-scheme: dark; }
+
   * { @apply border-border; }
   html, body { @apply bg-background text-foreground; }
   html { height: 100%; }
