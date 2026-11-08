@@ -434,13 +434,15 @@ class MiniAppRepo:
         }.get(sort, "published_at desc nulls last")
 
         where = " and ".join(conds)
-        radius_cond = (
-            f"(%(radius)s::float8 is null or {distance} <= %(radius)s::float8)"
-        )
+        # Без гео не добавляем OR с NULL-параметром: иначе планировщик
+        # перестаёт брать индекс published_at и простой список ползёт минутами.
+        radius_cond = ""
+        if radius_km and lat is not None and lon is not None:
+            radius_cond = f" and {distance} <= %(radius)s::float8"
         items_sql = f"""
             select {LIST_FIELDS}, s.code as source_code, {distance} as distance_km
             from listing l join source s on s.id = l.source_id
-            where {where} and {radius_cond}
+            where {where}{radius_cond}
             order by {order}
             limit %(limit)s offset %(offset)s
         """
