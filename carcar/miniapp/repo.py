@@ -530,8 +530,8 @@ class MiniAppRepo:
     def apply_detail(self, listing_id: int, values: dict[str, Any]) -> None:
         values = dict(values)
         for key, low, high in (
-            ("power_hp", 3, 2000),
-            ("engine_cm3", 50, 10_000),
+            ("power_hp", 10, 2000),
+            ("engine_cm3", 600, 10_000),
             ("doors", 1, 20),
             ("seats", 1, 100),
             ("co2_gkm", 0, 2000),

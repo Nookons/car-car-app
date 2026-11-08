@@ -188,10 +188,10 @@ def fetch_detail(
             vin = None
         # Некоторые карточки отдают мусор в мощности/объёме — не роняем запись.
         power = to_int(offer.details.get("engine_power"))
-        if power is not None and not 3 <= power <= 2000:
+        if power is not None and not 10 <= power <= 2000:
             power = None
         engine = to_int(offer.details.get("engine_capacity"))
-        if engine is not None and not 50 <= engine <= 10000:
+        if engine is not None and not 600 <= engine <= 10000:
             engine = None
         changed = sink.update_detail(
             listing.id,
