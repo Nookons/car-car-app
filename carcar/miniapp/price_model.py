@@ -13,6 +13,8 @@ from typing import Any
 
 # Сумма весов = 1. Цвет и поколение намеренно с малым весом: они влияют
 # на похожесть, но не отсекают объявления.
+MODEL_VERSION = 3
+
 WEIGHTS: dict[str, float] = {
     "year": 0.20,
     "mileage": 0.17,
@@ -362,6 +364,7 @@ def analyse_price(
         "avg_similarity": round(average_similarity * 100),
         "adjustment_pct": round((factor - 1) * 100, 1),
         "method": "adjusted_comparable_median",
+        "model_version": MODEL_VERSION,
         "criteria": criteria,
         "comparables": comparable_rows,
         "notes": [
@@ -370,6 +373,7 @@ def analyse_price(
         ],
     }
     return {
+        "model_version": MODEL_VERSION,
         "median": int(round(estimate)),
         "p10": int(round(range_low)),
         "p90": int(round(range_high)),
@@ -378,5 +382,6 @@ def analyse_price(
         "verdict": verdict,
         "confidence": confidence,
         "method": "adjusted_comparable_median",
+        "model_version": MODEL_VERSION,
         "report": report,
     }
