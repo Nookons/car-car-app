@@ -26,13 +26,13 @@ export async function api<T>(
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
 
   const method = options.method ?? "GET";
-  const isPublicGet = method === "GET" && !options.token;
   const response = await fetch(`${API_URL}/api${path}`, {
     method,
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    // Публичные GET можно кэшировать браузеру; персональные — никогда.
-    cache: isPublicGet ? "default" : "no-store",
+    // Кэш — на стороне API. Браузерный кэш после деплоя отдавал старые
+    // ответы без photos/price_analysis, поэтому всегда идём в сеть.
+    cache: "no-store",
     signal: options.signal,
   });
 
