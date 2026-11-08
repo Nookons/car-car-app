@@ -31,7 +31,7 @@ LIST_FIELDS = """
     l.year, l.mileage_km, l.fuel, l.gearbox, l.body, l.power_hp, l.engine_cm3,
     l.color, l.vin, l.city, l.region, l.lat, l.lon, l.seller_type, l.seller_name,
     l.version, l.generation, l.doors, l.seats, l.drive, l.condition,
-    l.thumb_url, l.photos_count, l.published_at, l.first_seen_at,
+    l.thumb_url, l.photos, l.photos_count, l.published_at, l.first_seen_at,
     l.last_seen_at, l.status
 """
 
@@ -49,6 +49,9 @@ def _iso(value: Any) -> str | None:
 
 
 def _item(row: dict[str, Any]) -> dict[str, Any]:
+    photos = [photo for photo in (row.get("photos") or []) if photo]
+    if not photos and row.get("thumb_url"):
+        photos = [row["thumb_url"]]
     return {
         "id": row["id"],
         "external_id": row["external_id"],
@@ -78,6 +81,7 @@ def _item(row: dict[str, Any]) -> dict[str, Any]:
         "doors": row.get("doors"),
         "seats": row.get("seats"),
         "thumbnail": row.get("thumb_url"),
+        "photos": photos[:6],
         "photos_count": row.get("photos_count") or 0,
         "published_at": _iso(row.get("published_at")),
         "distance_km": round(row["distance_km"], 1)
@@ -222,6 +226,70 @@ class MiniAppRepo:
         return self.get_user(user_id) or {}
 
     # -- объявления ----------------------------------------------------------
+    def _market_analyses(
+        self, rows: list[dict[str, Any]]
+    ) -> dict[int, dict[str, Any]]:
+        """Одна батч-агрегация вместо запроса на каждую карточку.
+
+        Для каждой карточки считаем медиану по той же модели, году ±2 и
+        пробегу ±30% — это те же условия, что и в карточке объявления.
+        Такой запрос выполняется одним проходом по нужным группам и не
+        превращается в 20 отдельных percentile-запросов.
+        """
+        ids = [
+            row["id"]
+            for row in rows
+            if row.get("price") and row.get("make") and row.get("model")
+        ]
+        if not ids:
+            return {}
+
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                with page as (
+                    select id, make, model, year, mileage_km
+                    from listing
+                    where id = any(%(ids)s::bigint[])
+                )
+                select p.id,
+                       percentile_cont(0.1) within group (order by m.price) as p10,
+                       percentile_cont(0.5) within group (order by m.price) as median,
+                       percentile_cont(0.9) within group (order by m.price) as p90,
+                       count(*) as sample
+                from page p
+                join listing m
+                  on m.status = 'active'
+                 and m.price is not null
+                 and m.make = p.make
+                 and m.model = p.model
+                 and (p.year is null or m.year between p.year - 2 and p.year + 2)
+                 and (p.mileage_km is null
+                      or m.mileage_km between p.mileage_km * 0.7 and p.mileage_km * 1.3)
+                group by p.id
+                """,
+                {"ids": ids},
+            )
+            stats = cur.fetchall()
+        prices = {row["id"]: row["price"] for row in rows}
+        result: dict[int, dict[str, Any]] = {}
+        for stat in stats:
+            median = _num(stat["median"])
+            sample = int(stat["sample"] or 0)
+            price = prices.get(stat["id"])
+            if not median or sample < 5 or price is None:
+                continue
+            diff = round((price - median) / median * 100)
+            result[stat["id"]] = {
+                "median": median,
+                "p10": _num(stat["p10"]),
+                "p90": _num(stat["p90"]),
+                "sample": sample,
+                "diff_pct": diff,
+                "verdict": "below" if diff <= -5 else ("above" if diff >= 5 else "fair"),
+            }
+        return result
+
     def search(
         self,
         *,
@@ -384,7 +452,21 @@ class MiniAppRepo:
             cur.execute(items_sql, params)
             rows = cur.fetchall()
 
-        return [_item(row) for row in rows], total
+        items = [_item(row) for row in rows]
+        analyses: dict[int, dict[str, Any]] = {}
+        # limit=1 — это запрос счётчика для фильтров; анализ рынка там не нужен.
+        if limit > 1:
+            try:
+                analyses = self._market_analyses(rows)
+            except Exception:
+                # Оценка рынка вспомогательная: без неё выдача всё равно должна открыться.
+                analyses = {}
+        for item in items:
+            analysis = analyses.get(item["id"])
+            if analysis:
+                item["price_analysis"] = analysis
+
+        return items, total
 
     def apply_detail(self, listing_id: int, values: dict[str, Any]) -> None:
         tags = [tag for tag in (values.get("equipment") or []) if tag][:120]

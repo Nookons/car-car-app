@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowRight } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
-import { ListingCard } from "@/components/listing-card";
+import { ListingRow } from "@/components/listing-row";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -115,19 +115,37 @@ export default function HomePage() {
           </Link>
         </div>
         {loading ? (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <Skeleton key={index} className="h-56" />
+          <div className="-mx-4 space-y-3 md:mx-0">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <RowSkeleton key={index} />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-            {items.map((item) => (
-              <ListingCard key={item.id} item={item} />
+          <div className="-mx-4 space-y-3 md:mx-0">
+            {items.map((item, index) => (
+              <ListingRow key={item.id} item={item} priority={index < 2} />
             ))}
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function RowSkeleton() {
+  return (
+    <div className="overflow-hidden border border-x-0 bg-card md:rounded-2xl md:border-x">
+      <div className="space-y-2.5 p-4 pr-12">
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-3 w-1/3" />
+        <Skeleton className="h-6 w-2/5" />
+      </div>
+      <Skeleton className="aspect-[16/9] w-full rounded-none" />
+      <div className="space-y-2 p-4">
+        <Skeleton className="h-3 w-1/4" />
+        <Skeleton className="h-3 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+      </div>
     </div>
   );
 }

@@ -1,3 +1,12 @@
+export type PriceAnalysis = {
+  median: number;
+  p10: number | null;
+  p90: number | null;
+  sample: number;
+  diff_pct: number;
+  verdict: "below" | "fair" | "above";
+};
+
 export type Listing = {
   id: number;
   external_id: string;
@@ -17,6 +26,7 @@ export type Listing = {
   city: string | null;
   region: string | null;
   thumbnail: string | null;
+  photos?: string[];
   photos_count: number;
   published_at: string | null;
   distance_km: number | null;
@@ -26,6 +36,7 @@ export type Listing = {
   condition?: string | null;
   color?: string | null;
   seller_type?: string | null;
+  price_analysis?: PriceAnalysis | null;
 };
 
 export type ListingCard = Listing & {
@@ -48,14 +59,7 @@ export type ListingCard = Listing & {
   consumption_urban: number | null;
   consumption_extra: number | null;
   equipment: string[];
-  price_analysis: {
-    median: number;
-    p10: number | null;
-    p90: number | null;
-    sample: number;
-    diff_pct: number;
-    verdict: "below" | "fair" | "above";
-  } | null;
+  price_analysis: PriceAnalysis | null;
 };
 
 export type User = {

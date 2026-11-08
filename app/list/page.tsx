@@ -418,7 +418,7 @@ export default function ListPage() {
           </Button>
         </div>
       ) : loading ? (
-        <div className="space-y-3">
+        <div className="-mx-4 space-y-3 md:mx-0">
           {Array.from({ length: 4 }).map((_, index) => (
             <ListSkeleton key={index} />
           ))}
@@ -426,7 +426,7 @@ export default function ListPage() {
       ) : items.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">{t("list.empty")}</p>
       ) : (
-        <div className="space-y-3">
+        <div className="-mx-4 space-y-3 md:mx-0">
           {items.map((item, index) => (
             <ListingRow key={item.id} item={item} priority={index < 2} />
           ))}
@@ -438,7 +438,7 @@ export default function ListPage() {
       ) : null}
 
       {loadingMore ? (
-        <div className="space-y-3">
+        <div className="-mx-4 space-y-3 md:mx-0">
           {Array.from({ length: 2 }).map((_, index) => (
             <ListSkeleton key={index} />
           ))}
@@ -481,7 +481,7 @@ export default function ListPage() {
 
 function ListSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl border bg-card">
+    <div className="overflow-hidden border border-x-0 bg-card md:rounded-2xl md:border-x">
       <div className="space-y-2.5 p-4 pr-12">
         <Skeleton className="h-4 w-2/3" />
         <Skeleton className="h-3 w-1/3" />
