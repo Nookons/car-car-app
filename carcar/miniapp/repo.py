@@ -229,12 +229,12 @@ class MiniAppRepo:
     def _market_analyses(
         self, rows: list[dict[str, Any]]
     ) -> dict[int, dict[str, Any]]:
-        """Одна батч-агрегация вместо запроса на каждую карточку.
+        """Быстрая оценка рынка из предрасчитанного model_option.
 
-        Для каждой карточки считаем медиану по той же модели, году ±2 и
-        пробегу ±30% — это те же условия, что и в карточке объявления.
-        Такой запрос выполняется одним проходом по нужным группам и не
-        превращается в 20 отдельных percentile-запросов.
+        Точный percentile по всей таблице считается только в карточке
+        объявления. Для ленты 20 таких запросов слишком дорогие, поэтому
+        берём медиану/перцентили из model_option (те же модели и годы)
+        и взвешиваем по числу объявлений в группах. Это ~0.06 c на 20 машин.
         """
         ids = [
             row["id"]
@@ -248,24 +248,26 @@ class MiniAppRepo:
             cur.execute(
                 """
                 with page as (
-                    select id, make, model, year, mileage_km
+                    select id, make, model, year, gearbox, fuel, body
                     from listing
                     where id = any(%(ids)s::bigint[])
                 )
                 select p.id,
-                       percentile_cont(0.1) within group (order by m.price) as p10,
-                       percentile_cont(0.5) within group (order by m.price) as median,
-                       percentile_cont(0.9) within group (order by m.price) as p90,
-                       count(*) as sample
+                       sum(o.price_median * o.listings)::numeric
+                           / nullif(sum(o.listings), 0) as median,
+                       sum(o.price_p10 * o.listings)::numeric
+                           / nullif(sum(o.listings), 0) as p10,
+                       sum(o.price_p90 * o.listings)::numeric
+                           / nullif(sum(o.listings), 0) as p90,
+                       sum(o.listings) as sample
                 from page p
-                join listing m
-                  on m.status = 'active'
-                 and m.price is not null
-                 and m.make = p.make
-                 and m.model = p.model
-                 and (p.year is null or m.year between p.year - 2 and p.year + 2)
-                 and (p.mileage_km is null
-                      or m.mileage_km between p.mileage_km * 0.7 and p.mileage_km * 1.3)
+                join model_option o
+                  on o.make = p.make
+                 and o.model = p.model
+                 and (p.year is null or p.year between o.year_min and o.year_max)
+                 and (p.gearbox is null or o.gearbox = p.gearbox)
+                 and (p.fuel is null or o.fuel = p.fuel)
+                 and (p.body is null or o.body = p.body or o.body = '')
                 group by p.id
                 """,
                 {"ids": ids},
