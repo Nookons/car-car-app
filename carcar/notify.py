@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 from typing import Any
 
@@ -34,6 +35,26 @@ def _num(value: Any) -> int | None:
     return None if value is None else int(value)
 
 
+def _coordinate(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    radius = 6371.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = (
+        math.sin(dphi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    )
+    return 2 * radius * math.asin(min(1.0, math.sqrt(a)))
+
+
 def matches(criteria: dict[str, Any], row: dict[str, Any]) -> bool:
     """Подходит ли объявление под критерии подписки."""
     if not criteria:
@@ -47,6 +68,15 @@ def matches(criteria: dict[str, Any], row: dict[str, Any]) -> bool:
         return False
     if criteria.get("model") and not text_equal("model", criteria["model"]):
         return False
+
+    query = str(criteria.get("q") or "").strip().lower()
+    if query:
+        haystack = " ".join(
+            str(row.get(field) or "") for field in ("title", "make", "model")
+        ).lower()
+        if query not in haystack:
+            return False
+
     price = row.get("price")
     if criteria.get("price_min") is not None and (price is None or price < criteria["price_min"]):
         return False
@@ -58,13 +88,50 @@ def matches(criteria: dict[str, Any], row: dict[str, Any]) -> bool:
     if criteria.get("year_max") is not None and (year is None or year > criteria["year_max"]):
         return False
     mileage = row.get("mileage_km")
+    if criteria.get("mileage_min") is not None and (
+        mileage is None or mileage < criteria["mileage_min"]
+    ):
+        return False
     if criteria.get("mileage_max") is not None and (
         mileage is None or mileage > criteria["mileage_max"]
     ):
         return False
-    for field in ("fuel", "gearbox", "body"):
+
+    for field in ("fuel", "gearbox", "body", "drive", "condition", "color", "seller_type"):
         if criteria.get(field) and not text_equal(field, criteria[field]):
             return False
+    if criteria.get("source"):
+        if (row.get("source_code") or "").lower() != str(criteria["source"]).lower():
+            return False
+
+    for value, low, high in (
+        (row.get("power_hp"), criteria.get("power_min"), criteria.get("power_max")),
+        (row.get("engine_cm3"), criteria.get("engine_min"), criteria.get("engine_max")),
+    ):
+        if low is not None and (value is None or value < low):
+            return False
+        if high is not None and (value is None or value > high):
+            return False
+
+    for field in ("doors", "seats"):
+        if criteria.get(field) is not None and row.get(field) != criteria[field]:
+            return False
+
+    # ГЕО: подписка, сохранённая с координатами, не должна присылать
+    # объявления из других городов/регионов.
+    sub_lat = _coordinate(criteria.get("lat"))
+    sub_lon = _coordinate(criteria.get("lon"))
+    if sub_lat is not None and sub_lon is not None:
+        radius = _coordinate(criteria.get("radius_km"))
+        if radius is None:
+            radius = 50.0
+        item_lat = _coordinate(row.get("lat"))
+        item_lon = _coordinate(row.get("lon"))
+        if item_lat is None or item_lon is None:
+            return False
+        if _distance_km(sub_lat, sub_lon, item_lat, item_lon) > radius:
+            return False
+
     return True
 
 
@@ -98,11 +165,11 @@ class Notifier:
             cur.execute(
                 """
                 select l.id, l.external_id, l.title, l.price, l.currency, l.year,
-                       l.mileage_km, l.city, l.make, l.model,
+                       l.mileage_km, l.city, l.make, l.model, l.lat, l.lon,
                        l.fuel, l.gearbox, l.body, l.thumb_url, l.url,
                        l.engine_cm3, l.power_hp, l.drive, l.color, l.doors, l.seats,
                        l.condition, l.co2_gkm, l.consumption_urban, l.consumption_extra,
-                       l.seller_name,
+                       l.seller_name, l.seller_type,
                        s.code as source_code
                 from listing l join source s on s.id = l.source_id
                 where s.code = %s and l.external_id = %s and l.status = 'active'
