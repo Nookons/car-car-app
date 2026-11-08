@@ -156,7 +156,7 @@ class MiniAppRepo:
         self.pool = ConnectionPool(
             url,
             min_size=1,
-            max_size=6,
+            max_size=10,
             open=True,
             kwargs={
                 "connect_timeout": 10,
@@ -400,7 +400,12 @@ class MiniAppRepo:
             conds.append("l.engine_cm3 <= %(engine_max)s")
             params["engine_max"] = engine_max
         if source:
-            conds.append("s.code = %(source)s")
+            # exists вместо join: count-запрос не тащит join в source и
+            # может идти по partial-индексу listing_active_published_idx.
+            conds.append(
+                "exists (select 1 from source s2 "
+                "where s2.id = l.source_id and s2.code = %(source)s)"
+            )
             params["source"] = source
 
         distance = "null::float8"
@@ -430,21 +435,18 @@ class MiniAppRepo:
         }.get(sort, "published_at desc nulls last")
 
         where = " and ".join(conds)
+        radius_cond = (
+            f"(%(radius)s::float8 is null or {distance} <= %(radius)s::float8)"
+        )
         count_sql = f"""
-            select count(*) as total from (
-                select {distance} as distance_km
-                from listing l join source s on s.id = l.source_id
-                where {where}
-            ) t
-            where %(radius)s::float8 is null or distance_km <= %(radius)s::float8
+            select count(*) as total
+            from listing l
+            where {where} and {radius_cond}
         """
         items_sql = f"""
-            select * from (
-                select {LIST_FIELDS}, s.code as source_code, {distance} as distance_km
-                from listing l join source s on s.id = l.source_id
-                where {where}
-            ) t
-            where %(radius)s::float8 is null or distance_km <= %(radius)s::float8
+            select {LIST_FIELDS}, s.code as source_code, {distance} as distance_km
+            from listing l join source s on s.id = l.source_id
+            where {where} and {radius_cond}
             order by {order}
             limit %(limit)s offset %(offset)s
         """
