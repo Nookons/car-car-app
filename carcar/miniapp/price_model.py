@@ -13,7 +13,7 @@ from typing import Any
 
 # Сумма весов = 1. Цвет и поколение намеренно с малым весом: они влияют
 # на похожесть, но не отсекают объявления.
-MODEL_VERSION = 4
+MODEL_VERSION = 5
 
 WEIGHTS: dict[str, float] = {
     "year": 0.20,
@@ -213,6 +213,19 @@ def analyse_price(
             for comp, similarity, _ in used
         ]
     )
+    market_modes = {
+        key: _weighted_mode([(comp, similarity) for comp, similarity, _ in used], key)
+        for key in CATEGORY_KEYS
+    }
+    market_profile = {
+        "year": avg_year,
+        "mileage_km": avg_mileage,
+        "engine_cm3": avg_engine,
+        "power_hp": avg_power,
+        "equipment": [],
+        **market_modes,
+    }
+    market_scores = _scores(subject, market_profile)
 
     subject_year = _number(subject.get("year"))
     subject_mileage = _number(subject.get("mileage_km"))
@@ -253,10 +266,6 @@ def analyse_price(
     verdict = "below" if diff <= -5 else ("above" if diff >= 5 else "fair")
 
     total_similarity = sum(similarity for _, similarity, _ in used)
-    avg_scores = {
-        key: sum(similarity * scores[key] for _, similarity, scores in used) / total_similarity
-        for key in WEIGHTS
-    }
     average_similarity = total_similarity / len(used)
     if len(used) >= 50 and average_similarity >= 0.65:
         confidence = "high"
@@ -280,7 +289,7 @@ def analyse_price(
             "subject": subject.get("year"),
             "market": round(avg_year, 1) if avg_year is not None else None,
             "weight": WEIGHTS["year"],
-            "match": round(avg_scores["year"], 2),
+            "match": round(market_scores["year"], 2),
             "effect_pct": effect("year"),
             "per_unit_pct": per_unit("year", slope_year, 1.0),
         },
@@ -289,7 +298,7 @@ def analyse_price(
             "subject": subject.get("mileage_km"),
             "market": round(avg_mileage) if avg_mileage is not None else None,
             "weight": WEIGHTS["mileage"],
-            "match": round(avg_scores["mileage"], 2),
+            "match": round(market_scores["mileage"], 2),
             "effect_pct": effect("mileage"),
             "per_unit_pct": round((math.exp(slope_mileage) - 1) * 100, 2) if slope_mileage else None,
         },
@@ -298,7 +307,7 @@ def analyse_price(
             "subject": subject.get("engine_cm3"),
             "market": round(avg_engine) if avg_engine is not None else None,
             "weight": WEIGHTS["engine"],
-            "match": round(avg_scores["engine"], 2),
+            "match": round(market_scores["engine"], 2),
             "effect_pct": effect("engine"),
             "per_unit_pct": round((math.exp(slope_engine) - 1) * 100, 1) if slope_engine else None,
         },
@@ -307,7 +316,7 @@ def analyse_price(
             "subject": subject.get("power_hp"),
             "market": round(avg_power) if avg_power is not None else None,
             "weight": WEIGHTS["power"],
-            "match": round(avg_scores["power"], 2),
+            "match": round(market_scores["power"], 2),
             "effect_pct": effect("power"),
             "per_unit_pct": round((math.exp(slope_power) - 1) * 100, 1) if slope_power else None,
         },
@@ -316,7 +325,7 @@ def analyse_price(
             "subject": int(subject_equipment),
             "market": round(avg_equipment, 1) if avg_equipment is not None and avg_equipment >= 1 else None,
             "weight": WEIGHTS["equipment"],
-            "match": round(avg_scores["equipment"], 2),
+            "match": round(market_scores["equipment"], 2),
             "effect_pct": None,
             "per_unit_pct": None,
         },
@@ -326,9 +335,9 @@ def analyse_price(
             {
                 "key": key,
                 "subject": subject.get(key),
-                "market": _weighted_mode([(comp, similarity) for comp, similarity, _ in used], key),
+                "market": market_modes[key],
                 "weight": WEIGHTS[key],
-                "match": round(avg_scores[key], 2),
+                "match": round(market_scores[key], 2),
                 "effect_pct": None,
                 "per_unit_pct": None,
             }
