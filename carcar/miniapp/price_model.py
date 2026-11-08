@@ -232,8 +232,6 @@ def analyse_price(
     slope_mileage = min(0.01, max(-0.08, slope_for(lambda c: _number(c.get("mileage_km")), 10_000.0)))
     slope_engine = min(0.2, max(-0.1, slope_for(lambda c: _number(c.get("engine_cm3")), 1000.0)))
     slope_power = min(0.1, max(-0.02, slope_for(lambda c: _number(c.get("power_hp")), 100.0)))
-    slope_equipment = min(0.015, max(-0.005, slope_for(lambda c: float(len(_equipment_set(c))), 1.0)))
-
     adjustments: dict[str, float] = {}
     if subject_year is not None and avg_year is not None:
         adjustments["year"] = slope_year * (subject_year - avg_year)
@@ -243,8 +241,6 @@ def analyse_price(
         adjustments["engine"] = slope_engine * ((subject_engine - avg_engine) / 1000.0)
     if subject_power is not None and avg_power is not None:
         adjustments["power"] = slope_power * ((subject_power - avg_power) / 100.0)
-    if avg_equipment is not None:
-        adjustments["equipment"] = slope_equipment * (subject_equipment - avg_equipment)
     total_adjustment = max(-0.35, min(0.35, sum(adjustments.values())))
     factor = math.exp(total_adjustment)
 
@@ -319,8 +315,8 @@ def analyse_price(
             "market": round(avg_equipment, 1) if avg_equipment is not None else None,
             "weight": WEIGHTS["equipment"],
             "match": round(avg_scores["equipment"], 2),
-            "effect_pct": effect("equipment"),
-            "per_unit_pct": round((math.exp(slope_equipment) - 1) * 100, 1) if slope_equipment else None,
+            "effect_pct": None,
+            "per_unit_pct": None,
         },
     ]
     for key in ("body", "gearbox", "drive", "fuel", "generation", "color"):

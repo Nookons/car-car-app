@@ -501,6 +501,12 @@ class MiniAppRepo:
                     description = coalesce(%(description)s, description),
                     version = coalesce(%(version)s, version),
                     generation = coalesce(%(generation)s, generation),
+                    body = coalesce(%(body)s, body),
+                    color = coalesce(%(color)s, color),
+                    fuel = coalesce(%(fuel)s, fuel),
+                    gearbox = coalesce(%(gearbox)s, gearbox),
+                    engine_cm3 = coalesce(%(engine_cm3)s, engine_cm3),
+                    power_hp = coalesce(%(power_hp)s, power_hp),
                     doors = coalesce(%(doors)s, doors),
                     seats = coalesce(%(seats)s, seats),
                     drive = coalesce(%(drive)s, drive),
@@ -611,20 +617,28 @@ class MiniAppRepo:
             or not row.get("condition")
             or not row.get("doors")
             or not row.get("color")
+            or not row.get("body")
         )
         if needs_details and row.get("url"):
             # Карточка скачана раньше без полного набора полей — добираем лениво.
             try:
                 from ..client import Client
                 from ..config import Settings
-                from ..parse import parse_offer
+                from ..parse import _to_int, parse_offer
 
                 client = Client(Settings())
                 offer = parse_offer(client.get(row["url"]).text, row["url"])
+                details = offer.details or {}
                 values = {
                     "description": (offer.description or "").strip()[:2000] or None,
                     "version": offer.version or None,
                     "generation": offer.generation or None,
+                    "body": details.get("body_type") or None,
+                    "color": details.get("color") or None,
+                    "fuel": details.get("fuel_type") or None,
+                    "gearbox": details.get("gearbox") or None,
+                    "engine_cm3": _to_int(details.get("engine_capacity")),
+                    "power_hp": _to_int(details.get("engine_power")),
                     "doors": offer.doors,
                     "seats": offer.seats,
                     "drive": offer.drive,

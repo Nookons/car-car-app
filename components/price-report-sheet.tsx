@@ -217,6 +217,9 @@ export function PriceReportSheet({
               </div>
             ))}
           </div>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {t("market.capNote")}
+          </p>
         </section>
 
         {report.comparables.length > 0 ? (
