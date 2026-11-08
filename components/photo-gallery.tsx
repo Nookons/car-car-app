@@ -52,7 +52,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
 
   if (!count) {
     return (
-      <div className="grid aspect-[4/3] place-items-center bg-muted text-sm text-muted-foreground">
+      <div className="grid aspect-[4/5] place-items-center bg-muted text-sm text-muted-foreground md:aspect-[16/10]">
         {t("listing.noPhotos")}
       </div>
     );
@@ -70,7 +70,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
           src={valid[index]}
           alt={title}
           priority
-          className="aspect-[4/3] w-full md:aspect-[16/10]"
+          className="aspect-[4/5] w-full md:aspect-[16/10]"
         />
       </button>
 
