@@ -1,3 +1,42 @@
+export type PriceCriterion = {
+  key: string;
+  subject: string | number | null;
+  market: string | number | null;
+  weight: number;
+  match: number | null;
+  effect_pct: number | null;
+  per_unit_pct: number | null;
+};
+
+export type PriceComparable = {
+  id: number;
+  title: string | null;
+  price: number | null;
+  year: number | null;
+  mileage_km: number | null;
+  engine_cm3: number | null;
+  body: string | null;
+  gearbox: string | null;
+  drive: string | null;
+  color: string | null;
+  similarity: number;
+};
+
+export type PriceReport = {
+  estimated: number;
+  base_median: number;
+  range: { low: number; high: number };
+  confidence: "low" | "medium" | "high";
+  sample: number;
+  excluded: number;
+  avg_similarity: number;
+  adjustment_pct: number;
+  method: string;
+  criteria: PriceCriterion[];
+  comparables: PriceComparable[];
+  notes: string[];
+};
+
 export type PriceAnalysis = {
   median: number;
   p10: number | null;
@@ -5,6 +44,9 @@ export type PriceAnalysis = {
   sample: number;
   diff_pct: number;
   verdict: "below" | "fair" | "above";
+  confidence?: "low" | "medium" | "high";
+  method?: string;
+  report?: PriceReport;
 };
 
 export type Listing = {

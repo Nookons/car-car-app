@@ -11,12 +11,14 @@ export function Dialog({
   title,
   children,
   footer,
+  fullHeight = false,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  fullHeight?: boolean;
 }) {
   const { t } = useI18n();
 
@@ -40,7 +42,10 @@ export function Dialog({
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div
         className={cn(
-          "relative z-10 flex max-h-[88vh] w-full max-w-md flex-col rounded-t-2xl bg-background shadow-xl sm:rounded-2xl",
+          "relative z-10 flex w-full max-w-md flex-col rounded-t-2xl bg-background shadow-xl sm:rounded-2xl",
+          fullHeight
+            ? "h-[94dvh] max-h-[94dvh] sm:h-[88vh] sm:max-h-[88vh]"
+            : "max-h-[88vh]",
         )}
       >
         <div className="flex items-center justify-between px-4 py-3">
@@ -53,7 +58,7 @@ export function Dialog({
             <X size={20} />
           </button>
         </div>
-        <div className="overflow-y-auto px-4 pb-4">{children}</div>
+        <div className={cn("overflow-y-auto px-4 pb-4", fullHeight && "flex-1")}>{children}</div>
         {footer ? (
           <div
             className="border-t px-4 pt-3"

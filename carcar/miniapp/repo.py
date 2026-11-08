@@ -7,6 +7,8 @@ import math
 from datetime import datetime
 from typing import Any
 
+from .price_model import analyse_price
+
 DISTANCE_SQL = """
 6371 * 2 * asin(least(1.0, sqrt(
     power(sin(radians(l.lat - %(lat)s) / 2), 2) +
@@ -525,6 +527,52 @@ class MiniAppRepo:
             )
         conn.commit()
 
+    def _price_analysis(self, cur: Any, row: dict[str, Any]) -> dict[str, Any] | None:
+        if not row.get("price") or not row.get("make") or not row.get("model"):
+            return None
+
+        fields = """
+            l.id, l.title, l.price, l.year, l.mileage_km, l.engine_cm3,
+            l.power_hp, l.body, l.gearbox, l.drive, l.fuel, l.color,
+            l.generation, l.equipment
+        """
+        base = [
+            "l.status = 'active'",
+            "l.price is not null",
+            "l.id <> %(id)s",
+            "l.make = %(make)s",
+            "l.model = %(model)s",
+        ]
+        base_params: dict[str, Any] = {
+            "id": row["id"],
+            "make": row["make"],
+            "model": row["model"],
+        }
+        params = dict(base_params)
+        conds = list(base)
+        year = row.get("year")
+        mileage = row.get("mileage_km")
+        if year:
+            params["year_lo"] = int(year) - 6
+            params["year_hi"] = int(year) + 6
+            conds.append("l.year between %(year_lo)s and %(year_hi)s")
+        if mileage:
+            params["mile_lo"] = int(mileage * 0.4)
+            params["mile_hi"] = int(mileage * 1.8)
+            conds.append("l.mileage_km between %(mile_lo)s and %(mile_hi)s")
+        cur.execute(
+            f"select {fields} from listing l where {' and '.join(conds)} limit 60",
+            params,
+        )
+        comps = cur.fetchall()
+        if len(comps) < 8:
+            cur.execute(
+                f"select {fields} from listing l where {' and '.join(base)} limit 60",
+                base_params,
+            )
+            comps = cur.fetchall()
+        return analyse_price(row, comps)
+
     def get_listing(self, listing_id: int) -> dict[str, Any] | None:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
@@ -556,41 +604,6 @@ class MiniAppRepo:
                 for e in cur.fetchall()
             ]
 
-            analysis = None
-            if row.get("price") and row.get("make") and row.get("model"):
-                year = row.get("year")
-                mileage = row.get("mileage_km")
-                cur.execute(
-                    """
-                    select percentile_cont(0.1) within group (order by price) as p10,
-                           percentile_cont(0.5) within group (order by price) as median,
-                           percentile_cont(0.9) within group (order by price) as p90,
-                           count(*) as sample
-                    from listing
-                    where status = 'active' and price is not null
-                      and make = %s and model = %s
-                      and (%s::int is null or year between %s::int - 2 and %s::int + 2)
-                      and (%s::int is null or mileage_km between %s::int * 0.7 and %s::int * 1.3)
-                    """,
-                    (
-                        row["make"], row["model"],
-                        year, year, year,
-                        mileage, mileage, mileage,
-                    ),
-                )
-                stat = cur.fetchone()
-                median = _num(stat["median"]) if stat and stat["median"] else None
-                sample = int(stat["sample"]) if stat else 0
-                if median and sample >= 5:
-                    diff = round((row["price"] - median) / median * 100)
-                    analysis = {
-                        "median": median,
-                        "p10": _num(stat["p10"]),
-                        "p90": _num(stat["p90"]),
-                        "sample": sample,
-                        "diff_pct": diff,
-                        "verdict": "below" if diff <= -5 else ("above" if diff >= 5 else "fair"),
-                    }
         needs_details = (
             not row.get("description")
             or not row.get("equipment")
@@ -626,6 +639,13 @@ class MiniAppRepo:
                 row.update({key: value for key, value in values.items() if value is not None})
             except Exception:
                 pass
+
+        analysis = None
+        if row.get("price") and row.get("make") and row.get("model"):
+            # Считаем после ленивой догрузки: иначе кузов, привод и
+            # комплектация в отчёте были бы пустыми.
+            with self.pool.connection() as conn, conn.cursor() as cur:
+                analysis = self._price_analysis(cur, row)
 
         return _card(row, events, analysis)
 

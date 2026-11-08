@@ -1,12 +1,16 @@
 "use client";
 
+import * as React from "react";
 import { Tag, TrendDown, TrendUp } from "@phosphor-icons/react";
+import { PriceReportSheet } from "@/components/price-report-sheet";
+import { Button } from "@/components/ui/button";
 import { price } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import type { ListingCard } from "@/lib/types";
 
 export function PriceMarket({ item }: { item: ListingCard }) {
   const { t } = useI18n();
+  const [reportOpen, setReportOpen] = React.useState(false);
   const analysis = item.price_analysis;
   if (!analysis || item.price == null) return null;
 
@@ -32,6 +36,7 @@ export function PriceMarket({ item }: { item: ListingCard }) {
         : t("market.fair");
 
   return (
+    <>
     <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
       <h2 className="flex items-center gap-2 text-base font-semibold">
         <Tag size={18} /> {t("market.title")}
@@ -72,10 +77,19 @@ export function PriceMarket({ item }: { item: ListingCard }) {
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {t("market.thisCar")} — {price(item.price, item.currency)}. {t("market.explain")} ·{" "}
-        {analysis.sample}
-      </p>
+      {analysis.report ? (
+        <Button variant="outline" className="w-full" onClick={() => setReportOpen(true)}>
+          <Tag size={18} />
+          {t("market.report")}
+        </Button>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          {t("market.thisCar")} — {price(item.price, item.currency)}. {t("market.explain")} ·{" "}
+          {analysis.sample}
+        </p>
+      )}
     </div>
+    <PriceReportSheet open={reportOpen} onClose={() => setReportOpen(false)} item={item} />
+    </>
   );
 }
