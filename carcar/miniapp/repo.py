@@ -528,6 +528,23 @@ class MiniAppRepo:
         return items, total, approx
 
     def apply_detail(self, listing_id: int, values: dict[str, Any]) -> None:
+        values = dict(values)
+        for key, low, high in (
+            ("power_hp", 3, 2000),
+            ("engine_cm3", 50, 10_000),
+            ("doors", 1, 20),
+            ("seats", 1, 100),
+            ("co2_gkm", 0, 2000),
+        ):
+            value = values.get(key)
+            if value is None:
+                continue
+            try:
+                number = int(value)
+            except (TypeError, ValueError):
+                values[key] = None
+                continue
+            values[key] = number if low <= number <= high else None
         tags = [tag for tag in (values.get("equipment") or []) if tag][:120]
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(

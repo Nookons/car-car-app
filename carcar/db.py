@@ -293,6 +293,14 @@ class DatabaseSink:
                 code=code,
             )
 
+    @staticmethod
+    def _smallint(value: int | None, low: int, high: int) -> int | None:
+        try:
+            number = int(value) if value is not None else None
+        except (TypeError, ValueError):
+            return None
+        return number if number is not None and low <= number <= high else None
+
     def _update_detail(
         self,
         external_id: str,
@@ -320,6 +328,11 @@ class DatabaseSink:
         equipment: list[str] | None = None,
         code: str = "otomoto",
     ) -> bool:
+        power_hp = self._smallint(power_hp, 3, 2000)
+        engine_cm3 = self._smallint(engine_cm3, 50, 10_000)
+        doors = self._smallint(doors, 1, 20)
+        seats = self._smallint(seats, 1, 100)
+        co2_gkm = self._smallint(co2_gkm, 0, 2000)
         photos = [p for p in (photos or []) if isinstance(p, str) and p.startswith("https://")][:60]
         tags = [tag for tag in (equipment or []) if isinstance(tag, str)][:120]
         source_id = self.source_id(code)
