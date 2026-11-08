@@ -14,7 +14,7 @@ type ThemeContextValue = {
 const ThemeContext = React.createContext<ThemeContextValue | null>(null);
 const STORAGE_KEY = "carcar.theme";
 const LIGHT_COLOR = "#f6f7f9";
-const DARK_COLOR = "#0b0f14";
+const DARK_COLOR = "#000000";
 
 const useIsomorphicLayoutEffect: typeof React.useEffect =
   typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
