@@ -34,9 +34,15 @@ function readTheme(): Theme {
 function systemIsDark(): boolean {
   try {
     const telegram = (window as unknown as {
-      Telegram?: { WebApp?: { colorScheme?: string } };
+      Telegram?: { WebApp?: { colorScheme?: string; initData?: string } };
     }).Telegram?.WebApp;
-    if (telegram?.colorScheme === "dark" || telegram?.colorScheme === "light") {
+    // Вне Telegram (обычный браузер) цвет берём из системной темы.
+    // Внутри Telegram — из его цветовой схемы, иначе WebApp-заглушка
+    // всегда отдаёт light и «Системная» игнорирует тёмную тему.
+    if (
+      telegram?.initData &&
+      (telegram.colorScheme === "dark" || telegram.colorScheme === "light")
+    ) {
       return telegram.colorScheme === "dark";
     }
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
