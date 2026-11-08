@@ -28,15 +28,15 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru" suppressHydrationWarning>
-      <head>
-        <script
+      <body>
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html:
               "(function(){try{var k='carcar.theme',v=localStorage.getItem(k)||'system',tg=window.Telegram&&window.Telegram.WebApp,s=tg&&tg.colorScheme,d=v==='dark'||(v==='system'&&(s?s==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches));var r=document.documentElement;r.classList.toggle('dark',d);r.style.colorScheme=d?'dark':'light';}catch(e){}})();",
           }}
         />
-      </head>
-      <body>
         <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
         <ThemeProvider>
           <I18nProvider>
