@@ -209,7 +209,7 @@ export default function ListingPage() {
   };
 
   return (
-    <div className="-mt-4 space-y-4 md:mt-0">
+    <div className="-mt-4 space-y-4 md:mt-0 listing-page">
       <div className="mx-auto w-full max-w-3xl">
         <div className="relative -mx-4 md:mx-0">
           <div className="relative overflow-hidden bg-muted md:rounded-3xl">
@@ -220,7 +220,10 @@ export default function ListingPage() {
 
             <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 via-black/15 to-transparent" />
 
-            <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3">
+            <div
+              className="absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3"
+              style={{ paddingTop: "calc(0.75rem + var(--tg-safe-top, 0px))" }}
+            >
               <Link href="/list" aria-label={t("listing.back")} className={controlClass}>
                 <CaretLeft size={22} />
               </Link>
@@ -296,7 +299,10 @@ export default function ListingPage() {
             </div>
 
             {source ? (
-              <span className="absolute left-3 top-16 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
+              <span
+                className="absolute left-3 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur"
+                style={{ top: "calc(4rem + var(--tg-safe-top, 0px))" }}
+              >
                 <span className="h-1.5 w-1.5 rounded-full bg-[#e53935]" />
                 {t("card.source").replace("{source}", source)}
               </span>

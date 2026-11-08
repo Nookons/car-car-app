@@ -48,6 +48,11 @@
   html.tg-fullscreen main {
     padding-top: calc(0.75rem + var(--tg-safe-top, 0px));
   }
+  /* На карточке объявления фото должно идти от самого верха,
+     без белой полосы safe-area над ним. */
+  html.tg-fullscreen .listing-page {
+    margin-top: calc(-0.75rem - var(--tg-safe-top, 0px));
+  }
 }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
