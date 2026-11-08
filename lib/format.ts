@@ -27,6 +27,44 @@ export function date(iso: string | null | undefined, lang: string = "ru") {
   });
 }
 
+/** Дата в стиле ленты: «2 окт.» вместо «02.10.2026». */
+export function dateShort(iso: string | null | undefined, lang: string = "ru") {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString(DATE_LOCALE[lang] ?? "ru-RU", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+/** Пробег для карточки: «147 тыс. км», «8 500 км». */
+export function mileageShort(value: number | null | undefined) {
+  if (value == null || value <= 0) return "";
+  if (value >= 10_000) return `${Math.round(value / 1000)} тыс. км`;
+  return `${num(value)} км`;
+}
+
+/** Объём двигателя: 1998 см³ → «2,0 л». */
+export function engineVolume(cm3: number | null | undefined, unit = "л") {
+  if (!cm3) return "";
+  return `${(cm3 / 1000).toFixed(1).replace(".", ",")} ${unit}`;
+}
+
+/** Мощность: 326 → «326 л.с.». */
+export function powerLabel(hp: number | null | undefined, unit = "л.с.") {
+  if (!hp) return "";
+  return `${num(hp)} ${unit}`;
+}
+
+/** Заголовок объявления с годом: «BMW 3-Series, 2018». */
+export function listingTitle(title: string, year: number | null | undefined) {
+  return year && !title.includes(String(year)) ? `${title}, ${year}` : title;
+}
+
+/** Строчная первая буква для значения в таблице: «Седан» → «седан». */
+export function lowerFirst(value: string) {
+  return value ? value[0].toLowerCase() + value.slice(1) : "";
+}
+
 const FUEL: Record<string, string> = {
   petrol: "Бензин",
   diesel: "Дизель",

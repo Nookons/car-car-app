@@ -72,6 +72,8 @@ def _item(row: dict[str, Any]) -> dict[str, Any]:
         "seller_type": row.get("seller_type"),
         "drive": row.get("drive"),
         "condition": row.get("condition"),
+        "version": row.get("version"),
+        "generation": row.get("generation"),
         "color": row.get("color"),
         "doors": row.get("doors"),
         "seats": row.get("seats"),

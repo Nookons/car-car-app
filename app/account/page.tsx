@@ -107,7 +107,7 @@ export default function AccountPage() {
             {t("account.create")}
           </Button>
         </Card>
-        <Dialog open={signupOpen} onOpenChange={setSignupOpen} title={t("account.create")}>
+        <Dialog open={signupOpen} onClose={() => setSignupOpen(false)} title={t("account.create")}>
           <p className="text-sm text-muted-foreground">{t("account.comingSoon")}</p>
         </Dialog>
       </div>

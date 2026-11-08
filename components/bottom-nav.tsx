@@ -16,8 +16,15 @@ const tabs = [
 export function BottomNav() {
   const pathname = usePathname();
   const { t } = useI18n();
+  const isListing = pathname.startsWith("/listing/");
+
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 backdrop-blur safe-bottom md:hidden">
+    <nav
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 backdrop-blur safe-bottom md:hidden",
+        isListing && "hidden",
+      )}
+    >
       <div className="mx-auto grid max-w-md grid-cols-4">
         {tabs.map(({ href, key, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);

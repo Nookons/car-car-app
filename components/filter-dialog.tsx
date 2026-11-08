@@ -34,11 +34,15 @@ const selectClass = "h-11 w-full rounded-xl border border-input bg-background px
 export function FilterDialog({
   open,
   initial,
+  title,
+  focus,
   onClose,
   onApply,
 }: {
   open: boolean;
   initial: Filters;
+  title?: string;
+  focus?: "location";
   onClose: () => void;
   onApply: (filters: Filters) => void;
 }) {
@@ -55,10 +59,19 @@ export function FilterDialog({
   const [saveMode, setSaveMode] = React.useState(false);
   const [saveName, setSaveName] = React.useState("");
   const [saved, setSaved] = React.useState(false);
+  const locationRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     if (open) setDraft(initial);
   }, [initial, open]);
+
+  React.useEffect(() => {
+    if (!open || focus !== "location") return;
+    const timer = setTimeout(() => {
+      locationRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [open, focus]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -128,7 +141,7 @@ export function FilterDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      title={t("filter.title")}
+      title={title ?? t("filter.title")}
       footer={
         saveMode ? (
           <div className="space-y-2">
@@ -164,24 +177,28 @@ export function FilterDialog({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2">
-            <Button variant="outline" onClick={() => setDraft({})}>
-              {t("filter.reset")}
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => setDraft({})}>
+                {t("filter.reset")}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSaveName(
+                    [draft.make, draft.model, draft.price_max ? `≤ ${num(draft.price_max)} zł` : ""]
+                      .filter(Boolean)
+                      .join(" ") || t("filter.save"),
+                  );
+                  setSaveMode(true);
+                }}
+              >
+                {t("filter.save")}
+              </Button>
+            </div>
+            <Button className="w-full" onClick={apply}>
+              {t("filter.show")}
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setSaveName(
-                  [draft.make, draft.model, draft.price_max ? `≤ ${num(draft.price_max)} zł` : ""]
-                    .filter(Boolean)
-                    .join(" ") || t("filter.save"),
-                );
-                setSaveMode(true);
-              }}
-            >
-              {t("filter.save")}
-            </Button>
-            <Button onClick={apply}>{t("filter.show")}</Button>
           </div>
         )
       }
@@ -522,7 +539,7 @@ export function FilterDialog({
           <p className="text-xs text-muted-foreground">{t("filter.optionsAll")}</p>
         ) : null}
 
-        <div className="space-y-1.5">
+        <div ref={locationRef} className="space-y-1.5 scroll-mt-2">
           <span className="text-xs text-muted-foreground">{t("filter.where")}</span>
           <label className="block space-y-1.5">
             <span className="text-xs text-muted-foreground">{t("filter.city")}</span>

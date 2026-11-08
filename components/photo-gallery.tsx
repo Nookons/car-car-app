@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowsOut, CaretLeft, CaretRight, X } from "@phosphor-icons/react";
+import { CaretLeft, CaretRight, X } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { SmartImage } from "@/components/smart-image";
 import { useI18n } from "@/lib/i18n";
@@ -64,7 +64,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
         type="button"
         onClick={() => setOpen(true)}
         className="group relative block w-full cursor-zoom-in bg-muted"
-        aria-label={t("listing.openMap")}
+        aria-label={t("listing.openPhoto")}
       >
         <SmartImage
           src={valid[index]}
@@ -72,13 +72,34 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
           priority
           className="aspect-[4/3] w-full md:aspect-[16/10]"
         />
-        <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-1 text-[11px] font-medium text-white">
-          {index + 1} / {count}
-        </span>
-        <span className="absolute bottom-2 right-2 hidden rounded-full bg-black/60 p-1.5 text-white sm:block">
-          <ArrowsOut size={16} />
-        </span>
       </button>
+
+      {count > 1 ? (
+        <>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+          <span className="absolute bottom-[4.25rem] left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
+            {index + 1}/{count}
+          </span>
+          <div className="no-scrollbar absolute inset-x-0 bottom-0 z-20 flex gap-1.5 overflow-x-auto px-2 pb-2">
+            {valid.map((src, position) => (
+              <button
+                key={position}
+                type="button"
+                onClick={() => setIndex(position)}
+                className={cn(
+                  "h-12 w-16 shrink-0 overflow-hidden rounded-md border-2 shadow-sm transition",
+                  position === index
+                    ? "border-white opacity-100"
+                    : "border-white/20 opacity-75 hover:opacity-100",
+                )}
+                aria-label={`${position + 1}`}
+              >
+                <SmartImage src={src} className="h-full w-full" />
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
 
       {count > 1 ? (
         <>
@@ -107,24 +128,6 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
         </>
       ) : null}
 
-      {count > 1 ? (
-        <div className="no-scrollbar flex min-w-0 gap-2 overflow-x-auto border-t bg-card p-2">
-          {valid.map((src, position) => (
-            <button
-              key={position}
-              type="button"
-              onClick={() => setIndex(position)}
-              className={cn(
-                "h-14 w-20 shrink-0 overflow-hidden rounded-lg border-2 transition",
-                position === index ? "border-primary" : "border-transparent opacity-70 hover:opacity-100",
-              )}
-              aria-label={`${position + 1}`}
-            >
-              <SmartImage src={src} className="h-full w-full" />
-            </button>
-          ))}
-        </div>
-      ) : null}
 
       {open ? (
         <div

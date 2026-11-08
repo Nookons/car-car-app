@@ -20,6 +20,12 @@ export type Listing = {
   photos_count: number;
   published_at: string | null;
   distance_km: number | null;
+  version?: string | null;
+  generation?: string | null;
+  drive?: string | null;
+  condition?: string | null;
+  color?: string | null;
+  seller_type?: string | null;
 };
 
 export type ListingCard = Listing & {

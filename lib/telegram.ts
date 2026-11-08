@@ -1,5 +1,7 @@
 type TelegramWebApp = {
   initData: string;
+  version?: string;
+  isVersionAtLeast?: (version: string) => boolean;
   ready: () => void;
   expand: () => void;
   isFullscreen?: boolean;
@@ -87,14 +89,28 @@ export function initTelegram(): void {
   if (!tg) return;
   tg.ready();
 
+  const supports = (version: string) => {
+    if (tg.isVersionAtLeast) return tg.isVersionAtLeast(version);
+    const current = (tg.version ?? "6.0").split(".").map(Number);
+    const target = version.split(".").map(Number);
+    for (let index = 0; index < Math.max(current.length, target.length); index += 1) {
+      const a = current[index] ?? 0;
+      const b = target[index] ?? 0;
+      if (a !== b) return a > b;
+    }
+    return true;
+  };
+
   // Bot API 8.0: на мобильных и в Desktop разворачивает Mini App на весь экран.
-  try {
-    tg.requestFullscreen?.();
-  } catch {
-    // клиент старее 8.0 — останется окно по умолчанию
+  if (supports("8.0")) {
+    try {
+      tg.requestFullscreen?.();
+    } catch {
+      // клиент старее 8.0 — останется окно по умолчанию
+    }
   }
   tg.expand?.();
-  tg.disableVerticalSwipes?.();
+  if (supports("7.7")) tg.disableVerticalSwipes?.();
 
   // В fullscreen высота и безопасные зоны приходят событиями — держим их в CSS.
   const syncLayout = () => {
