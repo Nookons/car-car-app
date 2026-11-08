@@ -327,7 +327,9 @@ class MiniAppRepo:
     ) -> tuple[list[dict[str, Any]], int, bool]:
         limit = max(1, min(limit, 50))
         offset = max(0, offset)
-        conds = ["l.status = 'active'"]
+        # Без published_at is not null PostgreSQL не может идти по
+        # listing_active_published_idx для sort=new и сканирует всю таблицу.
+        conds = ["l.status = 'active'", "l.published_at is not null"]
         # радиус имеет смысл только вместе с координатами
         params: dict[str, Any] = {"limit": limit, "offset": offset, "radius": None}
 
@@ -427,11 +429,11 @@ class MiniAppRepo:
                 )
 
         order = {
-            "new": "published_at desc nulls last",
-            "price_asc": "price asc nulls last",
-            "price_desc": "price desc nulls last",
+            "new": "published_at desc",
+            "price_asc": "price asc",
+            "price_desc": "price desc",
             "distance": "distance_km nulls last",
-        }.get(sort, "published_at desc nulls last")
+        }.get(sort, "published_at desc")
 
         where = " and ".join(conds)
         # Без гео не добавляем OR с NULL-параметром: иначе планировщик
@@ -450,7 +452,7 @@ class MiniAppRepo:
         # Для пустой выдачи берём оценку из partial-индекса, для фильтров —
         # нижнюю границу по загруженной странице; фронт показывает «N+».
         estimate = 0
-        filtered = len(conds) > 1
+        filtered = len(conds) > 2
         with self.pool.connection() as conn, conn.cursor() as cur:
             if not filtered:
                 cur.execute(
