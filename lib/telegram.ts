@@ -47,7 +47,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function requestLocation(): Promise<Coords> {
   const tg = telegram();
   const manager = tg?.LocationManager;
-  if (manager?.init) {
+  if (manager?.init && manager.isLocationAvailable !== false) {
     try {
       await manager.init();
     } catch {
@@ -56,8 +56,17 @@ export async function requestLocation(): Promise<Coords> {
     // Клиент иногда отвечает NotInitied сразу после init — даём ему время.
     for (let attempt = 0; attempt < 4; attempt += 1) {
       try {
-        const position = await manager.getLocation();
-        return { lat: position.latitude, lon: position.longitude };
+        const position = (await manager.getLocation()) as
+          | { latitude?: number; longitude?: number }
+          | undefined;
+        const latitude = Number(position?.latitude);
+        const longitude = Number(position?.longitude);
+        // В обычном браузере Telegram-заглушка может вернуть пустой объект.
+        // Тогда не подменяем координаты на undefined, а идём в navigator.geolocation.
+        if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+          return { lat: latitude, lon: longitude };
+        }
+        break;
       } catch (error) {
         if (!/notinit/i.test(String(error)) || attempt === 3) break;
         await sleep(400);
