@@ -64,9 +64,17 @@ function applyTheme(resolved: ResolvedTheme): void {
   // В Telegram шапка рисуется самим клиентом; подгоняем её под тему.
   try {
     const telegram = (window as unknown as {
-      Telegram?: { WebApp?: { setHeaderColor?: (color: string) => void } };
+      Telegram?: {
+        WebApp?: {
+          setHeaderColor?: (color: string) => void;
+          setBackgroundColor?: (color: string) => void;
+          setBottomBarColor?: (color: string) => void;
+        };
+      };
     }).Telegram?.WebApp;
     telegram?.setHeaderColor?.(color);
+    telegram?.setBackgroundColor?.(color);
+    telegram?.setBottomBarColor?.(color);
   } catch {
     // Старые версии Telegram могут не поддерживать метод.
   }

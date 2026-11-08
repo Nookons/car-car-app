@@ -29,15 +29,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru" suppressHydrationWarning>
       <body>
+        <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
         <Script
           id="theme-init"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var k='carcar.theme',v=localStorage.getItem(k)||'system',tg=window.Telegram&&window.Telegram.WebApp,real=tg&&tg.initData,s=real&&tg.colorScheme,d=v==='dark'||(v==='system'&&(s?s==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches));var r=document.documentElement;r.classList.toggle('dark',d);r.style.colorScheme=d?'dark':'light';}catch(e){}})();",
+              "(function(){try{var k='carcar.theme',v=localStorage.getItem(k)||'system',tg=window.Telegram&&window.Telegram.WebApp,real=tg&&tg.initData,s=real&&tg.colorScheme,d=v==='dark'||(v==='system'&&(s?s==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches));var r=document.documentElement;r.classList.toggle('dark',d);r.style.colorScheme=d?'dark':'light';r.style.backgroundColor=d?'#000000':'#f6f7f9';if(tg){var c=d?'#000000':'#f6f7f9';tg.setHeaderColor&&tg.setHeaderColor(c);tg.setBackgroundColor&&tg.setBackgroundColor(c);tg.setBottomBarColor&&tg.setBottomBarColor(c);}}catch(e){}})();",
           }}
         />
-        <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
         <ThemeProvider>
           <I18nProvider>
             <AuthProvider>
