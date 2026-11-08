@@ -324,8 +324,7 @@ class MiniAppRepo:
         lon: float | None = None,
         radius_km: float | None = None,
         sort: str = "new",
-        known_total: int | None = None,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], int, bool]:
         limit = max(1, min(limit, 50))
         offset = max(0, offset)
         conds = ["l.status = 'active'"]
@@ -438,11 +437,6 @@ class MiniAppRepo:
         radius_cond = (
             f"(%(radius)s::float8 is null or {distance} <= %(radius)s::float8)"
         )
-        count_sql = f"""
-            select count(*) as total
-            from listing l
-            where {where} and {radius_cond}
-        """
         items_sql = f"""
             select {LIST_FIELDS}, s.code as source_code, {distance} as distance_km
             from listing l join source s on s.id = l.source_id
@@ -450,14 +444,31 @@ class MiniAppRepo:
             order by {order}
             limit %(limit)s offset %(offset)s
         """
+        # Точный count(*) на этой базе слишком дорогой и валит пул соединений.
+        # Для пустой выдачи берём оценку из partial-индекса, для фильтров —
+        # нижнюю границу по загруженной странице; фронт показывает «N+».
+        estimate = 0
+        filtered = len(conds) > 1
         with self.pool.connection() as conn, conn.cursor() as cur:
-            if known_total is not None:
-                total = known_total
-            else:
-                cur.execute(count_sql, params)
-                total = int(cur.fetchone()["total"])
+            if not filtered:
+                cur.execute(
+                    "select reltuples::bigint as n from pg_class "
+                    "where relname = 'listing_active_published_idx'"
+                )
+                row = cur.fetchone()
+                estimate = int(row["n"] or 0) if row else 0
             cur.execute(items_sql, params)
             rows = cur.fetchall()
+
+        if len(rows) < limit:
+            total = offset + len(rows)
+            approx = False
+        elif not filtered:
+            total = max(estimate, offset + len(rows) + limit)
+            approx = True
+        else:
+            total = offset + len(rows) + limit
+            approx = True
 
         items = [_item(row) for row in rows]
         analyses: dict[int, dict[str, Any]] = {}
@@ -473,7 +484,7 @@ class MiniAppRepo:
             if analysis:
                 item["price_analysis"] = analysis
 
-        return items, total
+        return items, total, approx
 
     def apply_detail(self, listing_id: int, values: dict[str, Any]) -> None:
         tags = [tag for tag in (values.get("equipment") or []) if tag][:120]

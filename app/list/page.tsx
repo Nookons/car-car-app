@@ -55,6 +55,7 @@ type CachedList = {
   filters: Filters;
   items: Listing[];
   total: number;
+  approx: boolean;
   scroll: number;
 };
 
@@ -93,8 +94,13 @@ function listUrl(filters: Filters): string {
   return query ? `/list?${query}` : "/list";
 }
 
-function resultsLabel(t: ReturnType<typeof useI18n>["t"], lang: Lang, count: number): string {
-  const value = num(count);
+function resultsLabel(
+  t: ReturnType<typeof useI18n>["t"],
+  lang: Lang,
+  count: number,
+  approx = false,
+): string {
+  const value = `${num(count)}${approx ? "+" : ""}`;
   const mod10 = count % 10;
   const mod100 = count % 100;
   const few = mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14);
@@ -118,6 +124,7 @@ export default function ListPage() {
   const [filters, setFilters] = React.useState<Filters>({});
   const [items, setItems] = React.useState<Listing[]>([]);
   const [total, setTotal] = React.useState(0);
+  const [approx, setApprox] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -127,8 +134,8 @@ export default function ListPage() {
   const seq = React.useRef(0);
   const abortRef = React.useRef<AbortController | null>(null);
   const started = React.useRef(false);
-  const stateRef = React.useRef({ filters, items, total });
-  stateRef.current = { filters, items, total };
+  const stateRef = React.useRef({ filters, items, total, approx });
+  stateRef.current = { filters, items, total, approx };
 
   const fetchPage = React.useCallback(
     async (next: Filters, offset = 0, background = false) => {
@@ -147,17 +154,19 @@ export default function ListPage() {
         }
       }
       try {
-        const data = await api<{ items: Listing[]; total: number }>(
+        const data = await api<{ items: Listing[]; total: number; approx?: boolean }>(
           `/listings?${filtersToQuery(next, offset)}`,
           { token: token ?? undefined, signal: controller.signal },
         );
         if (id !== seq.current) return;
         setTotal(data.total);
+        setApprox(Boolean(data.approx));
         setItems((prev) => (offset === 0 ? data.items : [...prev, ...data.items]));
         cacheSet<CachedList>(CACHE_KEY, {
           filters: next,
           items: offset === 0 ? data.items : [...stateRef.current.items, ...data.items],
           total: data.total,
+          approx: Boolean(data.approx),
           scroll: offset === 0 ? 0 : window.scrollY,
         });
       } catch (exc) {
@@ -191,6 +200,7 @@ export default function ListPage() {
       setFilters(cached.filters);
       setItems(cached.items);
       setTotal(cached.total);
+      setApprox(cached.approx ?? false);
       setLoading(false);
       requestAnimationFrame(() => window.scrollTo(0, cached.scroll));
       void fetchPage(cached.filters, 0, true);
@@ -208,16 +218,28 @@ export default function ListPage() {
       if (frame) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
-        const { filters: f, items: list, total: sum } = stateRef.current;
-        cacheSet<CachedList>(CACHE_KEY, { filters: f, items: list, total: sum, scroll: window.scrollY });
+        const { filters: f, items: list, total: sum, approx: approximate } = stateRef.current;
+        cacheSet<CachedList>(CACHE_KEY, {
+          filters: f,
+          items: list,
+          total: sum,
+          approx: approximate,
+          scroll: window.scrollY,
+        });
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
-      const { filters: f, items: list, total: sum } = stateRef.current;
+      const { filters: f, items: list, total: sum, approx: approximate } = stateRef.current;
       if (list.length) {
-        cacheSet<CachedList>(CACHE_KEY, { filters: f, items: list, total: sum, scroll: window.scrollY });
+        cacheSet<CachedList>(CACHE_KEY, {
+          filters: f,
+          items: list,
+          total: sum,
+          approx: approximate,
+          scroll: window.scrollY,
+        });
       }
     };
   }, []);
@@ -390,7 +412,7 @@ export default function ListPage() {
 
       <div className="flex items-center justify-between gap-3 px-1">
         <p className="text-sm text-muted-foreground">
-          {loading && total === 0 ? t("filter.counting") : resultsLabel(t, lang, total)}
+          {loading && total === 0 ? t("filter.counting") : resultsLabel(t, lang, total, approx)}
         </p>
         <label className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border bg-card px-2.5 py-2 text-xs font-medium">
           <ArrowsDownUp size={16} className="shrink-0 text-muted-foreground" />
@@ -452,7 +474,11 @@ export default function ListPage() {
           disabled={loadingMore}
           onClick={() => fetchPage(filters, items.length)}
         >
-          {loadingMore ? t("list.loading") : `${t("list.more")} (${num(total - items.length)})`}
+          {loadingMore
+            ? t("list.loading")
+            : approx
+              ? t("list.more")
+              : `${t("list.more")} (${num(total - items.length)})`}
         </Button>
       ) : null}
 

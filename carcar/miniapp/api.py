@@ -336,14 +336,7 @@ def create_app(
         cached = cache.get(key)
         if cached is not None:
             return cached
-        total_key = "total:" + "&".join(
-            part
-            for part in request.url.query.split("&")
-            if part and not part.startswith(("limit=", "offset="))
-        )
-        known_total = cache.get(total_key)
-        items, total = repo.search(
-            known_total=known_total,
+        items, total, approx = repo.search(
             limit=limit,
             offset=offset,
             q=q,
@@ -374,9 +367,14 @@ def create_app(
             radius_km=radius_km,
             sort=sort,
         )
-        payload = {"items": items, "total": total, "limit": limit, "offset": offset}
+        payload = {
+            "items": items,
+            "total": total,
+            "approx": approx,
+            "limit": limit,
+            "offset": offset,
+        }
         cache.set(key, payload, ttl=120)
-        cache.set(total_key, total, ttl=300)
         return payload
 
     @app.get("/api/listings/{listing_id}")
