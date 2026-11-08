@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Bell, BellSlash, Trash, Eye } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
-import { ListingCard } from "@/components/listing-card";
+import { ListingRow } from "@/components/listing-row";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
@@ -262,7 +262,7 @@ export default function AccountPage() {
         </Button>
       </Card>
 
-      <Card className="space-y-3 p-4 lg:col-span-2">
+      <section className="space-y-3 lg:col-span-2">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold">{t("account.favorites")}</h2>
           <span className="text-xs text-muted-foreground">{favorites.size}</span>
@@ -270,13 +270,13 @@ export default function AccountPage() {
         {favItems.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("account.emptyFavorites")}</p>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {favItems.slice(0, 6).map((item) => (
-              <ListingCard key={item.id} item={item} />
+          <div className="-mx-4 space-y-3 md:mx-auto md:w-full md:max-w-2xl">
+            {favItems.slice(0, 6).map((item, index) => (
+              <ListingRow key={item.id} item={item} priority={index < 2} />
             ))}
           </div>
         )}
-      </Card>
+      </section>
 
       <p className="pb-2 text-center text-[11px] text-muted-foreground">
         <a

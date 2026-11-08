@@ -891,12 +891,13 @@ class MiniAppRepo:
                 else "l.published_at desc nulls last, coalesce(st.score, 0) desc"
             )
             sql = f"""
-                select l.id, l.title, l.price, l.currency, l.year, l.mileage_km,
-                       l.city, l.make, l.model, l.thumb_url, l.fuel, l.gearbox,
-                       l.published_at, coalesce(st.views, 0) views,
-                       coalesce(st.likes, 0) likes, coalesce(st.comments, 0) comments,
+                select {LIST_FIELDS}, s.code as source_code,
+                       coalesce(st.views, 0) views,
+                       coalesce(st.likes, 0) likes,
+                       coalesce(st.comments, 0) comments,
                        coalesce(st.reposts, 0) reposts
                 from listing l
+                join source s on s.id = l.source_id
                 left join listing_stat st on st.listing_id = l.id
                 where {' and '.join(conds)}
                 order by {order}
@@ -904,28 +905,27 @@ class MiniAppRepo:
             """
             cur.execute(sql, params)
             rows = cur.fetchall()
-        return [
-            {
-                "id": r["id"],
-                "title": r["title"],
-                "price": _num(r["price"]),
-                "currency": (r["currency"] or "PLN").strip(),
-                "year": r["year"],
-                "mileage_km": r["mileage_km"],
-                "city": r["city"] or "",
-                "make": r["make"] or "",
-                "model": r["model"] or "",
-                "thumbnail": r["thumb_url"],
-                "fuel": r["fuel"],
-                "gearbox": r["gearbox"],
-                "published_at": _iso(r["published_at"]),
-                "views": int(r["views"]),
-                "likes": int(r["likes"]),
-                "comments": int(r["comments"]),
-                "reposts": int(r["reposts"]),
-            }
-            for r in rows
-        ]
+
+        items = []
+        for row in rows:
+            item = _item(row)
+            item.update(
+                views=int(row["views"]),
+                likes=int(row["likes"]),
+                comments=int(row["comments"]),
+                reposts=int(row["reposts"]),
+            )
+            items.append(item)
+        if rows:
+            try:
+                analyses = self._market_analyses(rows)
+            except Exception:
+                analyses = {}
+            for item in items:
+                analysis = analyses.get(item["id"])
+                if analysis:
+                    item["price_analysis"] = analysis
+        return items
 
     # -- справочник для фильтров --------------------------------------------
     def filter_makes(self) -> list[dict[str, Any]]:
@@ -1185,7 +1185,17 @@ class MiniAppRepo:
                 (user_id,),
             )
             rows = cur.fetchall()
-        return [_item(r) for r in rows]
+        items = [_item(row) for row in rows]
+        if rows:
+            try:
+                analyses = self._market_analyses(rows)
+            except Exception:
+                analyses = {}
+            for item in items:
+                analysis = analyses.get(item["id"])
+                if analysis:
+                    item["price_analysis"] = analysis
+        return items
 
     def add_favorite(self, user_id: int, listing_id: int) -> bool:
         with self.pool.connection() as conn, conn.cursor() as cur:

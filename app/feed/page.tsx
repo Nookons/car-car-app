@@ -6,26 +6,16 @@ import { useRouter } from "next/navigation";
 import { ArrowsOut, ChatCircle, Eye, Heart, PaperPlaneTilt } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
 import { CommentsSheet } from "@/components/comments-sheet";
+import { ListingRow } from "@/components/listing-row";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { num } from "@/lib/format";
 import { labelFor, useI18n } from "@/lib/i18n";
+import type { Listing } from "@/lib/types";
 
-type FeedItem = {
-  id: number;
-  title: string;
-  price: number | null;
-  currency: string;
-  year: number | null;
-  mileage_km: number | null;
-  city: string;
-  make: string;
-  model: string;
+type FeedItem = Listing & {
   thumbnail: string;
-  fuel: string | null;
-  gearbox: string | null;
-  published_at: string | null;
   views: number;
   likes: number;
   comments: number;
@@ -190,37 +180,26 @@ export default function FeedPage() {
       </div>
 
       {loading ? (
-        <Skeleton className="h-[60dvh] w-full rounded-2xl" />
+        mode === "popular" ? (
+          <div className="mx-auto w-full max-w-2xl">
+            <div className="-mx-4 space-y-3 md:mx-0">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <FeedRowSkeleton key={index} />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <Skeleton className="h-[60dvh] w-full rounded-2xl" />
+        )
       ) : items.length === 0 ? (
         <p className="py-16 text-center text-sm text-muted-foreground">{t("feed.empty")}</p>
       ) : mode === "popular" ? (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {items.map((item) => (
-            <Link
-              key={item.id}
-              href={`/listing/${item.id}`}
-              className="min-w-0 overflow-hidden rounded-2xl border bg-card"
-            >
-              <div className="relative aspect-[4/3] bg-secondary">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={item.thumbnail} alt="" className="h-full w-full object-cover" loading="lazy" />
-                <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] text-white">
-                  <Eye size={12} /> {num(counts[item.id]?.views ?? item.views)}
-                </span>
-              </div>
-              <div className="space-y-1 p-2">
-                <p className="line-clamp-2 text-sm font-medium">{item.title}</p>
-                <p className="text-sm font-semibold">
-                  {num(item.price ?? 0)} {item.currency}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {[item.year, item.mileage_km ? `${num(item.mileage_km)} km` : null, item.city]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              </div>
-            </Link>
-          ))}
+        <div className="mx-auto w-full max-w-2xl">
+          <div className="-mx-4 space-y-3 md:mx-0">
+            {items.map((item, index) => (
+              <ListingRow key={item.id} item={item} priority={index < 2} />
+            ))}
+          </div>
         </div>
       ) : (
         <div className="h-[calc(100dvh-12.5rem)] snap-y snap-mandatory overflow-y-auto rounded-2xl">
@@ -311,14 +290,16 @@ export default function FeedPage() {
       )}
 
       {mode === "popular" ? (
-        <Button
-          variant="outline"
-          className="w-full"
-          disabled={loadingMore}
-          onClick={() => load(mode, items.length)}
-        >
-          {loadingMore ? t("list.loading") : t("list.more")}
-        </Button>
+        <div className="mx-auto w-full max-w-2xl">
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={loadingMore}
+            onClick={() => load(mode, items.length)}
+          >
+            {loadingMore ? t("list.loading") : t("list.more")}
+          </Button>
+        </div>
       ) : null}
 
       <CommentsSheet
@@ -336,6 +317,24 @@ export default function FeedPage() {
           }));
         }}
       />
+    </div>
+  );
+}
+
+function FeedRowSkeleton() {
+  return (
+    <div className="overflow-hidden border border-x-0 bg-card md:rounded-2xl md:border-x">
+      <div className="space-y-2.5 p-4 pr-12">
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-3 w-1/3" />
+        <Skeleton className="h-6 w-2/5" />
+      </div>
+      <Skeleton className="aspect-[16/9] w-full rounded-none" />
+      <div className="space-y-2 p-4">
+        <Skeleton className="h-3 w-1/4" />
+        <Skeleton className="h-3 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+      </div>
     </div>
   );
 }
