@@ -57,7 +57,7 @@ export function PriceReportSheet({
 
   const locale = lang === "uk" ? "uk-UA" : lang === "pl" ? "pl-PL" : lang === "en" ? "en-GB" : "ru-RU";
   const numberFor = (value: number, digits = 1) =>
-    value.toLocaleString(locale, { maximumFractionDigits: digits });
+    value.toLocaleString(locale, { maximumFractionDigits: digits, useGrouping: false });
 
   const valueFor = (criterion: PriceCriterion, value: string | number | null) => {
     if (value == null || value === "") return "—";
