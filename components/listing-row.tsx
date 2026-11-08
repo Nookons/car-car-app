@@ -63,7 +63,11 @@ export function ListingRow({ item, priority = false }: { item: Listing; priority
     .filter(Boolean)
     .join(", ");
 
-  const location = [item.city, item.region].filter(Boolean).join(", ");
+  const distance =
+    item.distance_km != null
+      ? `${Math.max(1, Math.round(item.distance_km))} ${t("filter.radius")}`
+      : "";
+  const location = [distance, item.city, item.region].filter(Boolean).join(", ");
 
   const onFavorite = () => {
     if (!token) {

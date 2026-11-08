@@ -439,9 +439,12 @@ class MiniAppRepo:
             where %(radius)s::float8 is null or distance_km <= %(radius)s::float8
         """
         items_sql = f"""
-            select {LIST_FIELDS}, s.code as source_code, {distance} as distance_km
-            from listing l join source s on s.id = l.source_id
-            where {where}
+            select * from (
+                select {LIST_FIELDS}, s.code as source_code, {distance} as distance_km
+                from listing l join source s on s.id = l.source_id
+                where {where}
+            ) t
+            where %(radius)s::float8 is null or distance_km <= %(radius)s::float8
             order by {order}
             limit %(limit)s offset %(offset)s
         """

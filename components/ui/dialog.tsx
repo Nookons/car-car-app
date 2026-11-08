@@ -54,7 +54,14 @@ export function Dialog({
           </button>
         </div>
         <div className="overflow-y-auto px-4 pb-4">{children}</div>
-        {footer ? <div className="border-t px-4 py-3">{footer}</div> : null}
+        {footer ? (
+          <div
+            className="border-t px-4 pt-3"
+            style={{ paddingBottom: "calc(1rem + var(--tg-safe-bottom, 0px))" }}
+          >
+            {footer}
+          </div>
+        ) : null}
       </div>
     </div>
   );

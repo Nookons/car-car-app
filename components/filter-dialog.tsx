@@ -54,6 +54,7 @@ export function FilterDialog({
   const [options, setOptions] = React.useState<Options | null>(null);
   const [cities, setCities] = React.useState<City[]>([]);
   const [pickedCity, setPickedCity] = React.useState("");
+  const [geoActive, setGeoActive] = React.useState(Boolean(initial.lat && initial.lon));
   const [geoNote, setGeoNote] = React.useState(initial.lat ? t("filter.calibrated") : "");
   const [geoFailed, setGeoFailed] = React.useState(false);
   const [saveMode, setSaveMode] = React.useState(false);
@@ -62,7 +63,12 @@ export function FilterDialog({
   const locationRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    if (open) setDraft(initial);
+    if (!open) return;
+    setDraft(initial);
+    const hasGeo = initial.lat != null && initial.lon != null;
+    setGeoActive(hasGeo);
+    setGeoNote(hasGeo ? t("filter.calibrated") : "");
+    setGeoFailed(false);
   }, [initial, open]);
 
   React.useEffect(() => {
@@ -111,8 +117,11 @@ export function FilterDialog({
       const { lat, lon } = await requestLocation();
       setDraft((prev) => ({ ...prev, lat, lon, radius_km: prev.radius_km ?? 50 }));
       setPickedCity("");
+      setGeoActive(true);
+      setGeoFailed(false);
       setGeoNote(t("filter.calibrated"));
     } catch {
+      setGeoActive(false);
       setGeoFailed(true);
       setGeoNote(t("filter.geoOff"));
     }
@@ -557,10 +566,12 @@ export function FilterDialog({
                     lon: city.lon,
                     radius_km: prev.radius_km ?? 50,
                   }));
+                  setGeoActive(true);
                   setGeoNote(`${t("filter.calibratedCity")}: ${name}`);
                   setGeoFailed(false);
                 } else {
                   setDraft((prev) => ({ ...prev, lat: undefined, lon: undefined }));
+                  setGeoActive(false);
                   setGeoNote("");
                 }
               }}
@@ -591,7 +602,7 @@ export function FilterDialog({
             </select>
           </div>
           {geoNote ? <p className="text-xs text-muted-foreground">{geoNote}</p> : null}
-          {!draft.lat && !pickedCity ? (
+          {!geoActive && !pickedCity ? (
             <p className="text-xs text-muted-foreground">{t("filter.radiusHint")}</p>
           ) : null}
           {geoFailed ? (
