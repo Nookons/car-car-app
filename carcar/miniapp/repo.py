@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from datetime import datetime
 from typing import Any
 
@@ -146,6 +147,40 @@ def _card(
         "consumption_extra": _flt(row.get("consumption_extra")),
         "equipment": list(row.get("equipment") or []),
     }
+
+
+BODY_HINTS = (
+    ("suv", ("suv", "внедорожник", "кроссовер", "crossover", "terenowy")),
+    ("kombi", ("kombi", "универсал", "wagon", "estate")),
+    ("sedan", ("sedan", "седан", "limuzyna")),
+    ("hatchback", ("hatchback", "хэтчбек", "хетчбек")),
+    ("coupe", ("coupe", "купе")),
+    ("cabrio", ("cabrio", "кабриолет", "convertible")),
+    ("minivan", ("minivan", "минивэн")),
+    ("pickup", ("pickup", "пикап")),
+)
+
+COLOR_RE = re.compile(
+    r"(?:kolor|color|колір|цвет)\s*[:\-]\s*([^\W\d_]+(?:\s+[^\W\d_]+)?)",
+    re.IGNORECASE,
+)
+
+
+def _infer_subject_features(row: dict[str, Any]) -> dict[str, Any]:
+    """Кузов/цвет часто пустые в строке — добираем из описания."""
+    subject = dict(row)
+    description = str(subject.get("description") or "")
+    if not subject.get("body"):
+        text = f"{subject.get('title') or ''} {description}".lower()
+        for body, hints in BODY_HINTS:
+            if any(hint in text for hint in hints):
+                subject["body"] = body
+                break
+    if not subject.get("color"):
+        match = COLOR_RE.search(description)
+        if match:
+            subject["color"] = match.group(1).strip()[:40]
+    return subject
 
 
 class MiniAppRepo:
@@ -577,7 +612,7 @@ class MiniAppRepo:
                 base_params,
             )
             comps = cur.fetchall()
-        return analyse_price(row, comps)
+        return analyse_price(_infer_subject_features(row), comps)
 
     def get_listing(self, listing_id: int) -> dict[str, Any] | None:
         with self.pool.connection() as conn, conn.cursor() as cur:
@@ -653,6 +688,15 @@ class MiniAppRepo:
                 row.update({key: value for key, value in values.items() if value is not None})
             except Exception:
                 pass
+
+        inferred = _infer_subject_features(row)
+        row.update(
+            {
+                key: inferred[key]
+                for key in ("body", "color")
+                if inferred.get(key) and not row.get(key)
+            }
+        )
 
         analysis = None
         if row.get("price") and row.get("make") and row.get("model"):

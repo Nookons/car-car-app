@@ -43,10 +43,16 @@ export function Dialog({
       <div
         className={cn(
           "relative z-10 flex w-full max-w-md flex-col rounded-t-2xl bg-background shadow-xl sm:rounded-2xl",
-          fullHeight
-            ? "h-[94dvh] max-h-[94dvh] sm:h-[88vh] sm:max-h-[88vh]"
-            : "max-h-[88vh]",
+          !fullHeight && "max-h-[88vh]",
         )}
+        style={
+          fullHeight
+            ? {
+                height: "calc(100dvh - max(var(--tg-safe-top, 0px), 80px) - 16px)",
+                maxHeight: "calc(100dvh - max(var(--tg-safe-top, 0px), 80px) - 16px)",
+              }
+            : undefined
+        }
       >
         <div className="flex items-center justify-between px-4 py-3">
           <h2 className="text-base font-semibold">{title}</h2>

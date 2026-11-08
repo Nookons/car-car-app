@@ -20,7 +20,6 @@ import { PhotoGallery } from "@/components/photo-gallery";
 import { PriceMarket } from "@/components/price-market";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { driveShort, gearboxShort } from "@/lib/card-labels";
@@ -305,7 +304,7 @@ export default function ListingPage() {
           </div>
         </div>
 
-        <div className="space-y-4 pt-4">
+        <div className="space-y-4 pb-24 pt-4 md:pb-0">
           <div className="space-y-2">
             {facts ? (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -376,7 +375,7 @@ export default function ListingPage() {
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
             <div className="min-w-0 space-y-3">
               {description ? (
-                <Card className="space-y-2 p-4">
+                <section className="space-y-2 border-t pt-4">
                   <h2 className="text-base font-semibold">{t("listing.description")}</h2>
                   <p
                     className={`whitespace-pre-line text-sm leading-relaxed ${
@@ -390,11 +389,11 @@ export default function ListingPage() {
                       {expanded ? t("listing.collapse") : t("listing.showMore")}
                     </Button>
                   ) : null}
-                </Card>
+                </section>
               ) : null}
 
               {item.equipment.length > 0 ? (
-                <Card className="space-y-2 p-4">
+                <section className="space-y-2 border-t pt-4">
                   <h2 className="text-base font-semibold">
                     {t("listing.equipment")}{" "}
                     <span className="text-sm text-muted-foreground">({item.equipment.length})</span>
@@ -411,11 +410,11 @@ export default function ListingPage() {
                         : `${t("listing.showAll")} (${item.equipment.length})`}
                     </Button>
                   ) : null}
-                </Card>
+                </section>
               ) : null}
 
-              <Card className="overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3">
+              <section className="space-y-2 border-t pt-4">
+                <div className="flex items-center justify-between">
                   <h2 className="text-base font-semibold">{t("listing.map")}</h2>
                   <a
                     className="text-sm text-muted-foreground hover:text-foreground"
@@ -426,19 +425,21 @@ export default function ListingPage() {
                     {t("listing.openMap")} ↗
                   </a>
                 </div>
-                <iframe
-                  title={t("listing.map")}
-                  src={mapEmbed}
-                  className="h-56 w-full border-0"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  allowFullScreen
-                />
-              </Card>
+                <div className="overflow-hidden rounded-xl bg-muted">
+                  <iframe
+                    title={t("listing.map")}
+                    src={mapEmbed}
+                    className="h-56 w-full border-0"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    allowFullScreen
+                  />
+                </div>
+              </section>
             </div>
 
             <div className="min-w-0 space-y-3">
-              <Card className="space-y-3 p-4">
+              <section className="space-y-3 border-t pt-4">
                 <h2 className="text-base font-semibold">{t("listing.seller")}</h2>
                 <div className="flex items-center gap-3">
                   <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary">
@@ -455,10 +456,10 @@ export default function ListingPage() {
                     </p>
                   </div>
                 </div>
-              </Card>
+              </section>
 
               {extraSpecs.length ? (
-                <Card className="space-y-3 p-4">
+                <section className="space-y-3 border-t pt-4">
                   <h2 className="text-base font-semibold">{t("listing.specs")}</h2>
                   <dl className="grid grid-cols-[112px_minmax(0,1fr)] gap-y-2.5 text-sm">
                     {extraSpecs.map((row) => (
@@ -468,7 +469,7 @@ export default function ListingPage() {
                       </React.Fragment>
                     ))}
                   </dl>
-                </Card>
+                </section>
               ) : null}
             </div>
           </div>

@@ -13,7 +13,7 @@ from typing import Any
 
 # Сумма весов = 1. Цвет и поколение намеренно с малым весом: они влияют
 # на похожесть, но не отсекают объявления.
-MODEL_VERSION = 3
+MODEL_VERSION = 4
 
 WEIGHTS: dict[str, float] = {
     "year": 0.20,
@@ -314,7 +314,7 @@ def analyse_price(
         {
             "key": "equipment",
             "subject": int(subject_equipment),
-            "market": round(avg_equipment, 1) if avg_equipment is not None else None,
+            "market": round(avg_equipment, 1) if avg_equipment is not None and avg_equipment >= 1 else None,
             "weight": WEIGHTS["equipment"],
             "match": round(avg_scores["equipment"], 2),
             "effect_pct": None,

@@ -2,6 +2,7 @@
 
 import { TrendDown, TrendUp } from "@phosphor-icons/react";
 import { Dialog } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { engineVolume, num, powerLabel, price } from "@/lib/format";
 import { labelFor, useI18n, type Key } from "@/lib/i18n";
 import type { ListingCard, PriceAnalysis, PriceCriterion } from "@/lib/types";
@@ -49,16 +50,20 @@ export function PriceReportSheet({
   onClose: () => void;
   item: ListingCard;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const analysis: PriceAnalysis | null = item.price_analysis;
   const report = analysis?.report;
   if (!analysis || !report) return null;
+
+  const locale = lang === "uk" ? "uk-UA" : lang === "pl" ? "pl-PL" : lang === "en" ? "en-GB" : "ru-RU";
+  const numberFor = (value: number, digits = 1) =>
+    value.toLocaleString(locale, { maximumFractionDigits: digits });
 
   const valueFor = (criterion: PriceCriterion, value: string | number | null) => {
     if (value == null || value === "") return "—";
     switch (criterion.key) {
       case "year":
-        return String(value);
+        return typeof value === "number" ? numberFor(value, 1) : String(value);
       case "mileage":
         return `${num(Number(value))} ${t("filter.radius")}`;
       case "engine":
@@ -107,7 +112,17 @@ export function PriceReportSheet({
   const subjectPosition = clamp(((Number(item.price ?? 0) - low) / span) * 100);
 
   return (
-    <Dialog open={open} onClose={onClose} title={t("market.reportTitle")} fullHeight>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={t("market.reportTitle")}
+      fullHeight
+      footer={
+        <Button className="w-full" onClick={onClose}>
+          {t("common.close")}
+        </Button>
+      }
+    >
       <div className="space-y-5 pb-6">
         <section className="space-y-2">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -149,20 +164,20 @@ export function PriceReportSheet({
           </div>
         </section>
 
-        <section className="grid grid-cols-2 gap-2 text-sm">
-          <div className="rounded-xl bg-secondary px-3 py-2">
+        <section className="grid grid-cols-2 gap-x-4 gap-y-3 border-y py-3 text-sm">
+          <div>
             <p className="text-[11px] text-muted-foreground">{t("market.sample")}</p>
             <p className="font-semibold">{report.sample}</p>
           </div>
-          <div className="rounded-xl bg-secondary px-3 py-2">
+          <div>
             <p className="text-[11px] text-muted-foreground">{t("market.excluded")}</p>
             <p className="font-semibold">{report.excluded}</p>
           </div>
-          <div className="rounded-xl bg-secondary px-3 py-2">
+          <div>
             <p className="text-[11px] text-muted-foreground">{t("market.avgSimilarity")}</p>
             <p className="font-semibold">{report.avg_similarity}%</p>
           </div>
-          <div className="rounded-xl bg-secondary px-3 py-2">
+          <div>
             <p className="text-[11px] text-muted-foreground">{t("market.confidence")}</p>
             <p className="font-semibold">{confidence}</p>
           </div>
@@ -183,9 +198,9 @@ export function PriceReportSheet({
 
         <section className="space-y-2">
           <h3 className="text-base font-semibold">{t("market.criteriaTitle")}</h3>
-          <div className="space-y-2">
+          <div className="divide-y">
             {report.criteria.map((criterion) => (
-              <div key={criterion.key} className="rounded-xl border p-3">
+              <div key={criterion.key} className="py-3 first:pt-0">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-sm font-medium">{t(criterionKey(criterion.key))}</span>
                   <span className="text-right text-xs">
@@ -214,6 +229,11 @@ export function PriceReportSheet({
                     </span>
                   ) : null}
                 </div>
+                {criterion.key === "equipment" && criterion.market == null ? (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {t("market.equipmentSparse")}
+                  </p>
+                ) : null}
               </div>
             ))}
           </div>
@@ -225,9 +245,9 @@ export function PriceReportSheet({
         {report.comparables.length > 0 ? (
           <section className="space-y-2">
             <h3 className="text-base font-semibold">{t("market.comparablesTitle")}</h3>
-            <div className="space-y-2">
+            <div className="divide-y">
               {report.comparables.map((comp) => (
-                <div key={comp.id} className="rounded-xl border p-3">
+                <div key={comp.id} className="py-3 first:pt-0">
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="line-clamp-1 min-w-0 text-sm font-medium">
                       {comp.title || item.title}

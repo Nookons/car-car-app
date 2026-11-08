@@ -37,7 +37,7 @@ export function PriceMarket({ item }: { item: ListingCard }) {
 
   return (
     <>
-    <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
+    <section className="space-y-3 border-t pt-4">
       <h2 className="flex items-center gap-2 text-base font-semibold">
         <Tag size={18} /> {t("market.title")}
       </h2>
@@ -88,7 +88,7 @@ export function PriceMarket({ item }: { item: ListingCard }) {
           {analysis.sample}
         </p>
       )}
-    </div>
+    </section>
     <PriceReportSheet open={reportOpen} onClose={() => setReportOpen(false)} item={item} />
     </>
   );
