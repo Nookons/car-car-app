@@ -88,10 +88,25 @@ export type PriceEvent = {
   observed_at: string | null;
 };
 
+export type PricePoint = {
+  price: number;
+  at: string | null;
+  kind:
+    | "initial"
+    | "price_drop"
+    | "price_up"
+    | "removed"
+    | "restored"
+    | "current"
+    | "price";
+};
+
 export type ListingCard = Listing & {
   url: string;
   photos: string[];
   events: PriceEvent[];
+  price_history: PricePoint[];
+  initial_price: number | null;
   status: "active" | "removed";
   first_seen_at?: string | null;
   last_seen_at?: string | null;

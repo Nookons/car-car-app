@@ -19,6 +19,7 @@ import {
 } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
 import { PhotoGallery } from "@/components/photo-gallery";
+import { PriceHistory } from "@/components/price-history";
 import { PriceMarket } from "@/components/price-market";
 import { SimilarListings } from "@/components/similar-listings";
 import { Badge } from "@/components/ui/badge";
@@ -431,6 +432,7 @@ export default function ListingPage() {
           </div>
 
           <PriceMarket item={item} />
+          <PriceHistory item={item} />
 
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
             <div className="min-w-0 space-y-3">

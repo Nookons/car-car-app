@@ -93,10 +93,57 @@ def _item(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _price_history(
+    row: dict[str, Any], events: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], int | None]:
+    """Точки истории цены: стартовая, изменения из listing_event, текущая.
+
+    Стартовой считаем old_price первого события — это цена до первого
+    изменения. Если событий нет, истории нет: показывать нечего.
+    """
+    current = _num(row.get("price"))
+    if not events:
+        return [], current
+    history: list[dict[str, Any]] = []
+    initial = _num(events[0].get("old_price"))
+    if initial is not None:
+        history.append(
+            {
+                "price": initial,
+                "at": _iso(row.get("first_seen_at"))
+                or _iso(events[0].get("observed_at")),
+                "kind": "initial",
+            }
+        )
+    for event in events:
+        new = _num(event.get("new_price"))
+        if new is None:
+            continue
+        if history and history[-1]["price"] == new:
+            continue
+        history.append(
+            {
+                "price": new,
+                "at": _iso(event.get("observed_at")),
+                "kind": event.get("kind") or "price",
+            }
+        )
+    if current is not None and (not history or history[-1]["price"] != current):
+        history.append(
+            {"price": current, "at": _iso(row.get("last_seen_at")), "kind": "current"}
+        )
+    if len(history) > 12:
+        # Стартовая точка + последние изменения: длинную историю не раздуваем.
+        history = [history[0], *history[-11:]]
+    return history, initial if initial is not None else current
+
+
 def _card(
     row: dict[str, Any],
     events: list[dict[str, Any]],
     analysis: dict[str, Any] | None = None,
+    price_history: list[dict[str, Any]] | None = None,
+    initial_price: int | None = None,
 ) -> dict[str, Any]:
     photos = [p for p in (row.get("photos") or []) if p] or (
         [row["thumb_url"]] if row.get("thumb_url") else []
@@ -134,6 +181,8 @@ def _card(
         "lat": row.get("lat"),
         "lon": row.get("lon"),
         "events": events,
+        "price_history": price_history or [],
+        "initial_price": initial_price if initial_price is not None else _num(row.get("price")),
         "status": row.get("status") or "active",
         "first_seen_at": _iso(row.get("first_seen_at")),
         "last_seen_at": _iso(row.get("last_seen_at")),
@@ -732,11 +781,11 @@ class MiniAppRepo:
                 """
                 select kind, old_price, new_price, observed_at
                 from listing_event where listing_id = %s
-                order by observed_at desc limit 10
+                order by observed_at asc
                 """,
                 (listing_id,),
             )
-            events = [
+            events_all = [
                 {
                     "kind": e["kind"],
                     "old_price": _num(e["old_price"]),
@@ -745,6 +794,9 @@ class MiniAppRepo:
                 }
                 for e in cur.fetchall()
             ]
+            # Для бейджа нужны последние изменения, для истории — все.
+            events = list(reversed(events_all[-10:]))
+            price_history, initial_price = _price_history(row, events_all)
 
         needs_details = (
             not row.get("description")
@@ -806,7 +858,7 @@ class MiniAppRepo:
             with self.pool.connection() as conn, conn.cursor() as cur:
                 analysis = self._price_analysis(cur, row)
 
-        return _card(row, events, analysis)
+        return _card(row, events, analysis, price_history, initial_price)
 
     def _similar_rows(
         self, cur: Any, subject: dict[str, Any], limit: int
