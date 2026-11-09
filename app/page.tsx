@@ -7,6 +7,8 @@ import { useAuth } from "@/components/auth-provider";
 import { ListingRow } from "@/components/listing-row";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
+import { brandLogoUrl } from "@/lib/brands";
+import { num } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import type { Listing } from "@/lib/types";
 
@@ -15,13 +17,19 @@ const QUICK = [
   { key: "home.low", href: "/list?mileage_max=100000" },
   { key: "home.auto", href: "/list?gearbox=automatic" },
   { key: "home.fresh", href: "/list?year_min=2024" },
+  { key: "home.today", href: "/list?published_days=1" },
 ] as const;
+
+type Make = { value: string; count: number };
+
+const HOME_MAKES = 8;
 
 export default function HomePage() {
   const { token, user, ready, error } = useAuth();
   const { t } = useI18n();
   const [items, setItems] = React.useState<Listing[]>([]);
   const [recs, setRecs] = React.useState<Listing[]>([]);
+  const [makes, setMakes] = React.useState<Make[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -33,6 +41,16 @@ export default function HomePage() {
       cancelled = true;
     };
   }, [token]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    api<{ items: Make[] }>("/filters/makes")
+      .then((data) => !cancelled && setMakes(data.items.slice(0, HOME_MAKES)))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   React.useEffect(() => {
     if (!token) return;
@@ -65,6 +83,36 @@ export default function HomePage() {
           </Link>
         ))}
       </div>
+
+      {makes.length > 0 ? (
+        <section className="mx-auto w-full max-w-2xl space-y-2">
+          <h2 className="text-base font-semibold">{t("home.brands")}</h2>
+          <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+            {makes.map((make) => (
+              <Link
+                key={make.value}
+                href={`/list?make=${encodeURIComponent(make.value)}`}
+                title={`${make.value}: ${num(make.count)}`}
+                className="flex w-[78px] shrink-0 flex-col items-center gap-1 rounded-xl border bg-card px-2 py-2.5 shadow-sm transition hover:shadow-md"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={brandLogoUrl(make.value)}
+                  alt=""
+                  width={32}
+                  height={32}
+                  loading="lazy"
+                  className="h-8 w-8 object-contain"
+                />
+                <span className="w-full truncate text-center text-[11px] font-medium">
+                  {make.value}
+                </span>
+                <span className="text-[10px] text-muted-foreground">{num(make.count)}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {recs.length > 0 ? (
         <section className="mx-auto w-full max-w-2xl space-y-3">
