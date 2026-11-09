@@ -18,7 +18,7 @@ Next.js на Vercel ──► FastAPI (Railway) ──► Supabase Postgres
 |---|---|
 | `/` главная | приветствие, быстрые фильтры, 6 свежих объявлений |
 | `/list` список | фильтры (марка, цена, год, пробег, топливо, КПП, радиус), пагинация, счётчик |
-| `/listing/[id]` | галерея фото, цена, характеристики, продавец, избранное, ссылка на otomoto |
+| `/listing/[id]` | галерея фото, цена и отчёт по рынку, отметка о снижении цены, характеристики, продавец, похожие объявления, избранное, ссылка на otomoto |
 | `/account` | профиль Telegram, язык, уведомления, сохранённые фильтры, избранное |
 
 Скриншоты: `docs/img/mini-*.png`.
@@ -104,6 +104,7 @@ PATCH /api/me               {lang?, notify_new?, digest?}
 GET  /api/listings          limit, offset, q, make, price_min/max, year_min/max,
                             mileage_max, fuel, gearbox, source, lat, lon, radius_km, sort
 GET  /api/listings/{id}     карточка
+GET  /api/listings/{id}/similar  похожие (limit 1..12, кэш 10 мин)
 GET/POST /api/subscriptions
 PATCH/DELETE /api/subscriptions/{id}
 GET/POST/DELETE /api/favorites

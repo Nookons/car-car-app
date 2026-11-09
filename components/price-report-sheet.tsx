@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { TrendDown, TrendUp } from "@phosphor-icons/react";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -247,7 +248,11 @@ export function PriceReportSheet({
             <h3 className="text-base font-semibold">{t("market.comparablesTitle")}</h3>
             <div className="divide-y">
               {report.comparables.map((comp) => (
-                <div key={comp.id} className="py-3 first:pt-0">
+                <Link
+                  key={comp.id}
+                  href={`/listing/${comp.id}`}
+                  className="block py-3 first:pt-0 transition hover:bg-secondary/40"
+                >
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="line-clamp-1 min-w-0 text-sm font-medium">
                       {comp.title || item.title}
@@ -277,7 +282,7 @@ export function PriceReportSheet({
                       {t("market.match")} {comp.similarity}%
                     </span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </section>

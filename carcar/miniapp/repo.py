@@ -160,6 +160,10 @@ BODY_HINTS = (
     ("pickup", ("pickup", "пикап")),
 )
 
+# Площадка иногда пишет «Inny» вместо модели: такие строки нельзя сравнивать
+# по модели — для похожих остаются марка, кузов и цена.
+GENERIC_MODELS = {"inny", "inne", "other", "unknown", "другое", "інше"}
+
 COLOR_RE = re.compile(
     r"(?:kolor|color|колір|цвет)\s*[:\-]\s*([^\W\d_]+(?:\s+[^\W\d_]+)?)",
     re.IGNORECASE,
@@ -724,6 +728,168 @@ class MiniAppRepo:
 
         return _card(row, events, analysis)
 
+    def _similar_rows(
+        self, cur: Any, subject: dict[str, Any], limit: int
+    ) -> list[dict[str, Any]]:
+        """Кандидаты «похожих» в три круга: точная модель → модель → марка.
+
+        Первый круг отсекает годы и цену, чтобы не показывать машину другого
+        класса; второй ослабляет ограничения, если модель редкая; третий
+        добирает ту же марку и кузов. Дубликаты между кругами убираем.
+        """
+        make = subject["make"]
+        model = (subject.get("model") or "").strip()
+        generic_model = not model or model.lower() in GENERIC_MODELS
+        price = _num(subject.get("price"))
+        year = subject.get("year")
+        body = subject.get("body")
+
+        base = [
+            "l.status = 'active'",
+            "l.published_at is not null",
+            "l.id <> %(id)s",
+            "l.make = %(make)s",
+        ]
+        shared: dict[str, Any] = {"id": subject["id"], "make": make}
+        if not generic_model:
+            base.append("l.model = %(model)s")
+            shared["model"] = model
+        rank: list[str] = []
+        if body:
+            shared["body"] = body
+            rank.append("(l.body is distinct from %(body)s)::int")
+        if year:
+            shared["year"] = year
+            rank.append("abs(l.year - %(year)s) nulls last")
+        if price:
+            shared["price"] = price
+            rank.append(
+                "abs(l.price - %(price)s::numeric) "
+                "/ greatest(%(price)s::numeric, 1) nulls last"
+            )
+        rank.append("l.published_at desc")
+
+        tiers: list[tuple[list[str], dict[str, Any], str]] = []
+
+        if not generic_model:
+            tight = dict(shared)
+            tight_conds = list(base)
+            if price:
+                tight["price_lo"] = int(price * 0.65)
+                tight["price_hi"] = int(price * 1.35)
+                tight_conds.append("l.price between %(price_lo)s and %(price_hi)s")
+            if year:
+                tight["year_lo"] = int(year) - 3
+                tight["year_hi"] = int(year) + 3
+                tight_conds.append("l.year between %(year_lo)s and %(year_hi)s")
+            tiers.append((tight_conds, tight, ", ".join(rank)))
+            tiers.append((list(base), dict(shared), ", ".join(rank)))
+
+        wide: dict[str, Any] = {"id": subject["id"], "make": make}
+        wide_conds = [
+            "l.status = 'active'",
+            "l.published_at is not null",
+            "l.id <> %(id)s",
+            "l.make = %(make)s",
+        ]
+        wide_rank: list[str] = []
+        if body:
+            wide["body"] = body
+            wide_conds.append("l.body = %(body)s")
+        if price:
+            wide["price"] = price
+            wide["price_lo"] = int(price * 0.5)
+            wide["price_hi"] = int(price * 1.5)
+            wide_conds.append("l.price between %(price_lo)s and %(price_hi)s")
+            wide_rank.append("abs(l.price - %(price)s::numeric) nulls last")
+        if year:
+            wide["year"] = year
+            wide_rank.append("abs(l.year - %(year)s) nulls last")
+        wide_rank.append("l.published_at desc")
+        tiers.append((wide_conds, wide, ", ".join(wide_rank)))
+
+        if generic_model:
+            # «Inny» без кузова: лучше показать ту же марку в том же бюджете,
+            # чем пустую секцию.
+            relaxed: dict[str, Any] = {"id": subject["id"], "make": make}
+            relaxed_conds = [
+                "l.status = 'active'",
+                "l.published_at is not null",
+                "l.id <> %(id)s",
+                "l.make = %(make)s",
+            ]
+            relaxed_rank: list[str] = []
+            if price:
+                relaxed["price"] = price
+                relaxed["price_lo"] = int(price * 0.5)
+                relaxed["price_hi"] = int(price * 1.5)
+                relaxed_conds.append("l.price between %(price_lo)s and %(price_hi)s")
+                relaxed_rank.append("abs(l.price - %(price)s::numeric) nulls last")
+            if year:
+                relaxed["year"] = year
+                relaxed_rank.append("abs(l.year - %(year)s) nulls last")
+            relaxed_rank.append("l.published_at desc")
+            tiers.append((relaxed_conds, relaxed, ", ".join(relaxed_rank)))
+
+        found: list[dict[str, Any]] = []
+        seen: set[int] = set()
+        for conds, params, order in tiers:
+            if len(found) >= limit:
+                break
+            # Третий круг — только когда одноклассников совсем мало.
+            if conds is wide_conds and len(found) >= 3:
+                break
+            query_params = dict(params, limit=limit - len(found))
+            cur.execute(
+                f"""
+                select {LIST_FIELDS}, s.code as source_code,
+                       null::float8 as distance_km
+                from listing l join source s on s.id = l.source_id
+                where {" and ".join(conds)}
+                order by {order}
+                limit %(limit)s
+                """,
+                query_params,
+            )
+            for row in cur.fetchall():
+                if row["id"] in seen:
+                    continue
+                seen.add(row["id"])
+                found.append(row)
+        return found
+
+    def similar(self, listing_id: int, limit: int = 6) -> list[dict[str, Any]] | None:
+        """Похожие авто для карточки. None — такого объявления нет (404)."""
+        limit = max(1, min(limit, 12))
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "select id, make, model, year, mileage_km, price, body "
+                "from listing where id = %s",
+                (listing_id,),
+            )
+            subject = cur.fetchone()
+            if not subject:
+                return None
+            if not subject.get("make"):
+                return []
+            rows = self._similar_rows(cur, subject, limit)
+
+        items = [_item(row) for row in rows]
+        if items:
+            # Ленте похожих хватает одного фото: не тащим 6 URL на каждую карточку.
+            for item in items:
+                item["photos"] = item["photos"][:1]
+            try:
+                analyses = self._market_analyses(rows)
+            except Exception:
+                # Оценка рынка вспомогательная: без неё список всё равно нужен.
+                analyses = {}
+            for item in items:
+                analysis = analyses.get(item["id"])
+                if analysis:
+                    item["price_analysis"] = analysis
+        return items
+
     # -- просмотры, реакции, популярность -----------------------------------
     def record_view(self, user_id: int, listing_id: int) -> int:
         """Один просмотр в день на пользователя; возвращает всего просмотров."""
@@ -921,7 +1087,11 @@ class MiniAppRepo:
                 if criteria.get("price_min") is not None:
                     price_min = max(price_min or 0, int(criteria["price_min"]))
                 if criteria.get("price_max") is not None:
-                    price_max = int(criteria["price_max"]) if price_max is None else max(price_max, int(criteria["price_max"]))
+                    price_max = (
+                        int(criteria["price_max"])
+                        if price_max is None
+                        else max(price_max, int(criteria["price_max"]))
+                    )
 
             cur.execute(
                 """

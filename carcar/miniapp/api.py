@@ -389,6 +389,21 @@ def create_app(
         cache.set(key, card, ttl=600)
         return card
 
+    @app.get("/api/listings/{listing_id}/similar")
+    def similar_listings(
+        listing_id: int, limit: int = Query(default=6, ge=1, le=12)
+    ) -> dict:
+        key = f"similar:v1:{listing_id}:{limit}"
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+        items = repo.similar(listing_id, limit)
+        if items is None:
+            raise HTTPException(status_code=404, detail="объявление не найдено")
+        payload = {"items": items}
+        cache.set(key, payload, ttl=600)
+        return payload
+
     # -- справочник фильтров ------------------------------------------------
     @app.get("/api/filters/makes")
     def filter_makes() -> dict:

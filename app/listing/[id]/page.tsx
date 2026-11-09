@@ -13,11 +13,13 @@ import {
   MapPin,
   ShareNetwork,
   Star,
+  TrendDown,
   User,
 } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
 import { PhotoGallery } from "@/components/photo-gallery";
 import { PriceMarket } from "@/components/price-market";
+import { SimilarListings } from "@/components/similar-listings";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,7 +39,7 @@ import {
 import { labelFor, useI18n } from "@/lib/i18n";
 import { sourceName } from "@/lib/source";
 import { cn } from "@/lib/utils";
-import type { ListingCard as ListingDetail } from "@/lib/types";
+import type { Listing, ListingCard as ListingDetail } from "@/lib/types";
 
 const controlClass =
   "grid h-10 w-10 place-items-center rounded-full bg-black/35 text-white backdrop-blur transition hover:bg-black/55";
@@ -48,6 +50,7 @@ export default function ListingPage() {
   const { token, favorites, toggleFavorite } = useAuth();
   const { t, lang } = useI18n();
   const [item, setItem] = React.useState<ListingDetail | null>(null);
+  const [similar, setSimilar] = React.useState<Listing[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [expanded, setExpanded] = React.useState(false);
   const [allEquipment, setAllEquipment] = React.useState(false);
@@ -56,10 +59,21 @@ export default function ListingPage() {
 
   React.useEffect(() => {
     if (!params?.id) return;
+    const id = params.id;
     let cancelled = false;
-    api<ListingDetail>(`/listings/${params.id}`)
+    // Переход по «похожему» не должен показывать старую машину под новым id.
+    setItem(null);
+    setSimilar([]);
+    setError(null);
+    setExpanded(false);
+    setAllEquipment(false);
+    setMenuOpen(false);
+    api<ListingDetail>(`/listings/${id}`)
       .then((data) => !cancelled && setItem(data))
       .catch((err) => !cancelled && setError(err.message));
+    api<{ items: Listing[] }>(`/listings/${id}/similar?limit=6`)
+      .then((data) => !cancelled && setSimilar(data.items))
+      .catch(() => !cancelled && setSimilar([]));
     return () => {
       cancelled = true;
     };
@@ -94,6 +108,23 @@ export default function ListingPage() {
 
   const title = listingTitle(item.title, item.year);
   const source = sourceName(item.source);
+  // События приходят от свежих к старым: показываем только последнее изменение.
+  const lastChange = item.events?.[0];
+  const lastDrop = lastChange?.kind === "price_drop" ? lastChange : null;
+  const dropAmount =
+    lastDrop?.old_price != null && lastDrop?.new_price != null
+      ? lastDrop.old_price - lastDrop.new_price
+      : 0;
+  // «Inny» — не модель: для неё ссылка ведёт на марку с кузовом.
+  const genericModel =
+    !item.model ||
+    ["inny", "inne", "other", "unknown", "другое", "інше"].includes(item.model.toLowerCase());
+  const makeQuery = item.make ? `make=${encodeURIComponent(item.make)}` : "";
+  const similarHref = !item.make
+    ? "/list"
+    : genericModel
+      ? `/list?${makeQuery}${item.body ? `&body=${encodeURIComponent(item.body)}` : ""}`
+      : `/list?${makeQuery}&model=${encodeURIComponent(item.model ?? "")}`;
   const isFav = favorites.has(item.id);
   const analysis = item.price_analysis;
   const description = item.description?.trim();
@@ -331,6 +362,18 @@ export default function ListingPage() {
                 </span>
               ) : null}
             </div>
+            {lastDrop && dropAmount > 0 ? (
+              <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                <TrendDown size={14} className="shrink-0" />
+                <span>
+                  {t("listing.priceDrop").replace(
+                    "{amount}",
+                    price(dropAmount, item.currency),
+                  )}
+                  {lastDrop.observed_at ? ` · ${dateShort(lastDrop.observed_at, lang)}` : ""}
+                </span>
+              </p>
+            ) : null}
           </div>
 
           {keySpecs.length ? (
@@ -479,6 +522,8 @@ export default function ListingPage() {
               ) : null}
             </div>
           </div>
+
+          <SimilarListings items={similar} allHref={similarHref} />
         </div>
       </div>
     </div>

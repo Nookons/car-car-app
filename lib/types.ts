@@ -81,9 +81,17 @@ export type Listing = {
   price_analysis?: PriceAnalysis | null;
 };
 
+export type PriceEvent = {
+  kind: "price_drop" | "price_up" | "removed" | "restored";
+  old_price: number | null;
+  new_price: number | null;
+  observed_at: string | null;
+};
+
 export type ListingCard = Listing & {
   url: string;
   photos: string[];
+  events: PriceEvent[];
   seller: { type: string | null; name: string };
   color: string;
   vin: string;
