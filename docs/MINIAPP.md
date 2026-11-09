@@ -21,7 +21,9 @@ Next.js на Vercel ──► FastAPI (Railway) ──► Supabase Postgres
 | `/listing/[id]` | галерея фото, цена и отчёт по рынку, отметка о снижении цены, баннер «снято с продажи», характеристики, продавец, похожие объявления, избранное, ссылка на otomoto |
 | `/account` | профиль Telegram, язык, уведомления, сохранённые фильтры, избранное |
 
-Скриншоты: `docs/img/mini-*.png`.
+Скриншоты: `docs/img/mini-*.png`, а также новые состояния —
+`docs/img/home-search.png`, `docs/img/list-search.png`,
+`docs/img/card-price-history.png`.
 
 ## Авторизация
 
