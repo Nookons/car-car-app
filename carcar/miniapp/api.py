@@ -398,7 +398,7 @@ def create_app(
 
     @app.get("/api/listings/{listing_id}")
     def listing(listing_id: int) -> dict:
-        key = f"card:v5:{listing_id}"
+        key = f"card:v6:{listing_id}"
         cached = cache.get(key)
         if cached is not None:
             return cached
