@@ -1,7 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // TODO: разобраться с типами и вернуть проверку в сборке.
-  typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
   async headers() {
     return [
