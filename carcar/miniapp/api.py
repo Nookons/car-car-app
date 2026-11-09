@@ -83,8 +83,9 @@ def create_app(
     if dev_tg_id and not dev_allowed:
         dev_tg_id = None
 
-    repo = MiniAppRepo(url)
     cache = Cache()
+    repo = MiniAppRepo(url)
+    repo.cache = cache
     dev_token = os.environ.get("CARCAR_DEV_TOKEN", "")
     ingest_token = os.environ.get("CARCAR_INGEST_TOKEN", "")
 

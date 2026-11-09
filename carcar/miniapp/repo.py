@@ -196,6 +196,8 @@ class MiniAppRepo:
 
         if "ljkugtpeboomboobodom" in url.lower():
             raise RuntimeError("это складская эко-система — Mini App сюда не подключаем")
+        # Кэш ставит API; в скриптах и тестах его может не быть.
+        self.cache: Any | None = None
         self.pool = ConnectionPool(
             url,
             min_size=1,
@@ -288,6 +290,21 @@ class MiniAppRepo:
         if not ids:
             return {}
 
+        prices = {row["id"]: row.get("price") for row in rows}
+        cached: dict[int, dict[str, Any]] = {}
+        if self.cache is not None:
+            pending = []
+            for item_id in ids:
+                key = f"market:v2:{item_id}:{prices[item_id]}"
+                hit = self.cache.get(key)
+                if hit:
+                    cached[item_id] = hit
+                else:
+                    pending.append(item_id)
+            ids = pending
+            if not ids:
+                return cached
+
         subject_fields = """
             l.id, l.make, l.model, l.title, l.price, l.year, l.mileage_km,
             l.engine_cm3, l.power_hp, l.body, l.gearbox, l.drive, l.fuel,
@@ -362,7 +379,7 @@ class MiniAppRepo:
                     fresh.setdefault(row.pop("subject_id"), []).append(dict(row))
                 grouped.update(fresh)
 
-        result: dict[int, dict[str, Any]] = {}
+        result: dict[int, dict[str, Any]] = dict(cached)
         for item_id in ids:
             subject = subjects.get(item_id)
             if not subject:
@@ -380,6 +397,12 @@ class MiniAppRepo:
                 "diff_pct": analysis["diff_pct"],
                 "verdict": analysis["verdict"],
             }
+            if self.cache is not None:
+                self.cache.set(
+                    f"market:v2:{item_id}:{prices[item_id]}",
+                    result[item_id],
+                    ttl=600,
+                )
         return result
 
     def search(
