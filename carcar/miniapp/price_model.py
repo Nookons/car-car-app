@@ -116,14 +116,18 @@ def _scores(subject: dict[str, Any], comp: dict[str, Any]) -> dict[str, float]:
     scores["engine"] = closeness(
         _number(subject.get("engine_cm3")), _number(comp.get("engine_cm3")), 1500
     )
-    scores["power"] = closeness(_number(subject.get("power_hp")), _number(comp.get("power_hp")), 150)
+    scores["power"] = closeness(
+        _number(subject.get("power_hp")), _number(comp.get("power_hp")), 150
+    )
 
     for key in ("body", "gearbox", "drive", "fuel"):
         a, b = subject.get(key), comp.get(key)
         if a is None or b is None:
             scores[key] = 0.5
         else:
-            scores[key] = 1.0 if a == b else {"body": 0.3, "gearbox": 0.4, "drive": 0.5}.get(key, 0.5)
+            scores[key] = (
+                1.0 if a == b else {"body": 0.3, "gearbox": 0.4, "drive": 0.5}.get(key, 0.5)
+            )
 
     a, b = subject.get("generation"), comp.get("generation")
     scores["generation"] = 0.5 if a is None or b is None else (1.0 if a == b else 0.6)
@@ -244,7 +248,9 @@ def analyse_price(
         return _weighted_slope(points)
 
     slope_year = min(0.15, max(0.0, slope_for(lambda c: _number(c.get("year")), 1.0)))
-    slope_mileage = min(0.01, max(-0.08, slope_for(lambda c: _number(c.get("mileage_km")), 10_000.0)))
+    slope_mileage = min(
+        0.01, max(-0.08, slope_for(lambda c: _number(c.get("mileage_km")), 10_000.0))
+    )
     slope_engine = min(0.2, max(-0.1, slope_for(lambda c: _number(c.get("engine_cm3")), 1000.0)))
     slope_power = min(0.1, max(-0.02, slope_for(lambda c: _number(c.get("power_hp")), 100.0)))
     adjustments: dict[str, float] = {}
@@ -281,7 +287,9 @@ def analyse_price(
     def per_unit(key: str, slope: float, scale: float) -> float | None:
         if len(used) < 8:
             return None
-        return round((math.exp(slope / scale) - 1) * 100, 1) if scale != 1 else round((math.exp(slope) - 1) * 100, 1)
+        if scale != 1:
+            return round((math.exp(slope / scale) - 1) * 100, 1)
+        return round((math.exp(slope) - 1) * 100, 1)
 
     criteria: list[dict[str, Any]] = [
         {
@@ -300,7 +308,9 @@ def analyse_price(
             "weight": WEIGHTS["mileage"],
             "match": round(market_scores["mileage"], 2),
             "effect_pct": effect("mileage"),
-            "per_unit_pct": round((math.exp(slope_mileage) - 1) * 100, 2) if slope_mileage else None,
+            "per_unit_pct": (
+                round((math.exp(slope_mileage) - 1) * 100, 2) if slope_mileage else None
+            ),
         },
         {
             "key": "engine",
@@ -323,7 +333,11 @@ def analyse_price(
         {
             "key": "equipment",
             "subject": int(subject_equipment),
-            "market": round(avg_equipment, 1) if avg_equipment is not None and avg_equipment >= 1 else None,
+            "market": (
+                round(avg_equipment, 1)
+                if avg_equipment is not None and avg_equipment >= 1
+                else None
+            ),
             "weight": WEIGHTS["equipment"],
             "match": round(market_scores["equipment"], 2),
             "effect_pct": None,
@@ -377,7 +391,8 @@ def analyse_price(
         "criteria": criteria,
         "comparables": comparable_rows,
         "notes": [
-            "Цена — взвешенная медиана похожих объявлений, скорректированная на год, пробег, объём, мощность и комплектацию.",
+            "Цена — взвешенная медиана похожих объявлений, скорректированная "
+            "на год, пробег, объём, мощность и комплектацию.",
             "Цвет и поколение влияют на вес похожести, но не отсекают объявления.",
         ],
     }
@@ -391,6 +406,5 @@ def analyse_price(
         "verdict": verdict,
         "confidence": confidence,
         "method": "adjusted_comparable_median",
-        "model_version": MODEL_VERSION,
         "report": report,
     }

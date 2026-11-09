@@ -277,7 +277,12 @@ def create_app(
             "heartbeat": heartbeat,
             "control": control.as_dict(),
             "storage": storage_stats(),
-            "polls": _safe(lambda: repo.polls(limit=60), store.read_polls(limit=60), errors, "polls")
+            "polls": _safe(
+                lambda: repo.polls(limit=60),
+                store.read_polls(limit=60),
+                errors,
+                "polls",
+            )
             if repo is not None
             else store.read_polls(limit=60),
             "runs": _safe(lambda: repo.runs(limit=5), store.recent_runs(limit=5), errors, "runs")
