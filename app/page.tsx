@@ -2,9 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight } from "@phosphor-icons/react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, MagnifyingGlass } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
 import { ListingRow } from "@/components/listing-row";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { brandLogoUrl } from "@/lib/brands";
@@ -26,7 +28,9 @@ const HOME_MAKES = 8;
 
 export default function HomePage() {
   const { token, user, ready, error } = useAuth();
+  const router = useRouter();
   const { t } = useI18n();
+  const [query, setQuery] = React.useState("");
   const [items, setItems] = React.useState<Listing[]>([]);
   const [recs, setRecs] = React.useState<Listing[]>([]);
   const [makes, setMakes] = React.useState<Make[]>([]);
@@ -72,6 +76,37 @@ export default function HomePage() {
         <p className="text-sm text-muted-foreground">{t("home.subtitle")}</p>
       </section>
 
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const term = query.trim();
+          router.push(term ? `/list?q=${encodeURIComponent(term)}` : "/list");
+        }}
+        className="relative"
+      >
+        <MagnifyingGlass
+          size={18}
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+        />
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t("list.searchPlaceholder")}
+          aria-label={t("list.search")}
+          maxLength={80}
+          enterKeyHint="search"
+          autoComplete="off"
+          className="pl-10 pr-12"
+        />
+        <button
+          type="submit"
+          aria-label={t("list.search")}
+          className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg bg-secondary text-muted-foreground transition hover:text-foreground"
+        >
+          <ArrowRight size={16} />
+        </button>
+      </form>
+
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
         {QUICK.map((quick) => (
           <Link
@@ -104,7 +139,7 @@ export default function HomePage() {
                   loading="lazy"
                   className="h-8 w-8 object-contain"
                 />
-                <span className="w-full truncate text-center text-[11px] font-medium">
+                <span className="line-clamp-2 min-h-[1.9em] w-full break-words text-center text-[10px] font-medium leading-tight">
                   {make.value}
                 </span>
                 <span className="text-[10px] text-muted-foreground">{num(make.count)}</span>

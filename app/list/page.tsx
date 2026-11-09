@@ -307,6 +307,7 @@ export default function ListPage() {
     ([key, value]) =>
       ![
         "sort",
+        "q",
         "lat",
         "lon",
         "make",
@@ -428,7 +429,7 @@ export default function ListPage() {
         >
           <span className="flex min-w-0 items-center gap-1.5">
             <SlidersHorizontal size={15} className="shrink-0" />
-            <span className="truncate">{t("filter.params")}</span>
+            <span className="truncate">{t("filter.paramsShort")}</span>
           </span>
           {advancedCount > 0 ? (
             <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
