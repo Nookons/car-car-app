@@ -92,6 +92,9 @@ export type ListingCard = Listing & {
   url: string;
   photos: string[];
   events: PriceEvent[];
+  status: "active" | "removed";
+  first_seen_at?: string | null;
+  last_seen_at?: string | null;
   seller: { type: string | null; name: string };
   color: string;
   vin: string;

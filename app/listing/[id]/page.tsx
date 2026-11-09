@@ -15,6 +15,7 @@ import {
   Star,
   TrendDown,
   User,
+  WarningCircle,
 } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
 import { PhotoGallery } from "@/components/photo-gallery";
@@ -375,6 +376,16 @@ export default function ListingPage() {
               </p>
             ) : null}
           </div>
+
+          {item.status === "removed" ? (
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+              <WarningCircle size={18} className="mt-0.5 shrink-0" />
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium">{t("listing.removedTitle")}</p>
+                <p className="text-xs opacity-90">{t("listing.removedHint")}</p>
+              </div>
+            </div>
+          ) : null}
 
           {keySpecs.length ? (
             <dl className="grid grid-cols-[100px_minmax(0,1fr)] gap-y-2.5 text-sm">
