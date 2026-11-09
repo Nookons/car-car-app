@@ -22,6 +22,7 @@
 | [`scripts/probe_otomoto.py`](scripts/probe_otomoto.py) | пробный сборщик otomoto: выдача и карточка, только стандартная библиотека |
 | [`scripts/latency_probe2.py`](scripts/latency_probe2.py) | замер задержки публикации: поллинг выдачи, распределение «createdAt → увидели» |
 | [`docs/PERF-collector.md`](docs/PERF-collector.md) | аудит производительности сборщика: замеры «до/после», находки, проверка |
+| [`docs/PERF-images.md`](docs/PERF-images.md) | фото: замеры «до/после» и ресайз на CDN площадки |
 
 ## Сборщик otomoto
 

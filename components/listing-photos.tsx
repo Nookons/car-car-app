@@ -3,6 +3,7 @@
 import * as React from "react";
 import { CarProfile } from "@phosphor-icons/react";
 import { SmartImage } from "@/components/smart-image";
+import { photoSize } from "@/lib/photos";
 import { cn } from "@/lib/utils";
 
 /**
@@ -81,7 +82,7 @@ export function ListingPhotos({
             )}
           >
             <SmartImage
-              src={src}
+              src={photoSize(src, 640, 480)}
               alt={title}
               priority={priority && position === 0}
               className="aspect-[16/9] w-full"

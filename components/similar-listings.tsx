@@ -6,6 +6,7 @@ import { ArrowRight } from "@phosphor-icons/react";
 import { SmartImage } from "@/components/smart-image";
 import { mileageShort, price } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
+import { photoSize } from "@/lib/photos";
 import type { Listing } from "@/lib/types";
 
 /**
@@ -42,7 +43,11 @@ export function SimilarListings({ items, allHref }: { items: Listing[]; allHref:
               className="w-44 shrink-0 snap-start overflow-hidden rounded-xl border bg-card shadow-sm transition hover:shadow-md"
             >
               {photo ? (
-                <SmartImage src={photo} alt={item.title} className="aspect-[4/3] w-full" />
+                <SmartImage
+                  src={photoSize(photo, 320, 240)}
+                  alt={item.title}
+                  className="aspect-[4/3] w-full"
+                />
               ) : (
                 <div className="aspect-[4/3] w-full bg-muted" aria-hidden />
               )}

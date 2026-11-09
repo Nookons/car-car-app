@@ -5,6 +5,7 @@ import { CaretLeft, CaretRight, X } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { SmartImage } from "@/components/smart-image";
 import { useI18n } from "@/lib/i18n";
+import { photoSize } from "@/lib/photos";
 
 export function PhotoGallery({ photos, title }: { photos: string[]; title: string }) {
   const { t } = useI18n();
@@ -30,7 +31,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
       const next = valid[(index + delta + count) % count];
       if (next) {
         const image = new window.Image();
-        image.src = next;
+        image.src = photoSize(next, 800, 600);
       }
     });
   }, [index, count, valid]);
@@ -67,7 +68,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
         aria-label={t("listing.openPhoto")}
       >
         <SmartImage
-          src={valid[index]}
+          src={photoSize(valid[index], 800, 600)}
           alt={title}
           priority
           className="aspect-[4/5] w-full md:aspect-[16/10]"
@@ -94,7 +95,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
                 )}
                 aria-label={`${position + 1}`}
               >
-                <SmartImage src={src} className="h-full w-full" />
+                <SmartImage src={photoSize(src, 160, 120)} className="h-full w-full" />
               </button>
             ))}
           </div>
