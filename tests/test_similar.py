@@ -61,3 +61,9 @@ def test_similar_limit_is_bounded(monkeypatch):
 
     assert client.get("/api/listings/1/similar?limit=0").status_code == 422
     assert client.get("/api/listings/1/similar?limit=13").status_code == 422
+
+
+def test_long_search_query_is_rejected(monkeypatch):
+    client = make_client(monkeypatch, FakeRepo())
+
+    assert client.get("/api/listings?q=" + "x" * 81).status_code == 422

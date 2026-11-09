@@ -318,7 +318,7 @@ def create_app(
         request: Request,
         limit: int = Query(default=20, ge=1, le=50),
         offset: int = Query(default=0, ge=0, le=10_000),
-        q: str | None = None,
+        q: str | None = Query(default=None, max_length=80),
         make: str | None = None,
         model: str | None = None,
         price_min: int | None = Query(default=None, ge=0),

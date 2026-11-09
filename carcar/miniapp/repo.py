@@ -497,8 +497,14 @@ class MiniAppRepo:
         params: dict[str, Any] = {"limit": limit, "offset": offset, "radius": None}
 
         if q:
-            conds.append("(l.title ILIKE %(q)s OR l.make ILIKE %(q)s OR l.model ILIKE %(q)s)")
-            params["q"] = f"%{q}%"
+            # Пользовательский % и _ — это символы, а не маски LIKE.
+            term = q.replace("!", "!!").replace("%", "!%").replace("_", "!_")
+            conds.append(
+                "(l.title ILIKE %(q)s ESCAPE '!' "
+                "OR l.make ILIKE %(q)s ESCAPE '!' "
+                "OR l.model ILIKE %(q)s ESCAPE '!')"
+            )
+            params["q"] = f"%{term}%"
         if make:
             # Значение приходит из выпадающего списка — сравниваем точно, индекс работает.
             conds.append("l.make = %(make)s")

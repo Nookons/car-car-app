@@ -1,12 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { ArrowsDownUp, CaretDown, MapPin, SlidersHorizontal, X } from "@phosphor-icons/react";
+import {
+  ArrowsDownUp,
+  CaretDown,
+  MagnifyingGlass,
+  MapPin,
+  SlidersHorizontal,
+  X,
+} from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
 import { FilterDialog } from "@/components/filter-dialog";
 import { ListingRow } from "@/components/listing-row";
 import { RangeDialog } from "@/components/range-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { cacheGet, cacheSet } from "@/lib/cache";
@@ -128,6 +136,7 @@ export default function ListPage() {
   const { token, ready } = useAuth();
   const { t, lang } = useI18n();
   const [filters, setFilters] = React.useState<Filters>({});
+  const [query, setQuery] = React.useState("");
   const [items, setItems] = React.useState<Listing[]>([]);
   const [total, setTotal] = React.useState(0);
   const [approx, setApprox] = React.useState(false);
@@ -140,8 +149,13 @@ export default function ListPage() {
   const seq = React.useRef(0);
   const abortRef = React.useRef<AbortController | null>(null);
   const started = React.useRef(false);
+  const applyRef = React.useRef<(next: Filters) => void>(() => {});
   const stateRef = React.useRef({ filters, items, total, approx });
   stateRef.current = { filters, items, total, approx };
+
+  React.useEffect(() => {
+    setQuery(filters.q ?? "");
+  }, [filters.q]);
 
   const fetchPage = React.useCallback(
     async (next: Filters, offset = 0, background = false) => {
@@ -264,6 +278,19 @@ export default function ListPage() {
     [fetchPage],
   );
 
+  applyRef.current = apply;
+
+  // Текст ищем с паузой: не дёргаем API на каждую букву.
+  React.useEffect(() => {
+    if (!started.current) return;
+    const next = query.trim();
+    if ((stateRef.current.filters.q ?? "") === next) return;
+    const timer = window.setTimeout(() => {
+      applyRef.current({ ...stateRef.current.filters, q: next || undefined });
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
   const changeSort = (sort: Filters["sort"]) => {
     const next = { ...filters, sort };
     setFilters(next);
@@ -321,6 +348,41 @@ export default function ListPage() {
   return (
     <div className="mx-auto w-full max-w-2xl space-y-3">
       <h1 className="px-1 text-xl font-semibold tracking-tight">{t("list.title")}</h1>
+
+      <div className="relative px-1">
+        <MagnifyingGlass
+          size={18}
+          className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+        />
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            apply({ ...filters, q: query.trim() || undefined });
+          }}
+          placeholder={t("list.searchPlaceholder")}
+          aria-label={t("list.search")}
+          maxLength={80}
+          enterKeyHint="search"
+          autoComplete="off"
+          className="pl-11 pr-10"
+        />
+        {query ? (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              apply({ ...filters, q: undefined });
+            }}
+            aria-label={t("list.clear")}
+            className="absolute right-3 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:bg-secondary"
+          >
+            <X size={15} />
+          </button>
+        ) : null}
+      </div>
 
       {chips.length > 0 ? (
         <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
