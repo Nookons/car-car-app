@@ -161,5 +161,6 @@ export type Filters = {
   lat?: number;
   lon?: number;
   radius_km?: number;
-  sort?: "new" | "price_asc" | "price_desc" | "distance";
+  published_days?: number;
+  sort?: "new" | "price_asc" | "price_desc" | "distance" | "year_desc" | "mileage_asc";
 };

@@ -102,7 +102,9 @@ POST /api/auth              {init_data} → {token, user}
 GET  /api/me                профиль
 PATCH /api/me               {lang?, notify_new?, notify_price?, digest?}
 GET  /api/listings          limit, offset, q, make, price_min/max, year_min/max,
-                            mileage_max, fuel, gearbox, source, lat, lon, radius_km, sort
+                            mileage_max, fuel, gearbox, source, published_days,
+                            lat, lon, radius_km; sort: new|price_asc|price_desc|
+                            distance|year_desc|mileage_asc
 GET  /api/listings/{id}     карточка
 GET  /api/listings/{id}/similar  похожие (limit 1..12, кэш 10 мин)
 GET/POST /api/subscriptions

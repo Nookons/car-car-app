@@ -340,10 +340,14 @@ def create_app(
         engine_min: int | None = None,
         engine_max: int | None = None,
         source: str | None = None,
+        published_days: int | None = Query(default=None, ge=1, le=90),
         lat: float | None = None,
         lon: float | None = None,
         radius_km: float | None = Query(default=None, ge=0, le=1000),
-        sort: str = Query(default="new", pattern="^(new|price_asc|price_desc|distance)$"),
+        sort: str = Query(
+            default="new",
+            pattern="^(new|price_asc|price_desc|distance|year_desc|mileage_asc)$",
+        ),
     ) -> dict:
         key = f"list:{request.url.query}"
         cached = cache.get(key)
@@ -375,6 +379,7 @@ def create_app(
             engine_min=engine_min,
             engine_max=engine_max,
             source=source,
+            published_days=published_days,
             lat=lat,
             lon=lon,
             radius_km=radius_km,

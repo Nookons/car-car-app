@@ -18,6 +18,11 @@ import type { Filters, Listing } from "@/lib/types";
 
 const CACHE_KEY = "list";
 const RADII = [25, 50, 100, 200];
+const FRESH = [
+  { days: 1, key: "fresh.24" },
+  { days: 3, key: "fresh.3" },
+  { days: 7, key: "fresh.7" },
+] as const;
 
 const TEXT_KEYS = new Set([
   "q",
@@ -49,6 +54,7 @@ const NUMBER_KEYS = new Set([
   "lat",
   "lon",
   "radius_km",
+  "published_days",
 ]);
 
 type CachedList = {
@@ -282,6 +288,7 @@ export default function ListPage() {
         "price_max",
         "year_min",
         "year_max",
+        "published_days",
       ].includes(key) &&
       value !== undefined &&
       value !== null &&
@@ -410,6 +417,29 @@ export default function ListPage() {
         </div>
       ) : null}
 
+      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+        {FRESH.map((item) => {
+          const active = filters.published_days === item.days;
+          return (
+            <button
+              key={item.days}
+              type="button"
+              aria-pressed={active}
+              onClick={() =>
+                apply({ ...filters, published_days: active ? undefined : item.days })
+              }
+              className={`shrink-0 rounded-xl border px-4 py-2 text-xs font-medium transition ${
+                active
+                  ? "border-foreground/30 bg-secondary text-foreground"
+                  : "bg-card text-muted-foreground hover:bg-secondary/60"
+              }`}
+            >
+              {t(item.key)}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="flex items-center justify-between gap-3 px-1">
         <p className="text-sm text-muted-foreground">
           {loading && total === 0 ? t("filter.counting") : resultsLabel(t, lang, total, approx)}
@@ -428,6 +458,8 @@ export default function ListPage() {
             <option value="distance" disabled={!near}>
               {t("sort.distance")}
             </option>
+            <option value="year_desc">{t("sort.year_desc")}</option>
+            <option value="mileage_asc">{t("sort.mileage_asc")}</option>
           </select>
         </label>
       </div>

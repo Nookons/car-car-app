@@ -92,6 +92,18 @@ export function activeFilterChips(filters: Filters, t: (key: Key) => string): Fi
     ["power_min", "power_max"],
   );
 
+  if (filters.published_days) {
+    const label =
+      filters.published_days === 1
+        ? t("fresh.24")
+        : filters.published_days === 3
+          ? t("fresh.3")
+          : filters.published_days === 7
+            ? t("fresh.7")
+            : t("fresh.days").replace("{days}", String(filters.published_days));
+    add("fresh", label, ["published_days"]);
+  }
+
   add("fuel", labelFor(t, "fuel", filters.fuel), ["fuel"]);
   add("gearbox", labelFor(t, "gearbox", filters.gearbox), ["gearbox"]);
   add("body", labelFor(t, "body", filters.body), ["body"]);

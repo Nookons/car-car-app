@@ -410,6 +410,7 @@ class MiniAppRepo:
         engine_min: int | None = None,
         engine_max: int | None = None,
         source: str | None = None,
+        published_days: int | None = None,
         lat: float | None = None,
         lon: float | None = None,
         radius_km: float | None = None,
@@ -498,6 +499,11 @@ class MiniAppRepo:
                 "where s2.id = l.source_id and s2.code = %(source)s)"
             )
             params["source"] = source
+        if published_days:
+            conds.append(
+                "l.published_at >= now() - make_interval(days => %(published_days)s)"
+            )
+            params["published_days"] = published_days
 
         distance = "null::float8"
         if lat is not None and lon is not None:
@@ -523,6 +529,8 @@ class MiniAppRepo:
             "price_asc": "price asc",
             "price_desc": "price desc",
             "distance": "distance_km nulls last",
+            "year_desc": "year desc nulls last, published_at desc",
+            "mileage_asc": "mileage_km asc nulls last, published_at desc",
         }.get(sort, "published_at desc")
 
         where = " and ".join(conds)
