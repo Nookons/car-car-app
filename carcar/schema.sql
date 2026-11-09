@@ -114,6 +114,30 @@ create index if not exists listing_needs_details_idx
     on listing (first_seen_at) where details_fetched_at is null and status = 'active';
 
 -- ---------------------------------------------------------------------------
+-- Предрасчитанная статистика рынка для лент и фильтров.
+-- Пересобирается из активных объявлений: carcar refresh-market или
+-- автоматически раз в 6 часов в watch (см. DatabaseSink.refresh_market).
+-- ---------------------------------------------------------------------------
+
+create table if not exists model_option (
+    make         text not null,
+    model        text not null,
+    gearbox      text not null default '',
+    fuel         text not null default '',
+    body         text not null default '',
+    listings     integer not null default 0,
+    year_min     integer,
+    year_max     integer,
+    price_p10    integer,
+    price_median integer,
+    price_p90    integer,
+    updated_at   timestamptz not null default now(),
+    primary key (make, model, gearbox, fuel, body)
+);
+
+create index if not exists model_option_make_idx on model_option (make, model);
+
+-- ---------------------------------------------------------------------------
 -- История: только изменения, а не каждый опрос
 -- ---------------------------------------------------------------------------
 

@@ -58,6 +58,27 @@ update listing set
 where source_id = %s and external_id = %s
 """
 
+MARKET_SQL = """
+insert into model_option (
+    make, model, gearbox, fuel, body, listings,
+    year_min, year_max, price_p10, price_median, price_p90, updated_at
+)
+select
+    make, model,
+    coalesce(gearbox, ''), coalesce(fuel, ''), coalesce(body, ''),
+    count(*)::int, min(year), max(year),
+    (percentile_disc(0.1) within group (order by price))::int,
+    (percentile_disc(0.5) within group (order by price))::int,
+    (percentile_disc(0.9) within group (order by price))::int,
+    now()
+from listing
+where status = 'active'
+  and price is not null and price > 0
+  and make is not null and make <> ''
+  and model is not null and model <> ''
+group by 1, 2, 3, 4, 5
+"""
+
 COLUMNS = (
     "url", "title", "price", "currency",
     "make", "model", "year", "mileage_km",
@@ -495,6 +516,47 @@ class DatabaseSink:
         if bad:
             log.warning("отбраковано при построчной записи: %d", bad)
         return result
+
+    @resilient
+    def refresh_market(self, min_age_minutes: int = 360) -> bool:
+        """Пересобирает модель рынка из активных объявлений.
+
+        Таблица маленькая (единицы тысяч строк), поэтому честный delete+insert
+        в одной транзакции: читатели видят либо старую, либо новую версию.
+        Advisory lock не даёт трём шардам считать её одновременно.
+        """
+        with self.conn.transaction(), self.conn.cursor() as cur:
+            cur.execute(
+                "select coalesce("
+                "max(updated_at) < now() - make_interval(mins => %s), true"
+                ") as stale from model_option",
+                (min_age_minutes,),
+            )
+            if not cur.fetchone()[0]:
+                return False
+            # Защита от пустой/чужой базы: не затираем статистику нулём.
+            cur.execute("select count(*) from listing where status = 'active'")
+            if int(cur.fetchone()[0]) < 100:
+                return False
+
+        with self.conn.transaction(), self.conn.cursor() as cur:
+            cur.execute("select pg_try_advisory_lock(hashtext('carcar_market_refresh'))")
+            if not cur.fetchone()[0]:
+                return False
+        try:
+            with self.conn.transaction(), self.conn.cursor() as cur:
+                cur.execute("delete from model_option")
+                cur.execute(MARKET_SQL)
+            return True
+        finally:
+            with (
+                contextlib.suppress(Exception),
+                self.conn.transaction(),
+                self.conn.cursor() as cur,
+            ):
+                cur.execute(
+                    "select pg_advisory_unlock(hashtext('carcar_market_refresh'))"
+                )
 
     # -- состояние коллектора (Railway: у каждого свой контейнер) ----------
     @resilient

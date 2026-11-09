@@ -516,6 +516,15 @@ def watch(
             print("пауза снята — продолжаю")
             paused_logged = False
 
+        # Раз в 6 часов обновляем медианы рынка: без этого лента и фильтры
+        # показывают цифры с момента первого расчёта.
+        if sink is not None:
+            try:
+                if sink.refresh_market():
+                    print("  рынок: медианы пересчитаны")
+            except Exception as exc:  # noqa: BLE001
+                log.warning("рынок не пересчитался: %s", exc)
+
         round_started = time.monotonic()
         rounds += 1
         print(f"[{datetime.now().strftime('%H:%M:%S')}] опрос #{rounds}")

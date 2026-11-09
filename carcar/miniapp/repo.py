@@ -272,12 +272,13 @@ class MiniAppRepo:
     def _market_analyses(
         self, rows: list[dict[str, Any]]
     ) -> dict[int, dict[str, Any]]:
-        """Быстрая оценка рынка из предрасчитанного model_option.
+        """Оценка рынка для ленты тем же взвешенным моделью, что и карточка.
 
-        Точный percentile по всей таблице считается только в карточке
-        объявления. Для ленты 20 таких запросов слишком дорогие, поэтому
-        берём медиану/перцентили из model_option (те же модели и годы)
-        и взвешиваем по числу объявлений в группах. Это ~0.06 c на 20 машин.
+        Раньше лента брала медиану из model_option по всем годам модели —
+        «новый BMW выше рынка» из-за сравнения с 2005-м, а вердикт расходился
+        с отчётом на карточке. Здесь одним запросом собираем до 60 похожих
+        на каждую карточку и считаем analyse_price; 20 машин — около 0.25 c,
+        а выдача всё равно кэшируется на 2 минуты.
         """
         ids = [
             row["id"]
@@ -287,51 +288,97 @@ class MiniAppRepo:
         if not ids:
             return {}
 
+        subject_fields = """
+            l.id, l.make, l.model, l.title, l.price, l.year, l.mileage_km,
+            l.engine_cm3, l.power_hp, l.body, l.gearbox, l.drive, l.fuel,
+            l.color, l.generation, l.equipment
+        """
+        comp_fields = """
+            c.id, c.title, c.price, c.year, c.mileage_km, c.engine_cm3,
+            c.power_hp, c.body, c.gearbox, c.drive, c.fuel, c.color,
+            c.generation, c.equipment
+        """
+        near = f"""
+            with page as (
+                select {subject_fields}
+                from listing l where l.id = any(%(ids)s::bigint[])
+            ),
+            comps as (
+                select p.id as subject_id, {comp_fields},
+                       row_number() over (
+                         partition by p.id
+                         order by abs(c.year - p.year) nulls last,
+                                  abs(c.mileage_km - p.mileage_km) nulls last
+                       ) as rn
+                from page p
+                join listing c
+                  on c.make = p.make and c.model = p.model
+                 and c.status = 'active' and c.price is not null
+                 and c.id <> p.id
+                 and (p.year is null or c.year between p.year - 6 and p.year + 6)
+                 and (
+                   p.mileage_km is null
+                   or c.mileage_km between p.mileage_km * 0.4 and p.mileage_km * 1.8
+                 )
+            )
+            select * from comps where rn <= 60
+        """
+        broad = f"""
+            with page as (
+                select {subject_fields}
+                from listing l where l.id = any(%(ids)s::bigint[])
+            ),
+            comps as (
+                select p.id as subject_id, {comp_fields},
+                       row_number() over (
+                         partition by p.id
+                         order by abs(c.price - p.price) nulls last
+                       ) as rn
+                from page p
+                join listing c
+                  on c.make = p.make and c.model = p.model
+                 and c.status = 'active' and c.price is not null
+                 and c.id <> p.id
+            )
+            select * from comps where rn <= 60
+        """
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
-                """
-                with page as (
-                    select id, make, model, year, gearbox, fuel, body
-                    from listing
-                    where id = any(%(ids)s::bigint[])
-                )
-                select p.id,
-                       sum(o.price_median * o.listings)::numeric
-                           / nullif(sum(o.listings), 0) as median,
-                       sum(o.price_p10 * o.listings)::numeric
-                           / nullif(sum(o.listings), 0) as p10,
-                       sum(o.price_p90 * o.listings)::numeric
-                           / nullif(sum(o.listings), 0) as p90,
-                       sum(o.listings) as sample
-                from page p
-                join model_option o
-                  on o.make = p.make
-                 and o.model = p.model
-                 and (p.year is null or p.year between o.year_min and o.year_max)
-                 and (p.gearbox is null or o.gearbox = p.gearbox)
-                 and (p.fuel is null or o.fuel = p.fuel)
-                 and (p.body is null or o.body = p.body or o.body = '')
-                group by p.id
-                """,
+                f"select {subject_fields} from listing l "
+                "where l.id = any(%(ids)s::bigint[])",
                 {"ids": ids},
             )
-            stats = cur.fetchall()
-        prices = {row["id"]: row["price"] for row in rows}
+            subjects = {row["id"]: dict(row) for row in cur.fetchall()}
+            cur.execute(near, {"ids": ids})
+            grouped: dict[int, list[dict[str, Any]]] = {}
+            for row in cur.fetchall():
+                grouped.setdefault(row.pop("subject_id"), []).append(dict(row))
+            thin = [item_id for item_id in ids if len(grouped.get(item_id, [])) < 8]
+            if thin:
+                cur.execute(broad, {"ids": thin})
+                # Карточка при недоборе заменяет выборку, а не копит её.
+                fresh: dict[int, list[dict[str, Any]]] = {}
+                for row in cur.fetchall():
+                    fresh.setdefault(row.pop("subject_id"), []).append(dict(row))
+                grouped.update(fresh)
+
         result: dict[int, dict[str, Any]] = {}
-        for stat in stats:
-            median = _num(stat["median"])
-            sample = int(stat["sample"] or 0)
-            price = prices.get(stat["id"])
-            if not median or sample < 5 or price is None:
+        for item_id in ids:
+            subject = subjects.get(item_id)
+            if not subject:
                 continue
-            diff = round((price - median) / median * 100)
-            result[stat["id"]] = {
-                "median": median,
-                "p10": _num(stat["p10"]),
-                "p90": _num(stat["p90"]),
-                "sample": sample,
-                "diff_pct": diff,
-                "verdict": "below" if diff <= -5 else ("above" if diff >= 5 else "fair"),
+            analysis = analyse_price(
+                _infer_subject_features(subject), grouped.get(item_id, [])
+            )
+            if not analysis:
+                continue
+            result[item_id] = {
+                "median": analysis["median"],
+                "p10": analysis["p10"],
+                "p90": analysis["p90"],
+                "sample": analysis["sample"],
+                "diff_pct": analysis["diff_pct"],
+                "verdict": analysis["verdict"],
             }
         return result
 

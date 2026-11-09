@@ -23,6 +23,7 @@
 | [`scripts/latency_probe2.py`](scripts/latency_probe2.py) | замер задержки публикации: поллинг выдачи, распределение «createdAt → увидели» |
 | [`docs/PERF-collector.md`](docs/PERF-collector.md) | аудит производительности сборщика: замеры «до/после», находки, проверка |
 | [`docs/PERF-images.md`](docs/PERF-images.md) | фото: замеры «до/после» и ресайз на CDN площадки |
+| [`docs/PERF-market.md`](docs/PERF-market.md) | рынок: почему `model_option` устарел и как лента считает оценку |
 
 ## Сборщик otomoto
 
@@ -33,6 +34,7 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"   # один раз, 
 .venv/bin/python -m carcar watch --minutes 30      # цикл опроса (как в проде)
 .venv/bin/python -m carcar detail --id 6151080882  # одна карточка
 .venv/bin/python -m carcar stats                   # что уже лежит на диске
+.venv/bin/python -m carcar refresh-market          # медианы рынка для ленты и фильтров
 ```
 
 Что делает и почему так:
@@ -74,6 +76,8 @@ data/
 - `sweep` идёт по страницам выдачи, прогресс пишет в `data/state/sweep.json`
   и продолжает с того же места после перезапуска. Полный рынок — ~8 048 страниц.
 - `enrich` догружает карточки тем, у кого их нет; приоритет — свежие объявления.
+- `refresh-market` пересобирает `model_option` из активных объявлений; в режиме
+  `watch` это происходит само раз в 6 часов (advisory lock — считает только один шард).
 - `404/410` от площадки → объявление помечается `removed` и уходит из очереди,
   а не качается бесконечно.
 - Одна битая строка больше не роняет пачку: при ошибке батч переписывается

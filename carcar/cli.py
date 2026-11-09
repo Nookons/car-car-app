@@ -106,6 +106,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_stats.add_argument("--data", type=Path, default=Path("data"))
     p_stats.add_argument("--file", action="store_true", help="смотреть папку, а не базу")
 
+    p_market = sub.add_parser(
+        "refresh-market", help="пересчитать медианы рынка (model_option)"
+    )
+    p_market.add_argument(
+        "--min-age",
+        type=int,
+        default=0,
+        help="не пересчитывать, если обновляли N минут назад",
+    )
+
     p_sweep = sub.add_parser("sweep", help="полный обход рынка (история, проверка снятых)")
     _add_common(p_sweep)
     p_sweep.add_argument("--from-page", type=int, default=0, help="продолжить с сохранённого места")
@@ -195,6 +205,19 @@ def main(argv: list[str] | None = None) -> int:
             finally:
                 sink.close()
         print(json.dumps(payload, ensure_ascii=False, indent=1))
+        return 0
+
+    if args.command == "refresh-market":
+        url = database_url()
+        if not url:
+            print("нужен DATABASE_URL", file=sys.stderr)
+            return 2
+        sink = DatabaseSink(url)
+        try:
+            changed = sink.refresh_market(min_age_minutes=args.min_age)
+        finally:
+            sink.close()
+        print("рынок пересчитан" if changed else "данные свежие — пропуск")
         return 0
 
     if args.command == "purge":
