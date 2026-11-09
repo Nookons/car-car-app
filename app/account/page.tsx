@@ -2,10 +2,10 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Bell, BellSlash, Trash, Eye, TrendDown } from "@phosphor-icons/react";
+import { Bell, BellSlash, Trash, Eye, TelegramLogo, TrendDown } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
 import { ListingRow } from "@/components/listing-row";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { api } from "@/lib/api";
 import { loadFilters, saveFilters } from "@/lib/filters";
 import { LANGS, labelFor, useI18n, type Key } from "@/lib/i18n";
 import { filtersSummary } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { Filters, Listing, Subscription, User } from "@/lib/types";
 
 export default function AccountPage() {
@@ -28,7 +29,6 @@ export default function AccountPage() {
   const [saving, setSaving] = React.useState(false);
   const [nameOpen, setNameOpen] = React.useState(false);
   const [name, setName] = React.useState("");
-  const [signupOpen, setSignupOpen] = React.useState(false);
 
   const load = React.useCallback(async () => {
     if (!token) return;
@@ -105,13 +105,16 @@ export default function AccountPage() {
         <Card className="space-y-4 p-6 text-center">
           <ThemeSwitch />
           <p className="text-sm text-muted-foreground">{t("account.guestHint")}</p>
-          <Button className="w-full" onClick={() => setSignupOpen(true)}>
-            {t("account.create")}
-          </Button>
+          <a
+            href={`https://t.me/${(process.env.NEXT_PUBLIC_TELEGRAM_BOT || "CarCarFinderBot").replace(/^@/, "")}?startapp`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(buttonVariants(), "w-full")}
+          >
+            <TelegramLogo size={18} />
+            {t("account.openTelegram")}
+          </a>
         </Card>
-        <Dialog open={signupOpen} onClose={() => setSignupOpen(false)} title={t("account.create")}>
-          <p className="text-sm text-muted-foreground">{t("account.comingSoon")}</p>
-        </Dialog>
       </div>
     );
   }

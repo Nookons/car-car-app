@@ -267,9 +267,8 @@ const ru = {
   "filter.engineToL": "до, л",
   "common.from": "от",
   "common.retry": "Повторить",
-  "account.guestHint": "Вы смотрите CarCar без аккаунта. Сохранение фильтров, избранное и уведомления появятся после регистрации.",
-  "account.create": "Создать аккаунт",
-  "account.comingSoon": "Регистрация скоро появится — пока можно пользоваться поиском и лентой.",
+  "account.guestHint": "Аккаунт создаётся в Telegram автоматически. Откройте CarCar в боте — там сохраняются фильтры, избранное и уведомления.",
+  "account.openTelegram": "Открыть в Telegram",
 
 
 
@@ -562,9 +561,8 @@ const pl: Record<Key, string> = {
   "filter.engineToL": "do, l",
   "common.from": "od",
   "common.retry": "Spróbuj ponownie",
-  "account.guestHint": "Przeglądasz CarCar bez konta. Zapisane filtry, ulubione i powiadomienia będą po rejestracji.",
-  "account.create": "Utwórz konto",
-  "account.comingSoon": "Rejestracja wkrótce — na razie korzystaj z wyszukiwania i feedu.",
+  "account.guestHint": "Konto tworzy się automatycznie w Telegramie. Otwórz CarCar w bocie — tam zapisują się filtry, ulubione i powiadomienia.",
+  "account.openTelegram": "Otwórz w Telegramie",
 
 
 
@@ -855,9 +853,8 @@ const en: Record<Key, string> = {
   "filter.engineToL": "to, l",
   "common.from": "from",
   "common.retry": "Retry",
-  "account.guestHint": "You are browsing CarCar without an account. Saved filters, favorites and alerts come after sign-up.",
-  "account.create": "Create account",
-  "account.comingSoon": "Sign-up is coming soon — for now search and feed are fully available.",
+  "account.guestHint": "Your account is created automatically in Telegram. Open CarCar in the bot to keep filters, favorites and alerts.",
+  "account.openTelegram": "Open in Telegram",
 
 
 
@@ -1149,9 +1146,8 @@ const uk: Record<Key, string> = {
   "filter.engineToL": "до, л",
   "common.from": "від",
   "common.retry": "Повторити",
-  "account.guestHint": "Ви переглядаєте CarCar без акаунта. Збережені фільтри, обране й сповіщення з’являться після реєстрації.",
-  "account.create": "Створити акаунт",
-  "account.comingSoon": "Реєстрація скоро з’явиться — поки доступні пошук і стрічка.",
+  "account.guestHint": "Акаунт створюється в Telegram автоматично. Відкрийте CarCar у боті — там зберігаються фільтри, обране й сповіщення.",
+  "account.openTelegram": "Відкрити в Telegram",
 
 
 

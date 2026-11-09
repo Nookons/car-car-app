@@ -23,7 +23,8 @@ Next.js на Vercel ──► FastAPI (Railway) ──► Supabase Postgres
 
 Скриншоты: `docs/img/mini-*.png`, а также новые состояния —
 `docs/img/home-search.png`, `docs/img/list-search.png`,
-`docs/img/card-price-history.png`.
+`docs/img/card-price-history.png`, гостевой аккаунт —
+`docs/img/guest-account-telegram.png`.
 
 ## Авторизация
 
@@ -41,6 +42,7 @@ Next.js на Vercel ──► FastAPI (Railway) ──► Supabase Postgres
 | Переменная | Значение |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | `https://<api>.up.railway.app` |
+| `NEXT_PUBLIC_TELEGRAM_BOT` | `CarCarFinderBot` — username бота для гостевой кнопки «Открыть в Telegram» |
 
 Root Directory на Vercel — корень репозитория (Next.js лежит в корне, рядом с Python-бэкендом). Framework — Next.js.
 
