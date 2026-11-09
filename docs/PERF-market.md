@@ -54,5 +54,5 @@ curl -s 'http://127.0.0.1:8080/api/filters/options?make=BMW'   # listings = ак
 curl -s 'http://127.0.0.1:8080/api/listings?limit=10&sort=new' # price_analysis
 ```
 
-Проверено: `pytest` 94 теста, `tsc --noEmit`, `ruff check`; живая база после
+Проверено: `pytest` 97 тестов, `tsc --noEmit`, `ruff check`; живая база после
 пересборки; вердикты ленты и карточки совпали 10/10 на выборке.

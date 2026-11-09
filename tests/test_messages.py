@@ -1,4 +1,4 @@
-from carcar.messages import caption, messages, price_drop_caption
+from carcar.messages import caption, grid_caption, messages, price_drop_caption
 
 ITEM = {
     "title": "BMW Seria 5",
@@ -61,3 +61,29 @@ def test_price_drop_caption_keeps_tiny_drop_visible():
 def test_price_drop_caption_escapes_title():
     text = price_drop_caption({**ITEM, "title": "Audi <A4>"}, 13000, 11900, "en")
     assert "&lt;A4&gt;" in text
+
+
+def test_grid_caption_shows_market_below():
+    text = grid_caption(
+        ITEM,
+        "ru",
+        {"sample": 20, "median": 12000, "diff_pct": -8, "verdict": "below"},
+    )
+    assert "ниже рынка на 8%" in text
+    assert "медиана 12 000 zł" in text
+
+
+def test_grid_caption_market_localized_and_fair():
+    assert "below market by 8%" in grid_caption(
+        ITEM, "en", {"sample": 20, "median": 12000, "diff_pct": -8, "verdict": "below"}
+    )
+    assert "в рынке" in grid_caption(
+        ITEM, "ru", {"sample": 20, "median": 12000, "diff_pct": 1, "verdict": "fair"}
+    )
+
+
+def test_grid_caption_skips_tiny_sample():
+    text = grid_caption(
+        ITEM, "ru", {"sample": 4, "median": 12000, "diff_pct": -8, "verdict": "below"}
+    )
+    assert "рынка" not in text

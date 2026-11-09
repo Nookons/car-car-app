@@ -40,5 +40,5 @@ curl -s http://127.0.0.1:8080/api/listings/240629 > /tmp/card.json
 # для каждого фото: curl -o /dev/null -w '%{size_download}\n' "<url>;s=160x120"
 ```
 
-Проверено: `tsc --noEmit` без ошибок, `pytest` 80 тестов, размеры вариантов
+Проверено: `tsc --noEmit` без ошибок, `pytest` 97 тестов, размеры вариантов
 подтверждены HTTP-запросами (200, `image/jpeg`, 160×120 / 800×600).

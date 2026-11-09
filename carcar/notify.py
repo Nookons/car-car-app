@@ -19,6 +19,7 @@ from psycopg.rows import dict_row
 
 from .messages import digest, grid_caption, price_drop_caption
 from .messages import messages as msg
+from .miniapp.price_model import analyse_price
 
 log = logging.getLogger("carcar.notify")
 
@@ -172,6 +173,7 @@ class Notifier:
                        l.fuel, l.gearbox, l.body, l.thumb_url, l.url,
                        l.engine_cm3, l.power_hp, l.drive, l.color, l.doors, l.seats,
                        l.condition, l.co2_gkm, l.consumption_urban, l.consumption_extra,
+                       l.generation, l.equipment,
                        l.seller_name, l.seller_type,
                        s.code as source_code
                 from listing l join source s on s.id = l.source_id
@@ -180,6 +182,41 @@ class Notifier:
                 (source, str(external_id)),
             )
             return cur.fetchone()
+
+    def market(self, conn: psycopg.Connection, item: dict[str, Any]) -> dict[str, Any] | None:
+        """Оценка рынка для уведомления — та же модель, что в карточке."""
+        if not item.get("price") or not item.get("make") or not item.get("model"):
+            return None
+        fields = (
+            "id, title, price, year, mileage_km, engine_cm3, power_hp, body, "
+            "gearbox, drive, fuel, color, generation, equipment"
+        )
+        base = (
+            "status = 'active' and price is not null "
+            "and make = %s and model = %s and id <> %s"
+        )
+        base_params = [item["make"], item["model"], item["id"]]
+        conds = [base]
+        params = list(base_params)
+        if item.get("year"):
+            conds.append("year between %s and %s")
+            params += [int(item["year"]) - 6, int(item["year"]) + 6]
+        if item.get("mileage_km"):
+            conds.append("mileage_km between %s and %s")
+            params += [int(item["mileage_km"] * 0.4), int(item["mileage_km"] * 1.8)]
+        with conn.cursor() as cur:
+            cur.execute(
+                f"select {fields} from listing where {' and '.join(conds)} limit 60",
+                params,
+            )
+            comps = [dict(row) for row in cur.fetchall()]
+            if len(comps) < 8:
+                cur.execute(
+                    f"select {fields} from listing where {base} limit 60",
+                    base_params,
+                )
+                comps = [dict(row) for row in cur.fetchall()]
+        return analyse_price(item, comps)
 
     def subscriptions(self, conn: psycopg.Connection) -> list[dict[str, Any]]:
         with conn.cursor() as cur:
@@ -319,11 +356,15 @@ class Notifier:
         return True, int(message_id) if message_id else None, None
 
     def send(
-        self, chat_id: int, item: dict[str, Any], lang: str | None = "ru"
+        self,
+        chat_id: int,
+        item: dict[str, Any],
+        lang: str | None = "ru",
+        market: dict[str, Any] | None = None,
     ) -> tuple[bool, int | None, str | None]:
         url = f"{self.public_url}/listing/{item['id']}"
         text = msg(lang)
-        caption = grid_caption(item, lang)
+        caption = grid_caption(item, lang, market)
         keyboard = {
             "inline_keyboard": [
                 [{"text": text["open_app"], "web_app": {"url": url}}],
@@ -618,6 +659,7 @@ class Notifier:
             item = self.listing(conn, event.get("source", "otomoto"), event["external_id"])
             if not item:
                 return 0
+            market = self.market(conn, item)
             sent = 0
             for sub in self.subscriptions(conn):
                 if not matches(sub["criteria"] or {}, item):
@@ -632,7 +674,9 @@ class Notifier:
                     self.hold(conn, sub["user_id"], item["id"])
                     continue
                 try:
-                    ok, message_id, error = self.send(sub["tg_id"], item, sub.get("lang"))
+                    ok, message_id, error = self.send(
+                        sub["tg_id"], item, sub.get("lang"), market
+                    )
                 except Exception as exc:  # noqa: BLE001
                     ok, message_id, error = False, None, str(exc)
                 if ok:

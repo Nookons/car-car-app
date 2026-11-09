@@ -25,6 +25,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "my_filters": "Мои фильтры",
         "my_favorites": "Избранное",
         "price_drop": "Цена снизилась",
+        "market_below": "ниже рынка на {pct}%",
+        "market_above": "выше рынка на {pct}%",
+        "market_fair": "в рынке",
+        "market_median": "медиана",
         "km": "км",
     "digest_title": "Новые объявления по вашим фильтрам",
     "digest_more": "и ещё {count} — открой приложение",
@@ -45,6 +49,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "my_filters": "Moje filtry",
         "my_favorites": "Ulubione",
         "price_drop": "Cena spadła",
+        "market_below": "poniżej rynku o {pct}%",
+        "market_above": "powyżej rynku o {pct}%",
+        "market_fair": "w rynku",
+        "market_median": "mediana",
         "km": "km",
     "digest_title": "Nowe ogłoszenia według Twoich filtrów",
     "digest_more": "i jeszcze {count} — otwórz aplikację",
@@ -65,6 +73,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "my_filters": "My filters",
         "my_favorites": "Favorites",
         "price_drop": "Price drop",
+        "market_below": "below market by {pct}%",
+        "market_above": "above market by {pct}%",
+        "market_fair": "at market",
+        "market_median": "median",
         "km": "km",
     "digest_title": "New listings matching your filters",
     "digest_more": "{count} more — open the app",
@@ -85,6 +97,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "my_filters": "Мої фільтри",
         "my_favorites": "Обране",
         "price_drop": "Ціна знизилась",
+        "market_below": "нижче ринку на {pct}%",
+        "market_above": "вище ринку на {pct}%",
+        "market_fair": "у ринку",
+        "market_median": "медіана",
         "km": "км",
     "digest_title": "Нові оголошення за вашими фільтрами",
     "digest_more": "і ще {count} — відкрий застосунок",
@@ -165,8 +181,10 @@ def _escape(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def grid_caption(item: dict, lang: str | None) -> str:
-    """Подпись к фото: ключевые факты и характеристики сеткой по две в строке."""
+def grid_caption(
+    item: dict, lang: str | None, market: dict | None = None
+) -> str:
+    """Подпись к фото: ключевые факты, оценка рынка и характеристики."""
     text = messages(lang)
     labels = specs(lang)
     fuel = FUEL_LABELS.get(lang, {}).get(item.get("fuel") or "", item.get("fuel") or "")
@@ -200,6 +218,20 @@ def grid_caption(item: dict, lang: str | None) -> str:
     grid = "\n".join(lines)
 
     price = f"{number(item.get('price'))} zł"
+    market_line = ""
+    if market and int(market.get("sample") or 0) >= 5:
+        verdict = market.get("verdict")
+        pct = abs(int(market.get("diff_pct") or 0))
+        if verdict == "below":
+            label = text["market_below"].format(pct=pct)
+        elif verdict == "above":
+            label = text["market_above"].format(pct=pct)
+        else:
+            label = text["market_fair"]
+        market_line = (
+            f"🎯 {_escape(label)} · {text['market_median']} "
+            f"{number(market.get('median'))} zł\n"
+        )
     facts = " · ".join(
         str(part)
         for part in [
@@ -212,6 +244,7 @@ def grid_caption(item: dict, lang: str | None) -> str:
     return (
         f"<b>{_escape(str(item.get('title') or ''))}</b>\n"
         f"<b>{price}</b>\n"
+        f"{market_line}"
         f"{_escape(facts)}\n\n"
         f"{grid}\n\n"
         f"{text['notify_ok']}"
