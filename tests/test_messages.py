@@ -1,4 +1,4 @@
-from carcar.messages import caption, messages
+from carcar.messages import caption, messages, price_drop_caption
 
 ITEM = {
     "title": "BMW Seria 5",
@@ -38,3 +38,26 @@ def test_buttons_localized():
     assert messages("pl")["open_app"].startswith("🚗")
     assert messages("en")["my_filters"] == "My filters"
     assert messages("uk")["menu_button"] == "Відкрити CarCar"
+
+
+def test_price_drop_caption_shows_old_and_new_price():
+    text = price_drop_caption(ITEM, 13000, 11900, "ru")
+    assert "Цена снизилась" in text
+    assert "13 000 zł" in text
+    assert "11 900 zł" in text
+    assert "−8%" in text
+
+
+def test_price_drop_caption_localized():
+    assert "Cena spadła" in price_drop_caption(ITEM, 13000, 11900, "pl")
+    assert "Price drop" in price_drop_caption(ITEM, 13000, 11900, "en")
+    assert "Ціна знизилась" in price_drop_caption(ITEM, 13000, 11900, "uk")
+
+
+def test_price_drop_caption_keeps_tiny_drop_visible():
+    assert "−0,3%" in price_drop_caption(ITEM, 13000, 12960, "ru")
+
+
+def test_price_drop_caption_escapes_title():
+    text = price_drop_caption({**ITEM, "title": "Audi <A4>"}, 13000, 11900, "en")
+    assert "&lt;A4&gt;" in text

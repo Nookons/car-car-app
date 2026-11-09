@@ -23,6 +23,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "notify_ok": "✅ Подходит под ваш фильтр",
         "open_app": "🚗 Открыть в CarCar",
         "my_filters": "Мои фильтры",
+        "my_favorites": "Избранное",
+        "price_drop": "Цена снизилась",
         "km": "км",
     "digest_title": "Новые объявления по вашим фильтрам",
     "digest_more": "и ещё {count} — открой приложение",
@@ -41,6 +43,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "notify_ok": "✅ Pasuje do Twojego filtra",
         "open_app": "🚗 Otwórz w CarCar",
         "my_filters": "Moje filtry",
+        "my_favorites": "Ulubione",
+        "price_drop": "Cena spadła",
         "km": "km",
     "digest_title": "Nowe ogłoszenia według Twoich filtrów",
     "digest_more": "i jeszcze {count} — otwórz aplikację",
@@ -59,6 +63,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "notify_ok": "✅ Matches your filter",
         "open_app": "🚗 Open in CarCar",
         "my_filters": "My filters",
+        "my_favorites": "Favorites",
+        "price_drop": "Price drop",
         "km": "km",
     "digest_title": "New listings matching your filters",
     "digest_more": "{count} more — open the app",
@@ -77,6 +83,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "notify_ok": "✅ Підходить під ваш фільтр",
         "open_app": "🚗 Відкрити в CarCar",
         "my_filters": "Мої фільтри",
+        "my_favorites": "Обране",
+        "price_drop": "Ціна знизилась",
         "km": "км",
     "digest_title": "Нові оголошення за вашими фільтрами",
     "digest_more": "і ще {count} — відкрий застосунок",
@@ -208,6 +216,47 @@ def grid_caption(item: dict, lang: str | None) -> str:
         f"{grid}\n\n"
         f"{text['notify_ok']}"
     )[:1024]
+
+
+def price_drop_caption(
+    item: dict, old_price: int | None, new_price: int | None, lang: str | None
+) -> str:
+    """Короткая подпись к фото: насколько подешевела машина из избранного."""
+    text = messages(lang)
+    old = int(old_price or 0)
+    new = int(new_price or 0)
+    percent = (old - new) / old * 100 if old > 0 else 0.0
+
+    def number(value) -> str:
+        return f"{value:,}".replace(",", " ")
+
+    fuel = FUEL_LABELS.get(lang or "ru", {}).get(item.get("fuel") or "", item.get("fuel") or "")
+    gearbox = GEARBOX_LABELS.get(lang or "ru", {}).get(
+        item.get("gearbox") or "", item.get("gearbox") or ""
+    )
+    facts = " · ".join(
+        str(part)
+        for part in [
+            item.get("year"),
+            f"{number(item['mileage_km'])} {text['km']}" if item.get("mileage_km") else None,
+            item.get("city"),
+        ]
+        if part
+    )
+    detail = " · ".join(str(part) for part in (fuel, gearbox, item.get("body")) if part)
+    percent_text = (
+        f"{percent:.0f}" if percent >= 1 else f"{percent:.1f}".replace(".", ",")
+    )
+    lines = [
+        f"<b>{_escape(str(item.get('title') or ''))}</b>",
+        f"{text['price_drop']}: <s>{number(old)} zł</s> → "
+        f"<b>{number(new)} zł</b> (−{percent_text}%)",
+    ]
+    if facts:
+        lines.append(_escape(facts))
+    if detail:
+        lines.append(_escape(detail))
+    return "\n".join(lines)[:1024]
 
 
 def article(item: dict, lang: str | None) -> str:

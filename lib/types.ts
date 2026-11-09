@@ -123,6 +123,7 @@ export type User = {
   last_name: string | null;
   lang: string;
   notify_new: boolean;
+  notify_price: boolean;
   digest: boolean;
 };
 

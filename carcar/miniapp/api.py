@@ -42,6 +42,7 @@ class CommentIn(BaseModel):
 class UserPatch(BaseModel):
     lang: str | None = Field(default=None, pattern="^(ru|pl|uk|en)$")
     notify_new: bool | None = None
+    notify_price: bool | None = None
     digest: bool | None = None
 
 
@@ -204,13 +205,17 @@ def create_app(
         for event in events:
             if not isinstance(event, dict) or not event.get("external_id"):
                 continue
-            bus.publish(
-                {
-                    "type": event.get("type", "listing.created"),
-                    "source": event.get("source", "otomoto"),
-                    "external_id": str(event["external_id"]),
-                }
-            )
+            out = {
+                "type": event.get("type", "listing.created"),
+                "source": event.get("source", "otomoto"),
+                "external_id": str(event["external_id"]),
+            }
+            # Для уведомлений о снижении цены нужны обе суммы.
+            for key in ("old_price", "new_price"):
+                value = event.get(key)
+                if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+                    out[key] = value
+            bus.publish(out)
             published += 1
         return {"ok": True, "published": published}
 
@@ -229,6 +234,10 @@ def create_app(
             "source": payload.get("source", "otomoto"),
             "external_id": str(payload.get("external_id", "")),
         }
+        for key in ("old_price", "new_price"):
+            value = payload.get(key)
+            if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+                event[key] = value
         bus = make_bus()
         bus.publish(event)
         return {"ok": True, "event": event, "bus": type(bus).__name__}
@@ -295,7 +304,11 @@ def create_app(
     @app.patch("/api/me")
     def patch_me(payload: UserPatch, user: dict = Depends(current_user)) -> dict:
         return repo.update_user(
-            user["id"], lang=payload.lang, notify_new=payload.notify_new, digest=payload.digest
+            user["id"],
+            lang=payload.lang,
+            notify_new=payload.notify_new,
+            notify_price=payload.notify_price,
+            digest=payload.digest,
         )
 
     # -- объявления ---------------------------------------------------------

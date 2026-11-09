@@ -124,6 +124,25 @@ def discover(
                             )
                     except Exception:
                         pass
+            # Падение цены — отдельное событие: по нему уведомляем тех,
+            # кто добавил машину в избранное.
+            changes = getattr(result, "price_events", [])
+            if bus is not None and changes:
+                try:
+                    for change in changes:
+                        if change.get("kind") != "price_drop":
+                            continue
+                        bus.publish(
+                            {
+                                "type": "listing.price_drop",
+                                "source": settings.source,
+                                "external_id": change["external_id"],
+                                "old_price": change["old_price"],
+                                "new_price": change["new_price"],
+                            }
+                        )
+                except Exception:
+                    pass
             known_ratio = 1 - result.inserted / max(len(parsed.items), 1)
             tail = f" | обновлено {result.updated}" if result.updated else ""
             shown = f"новых {result.inserted:2}{tail}"

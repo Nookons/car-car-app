@@ -100,7 +100,7 @@ pnpm build && pnpm start
 ```
 POST /api/auth              {init_data} → {token, user}
 GET  /api/me                профиль
-PATCH /api/me               {lang?, notify_new?, digest?}
+PATCH /api/me               {lang?, notify_new?, notify_price?, digest?}
 GET  /api/listings          limit, offset, q, make, price_min/max, year_min/max,
                             mileage_max, fuel, gearbox, source, lat, lon, radius_km, sort
 GET  /api/listings/{id}     карточка
@@ -109,3 +109,17 @@ GET/POST /api/subscriptions
 PATCH/DELETE /api/subscriptions/{id}
 GET/POST/DELETE /api/favorites
 ```
+
+## Уведомления о снижении цены
+
+Сборщик замечает изменение цены, пишет `listing_event` и публикует в шину
+событие `listing.price_drop` с `old_price`/`new_price`. Воркер находит всех,
+у кого эта машина в избранном и включён `notify_price`, и отправляет сообщение
+«было → стало, −N%» с фото и кнопкой в приложение.
+
+- тумблер «Снижение цены в избранном» — в аккаунте, по умолчанию включён;
+- дедуп: одна строка `notification` на пару user+listing, в `payload` лежат
+  старая и новая цена; повтор той же цены не отправляется, следующее
+  снижение перезаписывает payload;
+- ошибки отправки уходят в общий `retry_due` с тем же backoff, что и новые
+  объявления; дайджест их не забирает — снижение цены срочное.

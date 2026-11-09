@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Bell, BellSlash, Trash, Eye } from "@phosphor-icons/react";
+import { Bell, BellSlash, Trash, Eye, TrendDown } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
 import { ListingRow } from "@/components/listing-row";
 import { Button } from "@/components/ui/button";
@@ -178,6 +178,23 @@ export default function AccountPage() {
           >
             {me?.notify_new ? t("account.on") : t("account.off")}
           </Button>
+        </div>
+
+        <div className="space-y-1 py-1">
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-2 text-sm">
+              <TrendDown size={18} />
+              {t("account.notifyPrice")}
+            </span>
+            <Button
+              variant={me?.notify_price ? "default" : "outline"}
+              size="sm"
+              onClick={() => patchUser({ notify_price: !me?.notify_price })}
+            >
+              {me?.notify_price ? t("account.on") : t("account.off")}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">{t("account.notifyPriceHint")}</p>
         </div>
 
         <div className="flex items-center justify-between gap-3 py-1">

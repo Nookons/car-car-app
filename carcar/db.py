@@ -75,6 +75,8 @@ class UpsertResult:
     updated: int = 0
     unchanged: int = 0
     rejected: int = 0
+    # изменения цены для шины: [{"external_id", "kind", "old_price", "new_price"}]
+    price_events: list[dict[str, Any]] = field(default_factory=list)
 
 
 def database_url() -> str | None:
@@ -231,6 +233,15 @@ class DatabaseSink:
                         [(kind, old, new, source_id, ext) for ext, kind, old, new in events],
                     )
             self.conn.commit()
+            result.price_events = [
+                {
+                    "external_id": ext,
+                    "kind": kind,
+                    "old_price": int(old),
+                    "new_price": int(new),
+                }
+                for ext, kind, old, new in events
+            ]
             return result
         except Exception as exc:  # noqa: BLE001
             # Одна битая строка не должна ронять всю пачку и весь обход.
@@ -472,6 +483,15 @@ class DatabaseSink:
                     (kind, old_price, new_price, source_id, ext),
                 )
         self.conn.commit()
+        result.price_events = [
+            {
+                "external_id": ext,
+                "kind": kind,
+                "old_price": int(old_price),
+                "new_price": int(new_price),
+            }
+            for ext, kind, old_price, new_price in events
+        ]
         if bad:
             log.warning("отбраковано при построчной записи: %d", bad)
         return result

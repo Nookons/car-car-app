@@ -227,7 +227,7 @@ class MiniAppRepo:
                     last_name = excluded.last_name,
                     last_seen_at = now()
                 returning id, tg_id, username, first_name, last_name,
-                          lang, notify_new, digest, created_at
+                          lang, notify_new, notify_price, digest, created_at
                 """,
                 (
                     tg["id"],
@@ -245,7 +245,7 @@ class MiniAppRepo:
             cur.execute(
                 """
                 select id, tg_id, username, first_name, last_name, lang,
-                       notify_new, digest, created_at
+                       notify_new, notify_price, digest, created_at
                 from app_user where id = %s
                 """,
                 (user_id,),
@@ -254,7 +254,7 @@ class MiniAppRepo:
         return dict(row) if row else None
 
     def update_user(self, user_id: int, **fields: Any) -> dict[str, Any]:
-        allowed = {"lang", "notify_new", "digest"}
+        allowed = {"lang", "notify_new", "notify_price", "digest"}
         updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
         if updates:
             assignments = ", ".join(f"{key} = %({key})s" for key in updates)

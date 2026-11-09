@@ -173,10 +173,14 @@ create table if not exists app_user (
     last_name    text,
     lang         text not null default 'ru' check (lang in ('ru', 'pl', 'uk', 'en')),
     notify_new   boolean not null default true,
+    notify_price boolean not null default true,
     digest       boolean not null default false,
     created_at   timestamptz not null default now(),
     last_seen_at timestamptz not null default now()
 );
+
+-- снижение цены в избранном — отдельный тумблер (как и notify_new)
+alter table app_user add column if not exists notify_price boolean not null default true;
 
 create table if not exists subscription (
     id         bigint generated always as identity primary key,
@@ -286,11 +290,15 @@ alter table listing
     add column if not exists consumption_extra   numeric(4,1),
     add column if not exists equipment           text[];
 
--- уведомления о подходящих объявлениях (дедуп по паре user+listing)
+-- уведомления: new — по подписке, price_drop — падение цены в избранном.
+-- Одна строка на пару user+listing: price_drop переиспользует её и
+-- перезаписывает payload, поэтому старый сервис продолжает работать.
 create table if not exists notification (
     id         bigint generated always as identity primary key,
     user_id    bigint not null references app_user(id) on delete cascade,
     listing_id bigint not null references listing(id) on delete cascade,
+    kind       text not null default 'new',
+    payload    jsonb,
     status     text not null default 'pending'
                check (status in ('pending', 'sent', 'failed')),
     attempts   int not null default 0,
@@ -301,6 +309,9 @@ create table if not exists notification (
 
 create index if not exists notification_pending_idx
     on notification (status) where status = 'pending';
+
+alter table notification add column if not exists kind text not null default 'new';
+alter table notification add column if not exists payload jsonb;
 
 -- гарантии доставки: повторы и мёртвая очередь
 alter table notification add column if not exists next_attempt_at timestamptz not null default now();

@@ -1,11 +1,13 @@
 """Матчинг подписок и отправка объявлений в Telegram.
 
 Поток: событие `listing.created` → воркер → подписки пользователей →
-уведомление в таблицу `notification` (дедуп по user+listing) → отправка.
+уведомление в таблицу `notification` (одна строка на user+listing) → отправка.
+Событие `listing.price_drop` → те, у кого машина в избранном.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import time
@@ -15,7 +17,7 @@ import httpx
 import psycopg
 from psycopg.rows import dict_row
 
-from .messages import digest, grid_caption
+from .messages import digest, grid_caption, price_drop_caption
 from .messages import messages as msg
 
 log = logging.getLogger("carcar.notify")
@@ -100,9 +102,10 @@ def matches(criteria: dict[str, Any], row: dict[str, Any]) -> bool:
     for field in ("fuel", "gearbox", "body", "drive", "condition", "color", "seller_type"):
         if criteria.get(field) and not text_equal(field, criteria[field]):
             return False
-    if criteria.get("source"):
-        if (row.get("source_code") or "").lower() != str(criteria["source"]).lower():
-            return False
+    if criteria.get("source") and (row.get("source_code") or "").lower() != str(
+        criteria["source"]
+    ).lower():
+        return False
 
     for value, low, high in (
         (row.get("power_hp"), criteria.get("power_min"), criteria.get("power_max")),
@@ -191,18 +194,78 @@ class Notifier:
             )
             return cur.fetchall()
 
+    def favorited(
+        self, conn: psycopg.Connection, listing_id: int
+    ) -> list[dict[str, Any]]:
+        """Кому слать падение цены: избранное + включённый тумблер."""
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                select u.id as user_id, u.tg_id, u.lang
+                from favorite f join app_user u on u.id = f.user_id
+                where f.listing_id = %s and u.notify_price
+                """,
+                (listing_id,),
+            )
+            return cur.fetchall()
+
     def remember(
-        self, conn: psycopg.Connection, user_id: int, listing_id: int, status: str = "pending"
+        self,
+        conn: psycopg.Connection,
+        user_id: int,
+        listing_id: int,
+        status: str = "pending",
+        kind: str = "new",
+        payload: dict[str, Any] | None = None,
     ) -> bool:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                insert into notification (user_id, listing_id, status)
-                values (%s, %s, %s)
+                insert into notification (user_id, listing_id, status, kind, payload)
+                values (%s, %s, %s, %s, %s::jsonb)
                 on conflict (user_id, listing_id) do nothing
                 returning id
                 """,
-                (user_id, listing_id, status),
+                (
+                    user_id,
+                    listing_id,
+                    status,
+                    kind,
+                    json.dumps(payload, ensure_ascii=False) if payload else None,
+                ),
+            )
+            inserted = cur.fetchone()
+        conn.commit()
+        return bool(inserted)
+
+    def remember_price_drop(
+        self,
+        conn: psycopg.Connection,
+        user_id: int,
+        listing_id: int,
+        old_price: int,
+        new_price: int,
+    ) -> bool:
+        """Ставит падение цены в очередь. Та же пара user+listing — одна строка.
+
+        Если раньше уже присылали эту же новую цену, payload совпадёт и
+        уведомление не создастся; при следующем снижении — перезапишется.
+        """
+        payload = {"old_price": int(old_price), "new_price": int(new_price)}
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into notification (user_id, listing_id, status, kind, payload)
+                values (%s, %s, 'pending', 'price_drop', %s::jsonb)
+                on conflict (user_id, listing_id) do update
+                   set status = 'pending', kind = 'price_drop',
+                       payload = excluded.payload, attempts = 0,
+                       sent_at = null, last_error = null,
+                       next_attempt_at = now(), created_at = now()
+                 where notification.payload is distinct from excluded.payload
+                returning id
+                """,
+                (user_id, listing_id, json.dumps(payload, ensure_ascii=False)),
             )
             inserted = cur.fetchone()
         conn.commit()
@@ -217,21 +280,15 @@ class Notifier:
         self._last_global = time.monotonic()
         self._last_chat[chat_id] = self._last_global
 
-    def send(
-        self, chat_id: int, item: dict[str, Any], lang: str | None = "ru"
+    def _deliver(
+        self,
+        chat_id: int,
+        caption: str,
+        keyboard: dict[str, Any],
+        photo: str | None,
     ) -> tuple[bool, int | None, str | None]:
         self._throttle(chat_id)
-        url = f"{self.public_url}/listing/{item['id']}"
-        text = msg(lang)
-        caption = grid_caption(item, lang)
-        keyboard = {
-            "inline_keyboard": [
-                [{"text": text["open_app"], "web_app": {"url": url}}],
-                [{"text": text["my_filters"], "web_app": {"url": f"{self.public_url}/account"}}],
-            ]
-        }
-        # Фото-сообщение: ссылки в тексте нет, переход только по кнопке.
-        photo = item.get("thumb_url")
+        data: dict[str, Any] = {"ok": False}
         if photo:
             response = self.client.post(
                 f"https://api.telegram.org/bot{self.bot_token}/sendPhoto",
@@ -244,8 +301,6 @@ class Notifier:
                 },
             )
             data = response.json()
-        else:
-            data = {"ok": False}
         if not data.get("ok"):
             response = self.client.post(
                 f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
@@ -263,22 +318,68 @@ class Notifier:
         message_id = (data.get("result") or {}).get("message_id")
         return True, int(message_id) if message_id else None, None
 
+    def send(
+        self, chat_id: int, item: dict[str, Any], lang: str | None = "ru"
+    ) -> tuple[bool, int | None, str | None]:
+        url = f"{self.public_url}/listing/{item['id']}"
+        text = msg(lang)
+        caption = grid_caption(item, lang)
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": text["open_app"], "web_app": {"url": url}}],
+                [{"text": text["my_filters"], "web_app": {"url": f"{self.public_url}/account"}}],
+            ]
+        }
+        # Фото-сообщение: ссылки в тексте нет, переход только по кнопке.
+        return self._deliver(chat_id, caption, keyboard, item.get("thumb_url"))
+
+    def send_price_drop(
+        self,
+        chat_id: int,
+        item: dict[str, Any],
+        old_price: int,
+        new_price: int,
+        lang: str | None = "ru",
+    ) -> tuple[bool, int | None, str | None]:
+        url = f"{self.public_url}/listing/{item['id']}"
+        text = msg(lang)
+        caption = price_drop_caption(item, old_price, new_price, lang)
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": text["open_app"], "web_app": {"url": url}}],
+                [
+                    {
+                        "text": text["my_favorites"],
+                        "web_app": {"url": f"{self.public_url}/account"},
+                    }
+                ],
+            ]
+        }
+        return self._deliver(chat_id, caption, keyboard, item.get("thumb_url"))
+
     # -- фиксация результата --------------------------------------------
     def sent_last_hour(self, conn: psycopg.Connection, user_id: int) -> int:
         with conn.cursor() as cur:
             cur.execute(
-                "select count(*) from notification where user_id = %s "
+                "select count(*) as n from notification where user_id = %s "
                 "and status = 'sent' and sent_at > now() - interval '1 hour'",
                 (user_id,),
             )
-            return int(cur.fetchone()[0])
+            row = cur.fetchone()
+            return int(row["n"]) if row else 0
 
-    def hold(self, conn: psycopg.Connection, user_id: int, listing_id: int) -> None:
+    def hold(
+        self,
+        conn: psycopg.Connection,
+        user_id: int,
+        listing_id: int,
+        kind: str = "new",
+    ) -> None:
         with conn.cursor() as cur:
             cur.execute(
                 "update notification set status = 'held' "
-                "where user_id = %s and listing_id = %s",
-                (user_id, listing_id),
+                "where user_id = %s and listing_id = %s and kind = %s",
+                (user_id, listing_id, kind),
             )
         conn.commit()
 
@@ -288,6 +389,7 @@ class Notifier:
         user_id: int,
         listing_id: int,
         message_id: int | None,
+        kind: str = "new",
     ) -> None:
         with conn.cursor() as cur:
             cur.execute(
@@ -295,9 +397,9 @@ class Notifier:
                 update notification
                    set status = 'sent', sent_at = now(), attempts = attempts + 1,
                        telegram_message_id = %s, last_error = null
-                 where user_id = %s and listing_id = %s
+                 where user_id = %s and listing_id = %s and kind = %s
                 """,
-                (message_id, user_id, listing_id),
+                (message_id, user_id, listing_id, kind),
             )
         conn.commit()
 
@@ -308,6 +410,7 @@ class Notifier:
         listing_id: int,
         attempts: int,
         error: str,
+        kind: str = "new",
     ) -> None:
         next_status = "dead" if attempts + 1 >= MAX_ATTEMPTS else "failed"
         delay = retry_delay(attempts + 1)
@@ -317,9 +420,9 @@ class Notifier:
                 update notification
                    set status = %s, attempts = attempts + 1, last_error = %s,
                        next_attempt_at = now() + make_interval(secs => %s)
-                 where user_id = %s and listing_id = %s
+                 where user_id = %s and listing_id = %s and kind = %s
                 """,
-                (next_status, error[:500], delay, user_id, listing_id),
+                (next_status, error[:500], delay, user_id, listing_id, kind),
             )
         conn.commit()
 
@@ -331,7 +434,7 @@ class Notifier:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    select n.id, n.user_id, n.listing_id, n.attempts,
+                    select n.id, n.user_id, n.listing_id, n.attempts, n.kind, n.payload,
                            u.tg_id, u.lang,
                            l.title, l.price, l.currency, l.year, l.mileage_km,
                            l.city, l.thumb_url, l.url
@@ -340,7 +443,18 @@ class Notifier:
                     join listing l on l.id = n.listing_id
                     where n.status in ('pending', 'failed')
                       and n.next_attempt_at <= now()
-                      and u.notify_new and not u.digest
+                      and (
+                        (
+                          n.kind = 'price_drop' and u.notify_price
+                          and l.status = 'active'
+                          and exists (
+                            select 1 from favorite f
+                            where f.user_id = n.user_id
+                              and f.listing_id = n.listing_id
+                          )
+                        )
+                        or (n.kind <> 'price_drop' and u.notify_new and not u.digest)
+                      )
                     order by n.next_attempt_at
                     limit %s
                     """,
@@ -350,16 +464,36 @@ class Notifier:
             for row in rows:
                 item = dict(row)
                 item["id"] = row["listing_id"]
+                kind = str(row.get("kind") or "new")
                 try:
-                    ok, message_id, error = self.send(row["tg_id"], item, row.get("lang"))
+                    if kind == "price_drop":
+                        payload = row.get("payload") or {}
+                        ok, message_id, error = self.send_price_drop(
+                            row["tg_id"],
+                            item,
+                            int(payload.get("old_price") or 0),
+                            int(payload.get("new_price") or row.get("price") or 0),
+                            row.get("lang"),
+                        )
+                    else:
+                        ok, message_id, error = self.send(
+                            row["tg_id"], item, row.get("lang")
+                        )
                 except Exception as exc:  # noqa: BLE001
                     ok, message_id, error = False, None, str(exc)
                 if ok:
-                    self.mark_sent(conn, row["user_id"], row["listing_id"], message_id)
+                    self.mark_sent(
+                        conn, row["user_id"], row["listing_id"], message_id, kind=kind
+                    )
                     sent += 1
                 else:
                     self.mark_failed(
-                        conn, row["user_id"], row["listing_id"], row["attempts"], error or ""
+                        conn,
+                        row["user_id"],
+                        row["listing_id"],
+                        row["attempts"],
+                        error or "",
+                        kind=kind,
                     )
             return sent
         finally:
@@ -376,6 +510,7 @@ class Notifier:
                     select u.id, u.tg_id, u.lang, count(*) as total
                     from notification n join app_user u on u.id = n.user_id
                     where n.status = 'held'
+                      and n.kind <> 'price_drop'
                       and n.created_at < now() - make_interval(mins => %s)
                     group by u.id, u.tg_id, u.lang
                     limit %s
@@ -390,6 +525,7 @@ class Notifier:
                         select l.id, l.title, l.price, l.url
                         from notification n join listing l on l.id = n.listing_id
                         where n.user_id = %s and n.status = 'held'
+                          and n.kind <> 'price_drop'
                           and n.created_at < now() - make_interval(mins => %s)
                         order by n.created_at limit 20
                         """,
@@ -428,6 +564,7 @@ class Notifier:
                         update notification set status = 'sent', sent_at = now(),
                                attempts = attempts + 1, telegram_message_id = %s
                         where user_id = %s and status = 'held'
+                          and kind <> 'price_drop'
                           and created_at < now() - make_interval(mins => %s)
                         """,
                         (message_id, user["id"], min_age_minutes),
@@ -442,14 +579,19 @@ class Notifier:
         conn = self.connect()
         try:
             with conn.cursor() as cur:
-                cur.execute("select count(*) from notification where status = 'dead'")
-                dead = int(cur.fetchone()[0])
+                cur.execute("select count(*) as n from notification where status = 'dead'")
+                row = cur.fetchone()
+                dead = int(row["n"]) if row else 0
                 cur.execute(
-                    "select extract(epoch from (now() - max(heartbeat_at))) / 60 "
+                    "select extract(epoch from (now() - max(heartbeat_at))) / 60 as idle_min "
                     "from collector where heartbeat_at is not null"
                 )
                 row = cur.fetchone()
-                idle = int(row[0]) if row and row[0] is not None else None
+                idle = (
+                    int(row["idle_min"])
+                    if row and row["idle_min"] is not None
+                    else None
+                )
             return {"dead": dead, "collector_idle_min": idle}
         finally:
             conn.close()
@@ -463,8 +605,14 @@ class Notifier:
 
     # -- обработка события ----------------------------------------------
     def handle_event(self, event: dict[str, Any]) -> int:
-        if event.get("type") != "listing.created":
-            return 0
+        event_type = event.get("type")
+        if event_type == "listing.created":
+            return self._handle_created(event)
+        if event_type == "listing.price_drop":
+            return self.handle_price_drop(event)
+        return 0
+
+    def _handle_created(self, event: dict[str, Any]) -> int:
         conn = self.connect()
         try:
             item = self.listing(conn, event.get("source", "otomoto"), event["external_id"])
@@ -492,6 +640,57 @@ class Notifier:
                     sent += 1
                 else:
                     self.mark_failed(conn, sub["user_id"], item["id"], 0, error or "send failed")
+            return sent
+        finally:
+            conn.close()
+
+    def handle_price_drop(self, event: dict[str, Any]) -> int:
+        """Падение цены: сообщение тем, у кого машина в избранном."""
+        external_id = str(event.get("external_id") or "")
+        if not external_id:
+            return 0
+        conn = self.connect()
+        try:
+            item = self.listing(conn, event.get("source", "otomoto"), external_id)
+            if not item:
+                return 0
+            old_price = _num(event.get("old_price"))
+            new_price = _num(event.get("new_price")) or _num(item.get("price"))
+            if old_price is None or new_price is None or new_price >= old_price:
+                return 0
+            sent = 0
+            kind = "price_drop"
+            for user in self.favorited(conn, item["id"]):
+                if not self.remember_price_drop(
+                    conn, user["user_id"], item["id"], old_price, new_price
+                ):
+                    continue  # эту цену уже отправляли
+                if self.sent_last_hour(conn, user["user_id"]) >= HOURLY_CAP:
+                    # Час переполнен — уйдёт повтором из retry_due.
+                    self.mark_failed(
+                        conn, user["user_id"], item["id"], 0, "hourly cap", kind=kind
+                    )
+                    continue
+                try:
+                    ok, message_id, error = self.send_price_drop(
+                        user["tg_id"], item, old_price, new_price, user.get("lang")
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    ok, message_id, error = False, None, str(exc)
+                if ok:
+                    self.mark_sent(
+                        conn, user["user_id"], item["id"], message_id, kind=kind
+                    )
+                    sent += 1
+                else:
+                    self.mark_failed(
+                        conn,
+                        user["user_id"],
+                        item["id"],
+                        0,
+                        error or "send failed",
+                        kind=kind,
+                    )
             return sent
         finally:
             conn.close()
