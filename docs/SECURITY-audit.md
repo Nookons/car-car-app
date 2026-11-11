@@ -1,6 +1,6 @@
 # Security review: CarCar production
 
-Дата: 10.11.2026. Проверены исходники, текущая схема Supabase и доступные публичные HTTP-поверхности. Все SQL-проверки выполнялись в read-only транзакциях. DDL/данные production не изменялись.
+Исходный read-only аудит: 10.11.2026. Исправления и production-проверки: 11.11.2026.
 
 ## Срочные риски
 
@@ -12,13 +12,13 @@
 
 Код фронтенда использует FastAPI, а не Supabase SDK, поэтому прямые grants не нужны. При обычной настройке Supabase Data API с exposed schema `public` эти права могут превратить таблицы в доступный через REST API интерфейс. На самой базе проверены права роли; фактический HTTP REST endpoint не проверялся, так как anon key не публиковался в репозитории.
 
-Подготовлена миграция [20261110_lock_down_public_api.sql](/Users/nookon/Desktop/CarCar/db/migrations/20261110_lock_down_public_api.sql): отбирает `USAGE/CREATE` на `public` у PUBLIC/anon/authenticated, включает RLS на пользовательских/операционных таблицах, отзывает права клиентских ролей со всех таблиц/sequence/functions в `public` и убирает опасные default grants. Backend продолжает ходить владельцем схемы. Она **не применена к production**; будущим минимальным ролям сервисов после отдельного внедрения понадобится явный `USAGE` и точечные grants.
+Миграция [20261110_lock_down_public_api.sql](/Users/nookon/Desktop/CarCar/db/migrations/20261110_lock_down_public_api.sql) применена к production 11.11.2026: доступ PUBLIC/anon/authenticated к схеме и функциям закрыт, таблицы с пользовательскими данными защищены RLS. Backend проверен после изменений.
 
 ### P0 — приложение подключалось к БД как роль `postgres`
 
 Текущая connection string в локальном конфиге использует `postgres`. Read-only каталог ролей подтвердил `BYPASSRLS`, `CREATEROLE` и `CREATEDB`; объекты CarCar принадлежат этой роли. API и другие процессы используют `DATABASE_URL`, поэтому компрометация любого из них даёт широкие права на базу и может обходить RLS.
 
-Пароль владельца, присланный в чат, ротирован; новый пароль обновлён во всех Railway services и проверен повторным подключением. Подготовлена [миграция runtime-роли](</Users/nookon/Desktop/CarCar/db/migrations/20261111_create_runtime_role.sql>): отдельная роль без прав создавать БД/роли, с CRUD только на таблицы CarCar. До применения и переключения сервисов приложение ещё использует `postgres`. Локальный `.env.supabase` хранит административное подключение с правами `0600` и исключён из Git.
+Пароль владельца, присланный в чат, ротирован; обновлён во всех Railway services и проверен повторным подключением. Миграция [20261111_create_runtime_role.sql](/Users/nookon/Desktop/CarCar/db/migrations/20261111_create_runtime_role.sql) применена; все восемь сервисов настроены на `carcar_runtime`. Роль не может создавать БД/роли, имеет CRUD только на таблицы CarCar и `BYPASSRLS` для совместимости backend с существующей моделью доступа. `.env.supabase` хранит административное подключение с правами `0600` и исключён из Git.
 
 ## Исправления в коде, подготовленные локально
 
@@ -28,7 +28,7 @@
 - Telegram webhook в production требует `CARCAR_WEBHOOK_SECRET` и отклоняет запросы при отсутствующем секрете.
 - Vercel headers включают HSTS, `nosniff` и явную Referrer-Policy.
 
-Изменения в репозитории ещё не развёрнуты. Долгоживущий JWT (30 дней) сохраняется в localStorage; для целевого уровня безопасности нужен отдельный refresh flow с ротацией, отзывом сессий и коротким access token. Сейчас refresh endpoint отсутствует, поэтому просто уменьшать TTL сломало бы активные сессии.
+Изменения из коммитов `eaeaecc` и `724b78e` развёрнуты через Railway и Vercel; оба production deployment успешны. Долгоживущий JWT (30 дней) сохраняется в localStorage; для целевого уровня безопасности нужен отдельный refresh flow с ротацией, отзывом сессий и коротким access token. Сейчас refresh endpoint отсутствует, поэтому просто уменьшать TTL сломало бы активные сессии.
 
 ## Другие пробелы
 

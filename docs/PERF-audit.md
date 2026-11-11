@@ -1,6 +1,6 @@
 # Аудит производительности CarCar
 
-Дата: 10.11.2026. Объём: статический аудит репозитория — Python Telegram-бот/сборщик, FastAPI Mini App API, Next.js веб-клиент, PostgreSQL/Redis и Railway-конфигурация — плюс ограниченные read-only проверки production PostgreSQL и публичных Railway/Vercel endpoints. Полная телеметрия, нагрузочная проверка и доступ к настройкам внешних хостингов отсутствовали. Поэтому отсутствие конфигурации в репозитории отмечено как «не подтверждено», а не как доказанный runtime-дефект.
+Аудит: 10–11.11.2026. Объём: статический аудит репозитория — Python Telegram-бот/сборщик, FastAPI Mini App API, Next.js веб-клиент, PostgreSQL/Redis и Railway-конфигурация — плюс ограниченные read-only проверки production PostgreSQL и публичных Railway/Vercel endpoints. Полная телеметрия и нагрузочная проверка отсутствовали. Поэтому отсутствие конфигурации в репозитории отмечено как «не подтверждено», а не как доказанный runtime-дефект.
 
 ## Краткий итог
 
@@ -72,7 +72,7 @@
 | Railway CORS | OPTIONS preflight с Origin `https://car-car-app.vercel.app` вернул 200 и разрешённый origin/method/headers. |
 | Vercel `/` | HTTP 200, `Content-Encoding: br`, `X-Vercel-Cache: HIT`; HTML `Cache-Control: public, max-age=0, must-revalidate` и `Age` был > 100 000 с. Edge повторно валидирует HTML. |
 | Vercel JS chunks | HTTP 200, gzip и `Cache-Control: public,max-age=31536000,immutable`; Next chunks раздаются с долгим immutable cache. |
-| Vercel image optimizer | Запрос оптимизированного фото вернул HTTP 200 `image/webp`, 76 КБ, примерно 650 мс на cache miss. На текущем production ответе AVIF не наблюдался. Локальные изменения `next.config.mjs`/`SmartImage` ещё не развёрнуты. |
+| Vercel image optimizer | До релиза ответил `image/webp` (76 КБ, ~650 мс на cache miss); после релиза с `Accept: image/avif` ответил HTTP 200 `image/avif` (19 КБ). |
 
 ### Production PostgreSQL
 
@@ -94,4 +94,14 @@
 
 SQL/схема и публичные endpoints проверены, но Railway service logs/variables, Vercel project config, backup/restore и нагрузка при concurrency не доступны из этого окружения. Railway CLI аварийно завершается (код 134). `pg_stat_statements` отсутствует. Production DDL не менялся.
 
-Отдельный security snapshot и найденные права `anon` задокументированы в [`SECURITY-audit.md`](SECURITY-audit.md). Подготовлена блокировка grants; production применит её только после review и подтверждения владельца проекта.
+Отдельный security snapshot и исправленные права `anon` задокументированы в [`SECURITY-audit.md`](SECURITY-audit.md). Защитные grants и runtime-роли применены к production 11.11.2026.
+
+### Проверка после production-релиза 11.11.2026
+
+- Коммиты `eaeaecc` и `724b78e` успешно прошли Railway и Vercel deployment checks.
+- После миграции и переключения Railway на `carcar_runtime`: `/healthz` — HTTP 200 (~0.29 с), `/api/listings?limit=1&sort=new` — HTTP 200 (первый запрос после рестарта ~2.51 с, следующие три — 0.30–0.44 с). Это smoke-check, не нагрузочный тест; холодный запрос требует серверной трассировки.
+- Vercel главная — HTTP 200 с Brotli; Next image optimizer вернул HTTP 200 `image/avif` (19 КБ) для фото объявления.
+- Все шесть активных Railway-сервисов успешно перезапущены; URL runtime-роли выставлен также двум выключенным сервисам, которые остались выключенными.
+- Сессии приложения после переключения видны в PostgreSQL под `carcar_runtime`; production API после релиза продолжил обслуживать запросы.
+
+Права ролей, выполненная ротация секрета и оставшиеся auth-риски приведены в [`SECURITY-audit.md`](SECURITY-audit.md).
