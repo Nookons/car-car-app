@@ -34,7 +34,7 @@ LIST_FIELDS = """
     l.year, l.mileage_km, l.fuel, l.gearbox, l.body, l.power_hp, l.engine_cm3,
     l.color, l.vin, l.city, l.region, l.lat, l.lon, l.seller_type, l.seller_name,
     l.version, l.generation, l.doors, l.seats, l.drive, l.condition,
-    l.thumb_url, l.photos, l.photos_count, l.published_at, l.first_seen_at,
+    l.thumb_url, l.photos[1:6] as photos, l.photos_count, l.published_at, l.first_seen_at,
     l.last_seen_at, l.status
 """
 
@@ -429,7 +429,7 @@ class MiniAppRepo:
         if self.cache is not None:
             pending = []
             for item_id in ids:
-                key = f"market:v2:{item_id}:{prices[item_id]}"
+                key = f"market:v3:{item_id}:{prices[item_id]}"
                 hit = self.cache.get(key)
                 if hit:
                     cached[item_id] = hit
@@ -444,10 +444,13 @@ class MiniAppRepo:
             l.engine_cm3, l.power_hp, l.body, l.gearbox, l.drive, l.fuel,
             l.color, l.generation, l.equipment
         """
+        # Комплектация весит 5 % в модели, но занимает 87 % трафика: полный
+        # список опций — это ~1.1 КБ на машину, а машин на страницу до 600.
+        # Первых восьми пунктов достаточно, чтобы отличить «богатую» от «пустой».
         comp_fields = """
             c.id, c.title, c.price, c.year, c.mileage_km, c.engine_cm3,
             c.power_hp, c.body, c.gearbox, c.drive, c.fuel, c.color,
-            c.generation, c.equipment
+            c.generation, c.equipment[1:8] as equipment
         """
         near = f"""
             with page as (
@@ -530,9 +533,9 @@ class MiniAppRepo:
             }
             if self.cache is not None:
                 self.cache.set(
-                    f"market:v2:{item_id}:{prices[item_id]}",
+                    f"market:v3:{item_id}:{prices[item_id]}",
                     result[item_id],
-                    ttl=600,
+                    ttl=21_600,
                 )
         return result
 
