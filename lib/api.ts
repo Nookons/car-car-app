@@ -24,10 +24,12 @@ export async function api<T>(
     method?: string;
     body?: unknown;
     signal?: AbortSignal;
+    analyticsAdminToken?: string;
   } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
+  if (options.analyticsAdminToken) headers["X-Analytics-Admin-Token"] = options.analyticsAdminToken;
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
 
   const method = options.method ?? "GET";

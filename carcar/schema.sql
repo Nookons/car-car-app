@@ -224,6 +224,26 @@ create table if not exists favorite (
     primary key (user_id, listing_id)
 );
 
+-- Daily, privacy-preserving product activity aggregates. No raw search text,
+-- IP addresses, or device identifiers are stored here.
+create table if not exists user_activity_daily (
+    user_id bigint not null references app_user(id) on delete cascade,
+    day date not null default current_date,
+    sessions integer not null default 0,
+    searches integer not null default 0,
+    listing_views integer not null default 0,
+    favorites_added integer not null default 0,
+    subscriptions_created integer not null default 0,
+    last_session_at timestamptz,
+    last_search_at timestamptz,
+    last_active_at timestamptz not null default now(),
+    primary key (user_id, day)
+);
+create index if not exists user_activity_daily_day_idx
+    on user_activity_daily (day desc, user_id);
+alter table user_activity_daily enable row level security;
+revoke all privileges on table public.user_activity_daily from anon, authenticated;
+
 alter table app_user     enable row level security;
 alter table subscription enable row level security;
 alter table favorite     enable row level security;

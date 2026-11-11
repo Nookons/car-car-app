@@ -81,6 +81,11 @@ export default function ListingPage() {
     };
   }, [params?.id]);
 
+  React.useEffect(() => {
+    if (!token || !params?.id) return;
+    void api(`/listings/${params.id}/view`, { method: "POST", token }).catch(() => {});
+  }, [params?.id, token]);
+
   if (error) {
     return (
       <div className="-mt-4 flex flex-col items-center gap-4 py-20 text-center md:mt-0">

@@ -87,9 +87,7 @@ def _item(row: dict[str, Any]) -> dict[str, Any]:
         "photos": photos[:6],
         "photos_count": row.get("photos_count") or 0,
         "published_at": _iso(row.get("published_at")),
-        "distance_km": round(row["distance_km"], 1)
-        if row.get("distance_km") is not None
-        else None,
+        "distance_km": round(row["distance_km"], 1) if row.get("distance_km") is not None else None,
     }
 
 
@@ -110,8 +108,7 @@ def _price_history(
         history.append(
             {
                 "price": initial,
-                "at": _iso(row.get("first_seen_at"))
-                or _iso(events[0].get("observed_at")),
+                "at": _iso(row.get("first_seen_at")) or _iso(events[0].get("observed_at")),
                 "kind": "initial",
             }
         )
@@ -129,9 +126,7 @@ def _price_history(
             }
         )
     if current is not None and (not history or history[-1]["price"] != current):
-        history.append(
-            {"price": current, "at": _iso(row.get("last_seen_at")), "kind": "current"}
-        )
+        history.append({"price": current, "at": _iso(row.get("last_seen_at")), "kind": "current"})
     if len(history) > 12:
         # Стартовая точка + последние изменения: длинную историю не раздуваем.
         history = [history[0], *history[-11:]]
@@ -265,6 +260,91 @@ class MiniAppRepo:
     def close(self) -> None:
         self.pool.close()
 
+    def record_session(self, user_id: int) -> None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """insert into user_activity_daily
+                   (user_id, day, sessions, last_session_at, last_active_at)
+                   values (%s, current_date, 1, now(), now())
+                   on conflict (user_id, day) do update set
+                     sessions = user_activity_daily.sessions + case
+                       when coalesce(user_activity_daily.last_session_at, '-infinity')
+                         < now() - interval '30 minutes'
+                         then 1 else 0 end,
+                     last_session_at = case
+                       when coalesce(user_activity_daily.last_session_at, '-infinity')
+                         < now() - interval '30 minutes'
+                         then now() else user_activity_daily.last_session_at end,
+                     last_active_at = now()""",
+                (user_id,),
+            )
+        conn.commit()
+
+    def record_search(self, user_id: int) -> None:
+        # Count search activity without persisting the search term or filters.
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """insert into user_activity_daily
+                   (user_id, day, searches, last_search_at, last_active_at)
+                   values (%s, current_date, 1, now(), now())
+                   on conflict (user_id, day) do update set
+                     searches = user_activity_daily.searches + case
+                       when user_activity_daily.last_search_at > now() - interval '10 seconds'
+                       then 0 else 1 end,
+                     last_search_at = now(),
+                     last_active_at = now()""",
+                (user_id,),
+            )
+        conn.commit()
+
+    def user_activity_metrics(self, days: int, limit: int, offset: int) -> dict[str, Any]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """select
+                    (select count(*) from app_user) as registered_users,
+                    (select count(*) from app_user
+                      where last_seen_at >= now() - interval '1 day') as dau,
+                    (select count(*) from app_user
+                      where last_seen_at >= now() - interval '7 days') as wau,
+                    (select count(*) from app_user
+                      where last_seen_at >= now() - interval '30 days') as mau"""
+            )
+            totals = cur.fetchone()
+            cur.execute(
+                """select day, sum(sessions)::int sessions, sum(searches)::int searches,
+                          sum(listing_views)::int listing_views,
+                          sum(favorites_added)::int favorites_added,
+                          sum(subscriptions_created)::int subscriptions_created,
+                          count(distinct user_id)::int active_users
+                   from user_activity_daily where day >= current_date - %s
+                   group by day order by day""",
+                (days - 1,),
+            )
+            daily = cur.fetchall()
+            cur.execute(
+                """select u.id, u.username, u.created_at, u.last_seen_at,
+                          coalesce(sum(a.sessions), 0)::int sessions,
+                          coalesce(sum(a.searches), 0)::int searches,
+                          coalesce(sum(a.listing_views), 0)::int listing_views,
+                          coalesce(sum(a.favorites_added), 0)::int favorites_added,
+                          coalesce(sum(a.subscriptions_created), 0)::int subscriptions_created
+                   from app_user u left join user_activity_daily a
+                     on a.user_id = u.id and a.day >= current_date - %s
+                   group by u.id order by u.last_seen_at desc
+                   limit %s offset %s""",
+                (days - 1, limit, offset),
+            )
+            users = cur.fetchall()
+            cur.execute(
+                """select l.id, l.title, count(*)::int views
+                   from listing_view v join listing l on l.id = v.listing_id
+                   where v.day >= current_date - %s
+                   group by l.id, l.title order by views desc limit 20""",
+                (days - 1,),
+            )
+            top_listings = cur.fetchall()
+        return {"totals": totals, "daily": daily, "users": users, "top_listings": top_listings}
+
     # -- пользователи ------------------------------------------------------
     def ensure_user(self, tg: dict[str, Any]) -> dict[str, Any]:
         with self.pool.connection() as conn, conn.cursor() as cur:
@@ -320,9 +400,7 @@ class MiniAppRepo:
         return self.get_user(user_id) or {}
 
     # -- объявления ----------------------------------------------------------
-    def _market_analyses(
-        self, rows: list[dict[str, Any]]
-    ) -> dict[int, dict[str, Any]]:
+    def _market_analyses(self, rows: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
         """Оценка рынка для ленты тем же взвешенным моделью, что и карточка.
 
         Раньше лента брала медиану из model_option по всем годам модели —
@@ -332,9 +410,7 @@ class MiniAppRepo:
         а выдача всё равно кэшируется на 2 минуты.
         """
         ids = [
-            row["id"]
-            for row in rows
-            if row.get("price") and row.get("make") and row.get("model")
+            row["id"] for row in rows if row.get("price") and row.get("make") and row.get("model")
         ]
         if not ids:
             return {}
@@ -410,8 +486,7 @@ class MiniAppRepo:
         """
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
-                f"select {subject_fields} from listing l "
-                "where l.id = any(%(ids)s::bigint[])",
+                f"select {subject_fields} from listing l where l.id = any(%(ids)s::bigint[])",
                 {"ids": ids},
             )
             subjects = {row["id"]: dict(row) for row in cur.fetchall()}
@@ -433,9 +508,7 @@ class MiniAppRepo:
             subject = subjects.get(item_id)
             if not subject:
                 continue
-            analysis = analyse_price(
-                _infer_subject_features(subject), grouped.get(item_id, [])
-            )
+            analysis = analyse_price(_infer_subject_features(subject), grouped.get(item_id, []))
             if not analysis:
                 continue
             result[item_id] = {
@@ -578,9 +651,7 @@ class MiniAppRepo:
             )
             params["source"] = source
         if published_days:
-            conds.append(
-                "l.published_at >= now() - make_interval(days => %(published_days)s)"
-            )
+            conds.append("l.published_at >= now() - make_interval(days => %(published_days)s)")
             params["published_days"] = published_days
 
         distance = "null::float8"
@@ -866,9 +937,7 @@ class MiniAppRepo:
 
         return _card(row, events, analysis, price_history, initial_price)
 
-    def _similar_rows(
-        self, cur: Any, subject: dict[str, Any], limit: int
-    ) -> list[dict[str, Any]]:
+    def _similar_rows(self, cur: Any, subject: dict[str, Any], limit: int) -> list[dict[str, Any]]:
         """Кандидаты «похожих» в три круга: точная модель → модель → марка.
 
         Первый круг отсекает годы и цену, чтобы не показывать машину другого
@@ -902,8 +971,7 @@ class MiniAppRepo:
         if price:
             shared["price"] = price
             rank.append(
-                "abs(l.price - %(price)s::numeric) "
-                "/ greatest(%(price)s::numeric, 1) nulls last"
+                "abs(l.price - %(price)s::numeric) / greatest(%(price)s::numeric, 1) nulls last"
             )
         rank.append("l.published_at desc")
 
@@ -1001,8 +1069,7 @@ class MiniAppRepo:
         limit = max(1, min(limit, 12))
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
-                "select id, make, model, year, mileage_km, price, body "
-                "from listing where id = %s",
+                "select id, make, model, year, mileage_km, price, body from listing where id = %s",
                 (listing_id,),
             )
             subject = cur.fetchone()
@@ -1040,6 +1107,15 @@ class MiniAppRepo:
             fresh = cur.fetchone()
             if fresh:
                 cur.execute(
+                    """insert into user_activity_daily
+                       (user_id, day, listing_views, last_active_at)
+                       values (%s, current_date, 1, now())
+                       on conflict (user_id, day) do update set
+                         listing_views = user_activity_daily.listing_views + 1,
+                         last_active_at = now()""",
+                    (user_id,),
+                )
+                cur.execute(
                     """
                     insert into listing_stat (listing_id, views, score)
                     values (%s, 1, 1)
@@ -1056,9 +1132,7 @@ class MiniAppRepo:
                 )
                 views = int(cur.fetchone()["views"])
             else:
-                cur.execute(
-                    "select views from listing_stat where listing_id = %s", (listing_id,)
-                )
+                cur.execute("select views from listing_stat where listing_id = %s", (listing_id,))
                 row = cur.fetchone()
                 views = int(row["views"]) if row else 0
         conn.commit()
@@ -1108,9 +1182,7 @@ class MiniAppRepo:
                         """,
                         (listing_id,),
                     )
-            cur.execute(
-                "select likes from listing_stat where listing_id = %s", (listing_id,)
-            )
+            cur.execute("select likes from listing_stat where listing_id = %s", (listing_id,))
             row = cur.fetchone()
         conn.commit()
         return {"likes": int(row["likes"]) if row else 0, "liked": on}
@@ -1138,9 +1210,7 @@ class MiniAppRepo:
                     """,
                     (listing_id,),
                 )
-            cur.execute(
-                "select reposts from listing_stat where listing_id = %s", (listing_id,)
-            )
+            cur.execute("select reposts from listing_stat where listing_id = %s", (listing_id,))
             row = cur.fetchone()
         conn.commit()
         return {"reposts": int(row["reposts"]) if row else 0}
@@ -1322,7 +1392,7 @@ class MiniAppRepo:
                 from listing l
                 join source s on s.id = l.source_id
                 left join listing_stat st on st.listing_id = l.id
-                where {' and '.join(conds)}
+                where {" and ".join(conds)}
                 order by {order}
                 limit %(limit)s offset %(offset)s
             """
@@ -1465,9 +1535,7 @@ class MiniAppRepo:
                 """,
                 model_params,
             )
-            conditions = [
-                {"value": r["condition"], "count": int(r["n"])} for r in cur.fetchall()
-            ]
+            conditions = [{"value": r["condition"], "count": int(r["n"])} for r in cur.fetchall()]
 
             cur.execute(
                 f"""
@@ -1545,6 +1613,15 @@ class MiniAppRepo:
                 (user_id, name, json.dumps(criteria)),
             )
             row = cur.fetchone()
+            cur.execute(
+                """insert into user_activity_daily
+                   (user_id, day, subscriptions_created, last_active_at)
+                   values (%s, current_date, 1, now())
+                   on conflict (user_id, day) do update set
+                     subscriptions_created = user_activity_daily.subscriptions_created + 1,
+                     last_active_at = now()""",
+                (user_id,),
+            )
         conn.commit()
         return {
             "id": row["id"],
@@ -1579,9 +1656,7 @@ class MiniAppRepo:
         conn.commit()
         if not row:
             return None
-        return next(
-            (s for s in self.subscriptions(user_id) if s["id"] == sub_id), None
-        )
+        return next((s for s in self.subscriptions(user_id) if s["id"] == sub_id), None)
 
     def delete_subscription(self, user_id: int, sub_id: int) -> bool:
         with self.pool.connection() as conn, conn.cursor() as cur:
@@ -1624,10 +1699,20 @@ class MiniAppRepo:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
                 "insert into favorite (user_id, listing_id) values (%s, %s) "
-                "on conflict do nothing",
+                "on conflict do nothing returning 1",
                 (user_id, listing_id),
             )
-            added = cur.rowcount
+            added = cur.fetchone()
+            if added:
+                cur.execute(
+                    """insert into user_activity_daily
+                       (user_id, day, favorites_added, last_active_at)
+                       values (%s, current_date, 1, now())
+                       on conflict (user_id, day) do update set
+                         favorites_added = user_activity_daily.favorites_added + 1,
+                         last_active_at = now()""",
+                    (user_id,),
+                )
         conn.commit()
         return bool(added)
 

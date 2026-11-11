@@ -7,6 +7,7 @@ venv/
 # Секреты и локальная конфигурация
 .env
 .env.*
+/.carcar-analytics-admin-token
 !.env.example
 !.env.example.web
 

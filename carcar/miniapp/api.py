@@ -90,6 +90,7 @@ def create_app(
     repo.cache = cache
     dev_token = os.environ.get("CARCAR_DEV_TOKEN", "")
     ingest_token = os.environ.get("CARCAR_INGEST_TOKEN", "")
+    analytics_admin_token = os.environ.get("CARCAR_ANALYTICS_ADMIN_TOKEN", "")
 
     public_url = os.environ.get("CARCAR_PUBLIC_URL", "").rstrip("/")
     api_url = os.environ.get("CARCAR_API_URL", "").rstrip("/")
@@ -157,9 +158,7 @@ def create_app(
                 warm_task.cancel()
         repo.close()
 
-    app = FastAPI(
-        title="CarCar Mini App", docs_url=None, redoc_url=None, lifespan=lifespan
-    )
+    app = FastAPI(title="CarCar Mini App", docs_url=None, redoc_url=None, lifespan=lifespan)
 
     # Фронт живёт на Vercel (или localhost:3100) — это другой origin.
     origins = os.environ.get(
@@ -171,7 +170,7 @@ def create_app(
         allow_origins=[origin.strip() for origin in origins if origin.strip()],
         allow_credentials=False,
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type"],
+        allow_headers=["Authorization", "Content-Type", "X-Analytics-Admin-Token"],
     )
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
@@ -187,6 +186,22 @@ def create_app(
         if not user:
             raise HTTPException(status_code=401, detail="пользователь не найден")
         return user
+
+    def optional_user(authorization: str | None = Header(default=None)) -> dict | None:
+        if not authorization or not authorization.startswith("Bearer "):
+            return None
+        try:
+            return repo.get_user(verify_token(authorization[7:], jwt_secret))
+        except AuthError:
+            return None
+
+    def analytics_admin(
+        token: str | None = Header(default=None, alias="X-Analytics-Admin-Token"),
+    ) -> None:
+        if not analytics_admin_token:
+            raise HTTPException(status_code=503, detail="аналитика администратора не настроена")
+        if not hmac.compare_digest(token or "", analytics_admin_token):
+            raise HTTPException(status_code=401, detail="нужен токен администратора")
 
     @app.get("/")
     def index() -> FileResponse:
@@ -301,7 +316,17 @@ def create_app(
             except AuthError as exc:
                 raise HTTPException(status_code=401, detail=str(exc)) from exc
             user = repo.ensure_user(data["user"])
+        repo.record_session(user["id"])
         return {"token": issue_token(user["id"], jwt_secret), "user": user}
+
+    @app.get("/api/admin/metrics")
+    def admin_metrics(
+        _: None = Depends(analytics_admin),
+        days: int = Query(default=30, ge=1, le=90),
+        limit: int = Query(default=50, ge=1, le=200),
+        offset: int = Query(default=0, ge=0, le=100_000),
+    ) -> dict:
+        return repo.user_activity_metrics(days, limit, offset)
 
     # -- профиль -----------------------------------------------------------
     @app.get("/api/me")
@@ -322,6 +347,7 @@ def create_app(
     @app.get("/api/listings")
     def listings(
         request: Request,
+        user: dict | None = Depends(optional_user),
         limit: int = Query(default=20, ge=1, le=50),
         offset: int = Query(default=0, ge=0, le=10_000),
         q: str | None = Query(default=None, max_length=80),
@@ -356,6 +382,40 @@ def create_app(
             pattern="^(new|price_asc|price_desc|distance|year_desc|mileage_asc)$",
         ),
     ) -> dict:
+        if (
+            user
+            and offset == 0
+            and any(
+                (
+                    q,
+                    make,
+                    model,
+                    price_min,
+                    price_max,
+                    year_min,
+                    year_max,
+                    mileage_min,
+                    mileage_max,
+                    fuel,
+                    gearbox,
+                    body,
+                    drive,
+                    condition,
+                    seller_type,
+                    color,
+                    doors,
+                    seats,
+                    power_min,
+                    power_max,
+                    engine_min,
+                    engine_max,
+                    source,
+                    published_days,
+                    radius_km,
+                )
+            )
+        ):
+            repo.record_search(user["id"])
         key = f"list:{request.url.query}"
         cached = cache.get(key)
         if cached is not None:
@@ -415,9 +475,7 @@ def create_app(
         return card
 
     @app.get("/api/listings/{listing_id}/similar")
-    def similar_listings(
-        listing_id: int, limit: int = Query(default=6, ge=1, le=12)
-    ) -> dict:
+    def similar_listings(listing_id: int, limit: int = Query(default=6, ge=1, le=12)) -> dict:
         key = f"similar:v1:{listing_id}:{limit}"
         cached = cache.get(key)
         if cached is not None:
@@ -470,14 +528,6 @@ def create_app(
         return payload
 
     # -- просмотры и реакции -----------------------------------------------
-    def optional_user(authorization: str | None = Header(default=None)) -> dict | None:
-        if not authorization or not authorization.startswith("Bearer "):
-            return None
-        try:
-            return repo.get_user(verify_token(authorization[7:], jwt_secret))
-        except AuthError:
-            return None
-
     @app.post("/api/listings/{listing_id}/view")
     def record_view(listing_id: int, user: dict = Depends(current_user)) -> dict:
         return {"views": repo.record_view(user["id"], listing_id)}
@@ -508,9 +558,7 @@ def create_app(
         offset: int = Query(default=0, ge=0, le=5000),
         user: dict | None = Depends(optional_user),
     ) -> dict:
-        items = repo.feed(
-            user["id"] if user else None, mode=mode, limit=limit, offset=offset
-        )
+        items = repo.feed(user["id"] if user else None, mode=mode, limit=limit, offset=offset)
         return {"items": items, "mode": mode}
 
     @app.get("/api/recommendations")
