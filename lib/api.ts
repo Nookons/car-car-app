@@ -12,6 +12,11 @@ export class ApiError extends Error {
   }
 }
 
+// Coalesce identical in-flight GETs (for example when multiple components
+// mount together). Requests with AbortSignals stay independent because one
+// consumer must not cancel another consumer's request.
+const inFlightGets = new Map<string, Promise<unknown>>();
+
 export async function api<T>(
   path: string,
   options: {
@@ -26,19 +31,35 @@ export async function api<T>(
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
 
   const method = options.method ?? "GET";
-  const response = await fetch(`${API_URL}/api${path}`, {
-    method,
-    headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    // Кэш — на стороне API. Браузерный кэш после деплоя отдавал старые
-    // ответы без photos/price_analysis, поэтому всегда идём в сеть.
-    cache: "no-store",
-    signal: options.signal,
-  });
+  const url = `${API_URL}/api${path}`;
+  const request = async (): Promise<T> => {
+    const response = await fetch(url, {
+      method,
+      headers,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      // API cache is authoritative; avoid persisting potentially stale listings in the browser.
+      cache: "no-store",
+      signal: options.signal,
+    });
 
-  if (!response.ok) {
-    const detail = await response.json().catch(() => ({}));
-    throw new ApiError(response.status, detail.detail ?? `HTTP ${response.status}`);
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, detail.detail ?? `HTTP ${response.status}`);
+    }
+    return response.json() as Promise<T>;
+  };
+
+  if (method !== "GET" || options.body !== undefined || options.signal) {
+    return request();
   }
-  return response.json() as Promise<T>;
+
+  const key = JSON.stringify([options.token ?? "", url]);
+  const existing = inFlightGets.get(key);
+  if (existing) return existing as Promise<T>;
+
+  const pending = request().finally(() => {
+    if (inFlightGets.get(key) === pending) inFlightGets.delete(key);
+  });
+  inFlightGets.set(key, pending);
+  return pending;
 }

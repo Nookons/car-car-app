@@ -21,20 +21,32 @@ export function ListingPhotos({
 }) {
   const [index, setIndex] = React.useState(0);
   const scroller = React.useRef<HTMLDivElement>(null);
+  const scrollFrame = React.useRef<number | null>(null);
   const startX = React.useRef<number | null>(null);
   const dragged = React.useRef(false);
   const count = photos.length;
   const multiple = count > 1;
 
   const onScroll = () => {
-    const element = scroller.current;
-    if (!element || !multiple) return;
-    const first = element.firstElementChild as HTMLElement | null;
-    if (!first) return;
-    const step = first.offsetWidth + 4;
-    const next = Math.round(element.scrollLeft / step);
-    setIndex(Math.max(0, Math.min(count - 1, next)));
+    if (!multiple || scrollFrame.current != null) return;
+    scrollFrame.current = window.requestAnimationFrame(() => {
+      scrollFrame.current = null;
+      const element = scroller.current;
+      if (!element || !multiple) return;
+      const first = element.firstElementChild as HTMLElement | null;
+      if (!first) return;
+      const step = first.offsetWidth + 4;
+      const next = Math.max(0, Math.min(count - 1, Math.round(element.scrollLeft / step)));
+      setIndex((current) => (current === next ? current : next));
+    });
   };
+
+  React.useEffect(
+    () => () => {
+      if (scrollFrame.current != null) window.cancelAnimationFrame(scrollFrame.current);
+    },
+    [],
+  );
 
   if (!count) {
     return (
@@ -85,6 +97,7 @@ export function ListingPhotos({
               src={photoSize(src, 640, 480)}
               alt={title}
               priority={priority && position === 0}
+              sizes="(max-width: 768px) 100vw, 640px"
               className="aspect-[16/9] w-full"
             />
           </div>

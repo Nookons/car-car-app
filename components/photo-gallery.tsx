@@ -24,18 +24,6 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
     [count],
   );
 
-  // Предзагружаем соседние кадры: листание становится мгновенным.
-  React.useEffect(() => {
-    if (count < 2) return;
-    [1, -1].forEach((delta) => {
-      const next = valid[(index + delta + count) % count];
-      if (next) {
-        const image = new window.Image();
-        image.src = photoSize(next, 800, 600);
-      }
-    });
-  }, [index, count, valid]);
-
   React.useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
@@ -71,6 +59,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
           src={photoSize(valid[index], 800, 600)}
           alt={title}
           priority
+          sizes="(max-width: 768px) 100vw, 720px"
           className="aspect-[4/5] w-full md:aspect-[16/10]"
         />
       </button>
@@ -95,7 +84,11 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
                 )}
                 aria-label={`${position + 1}`}
               >
-                <SmartImage src={photoSize(src, 160, 120)} className="h-full w-full" />
+                <SmartImage
+                  src={photoSize(src, 160, 120)}
+                  sizes="64px"
+                  className="h-full w-full"
+                />
               </button>
             ))}
           </div>

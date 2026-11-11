@@ -70,13 +70,15 @@ def create_app(
         raise RuntimeError("нужен DATABASE_URL")
     bot_token = bot_token or os.environ.get("CARCAR_BOT_TOKEN", "")
     dev_allowed = os.environ.get("CARCAR_ALLOW_DEV") == "1"
-    jwt_secret = (
-        jwt_secret
-        or os.environ.get("CARCAR_JWT_SECRET")
-        or (bot_token if bot_token else ("dev-secret" if dev_allowed else ""))
-    )
+    jwt_secret = jwt_secret or os.environ.get("CARCAR_JWT_SECRET")
+    if not jwt_secret and dev_allowed:
+        jwt_secret = "dev-secret"
+    if not jwt_secret and bot_token:
+        raise RuntimeError("в production нужен отдельный CARCAR_JWT_SECRET")
     if not jwt_secret:
         raise RuntimeError("нужен CARCAR_JWT_SECRET или CARCAR_BOT_TOKEN")
+    if bot_token and not dev_allowed and hmac.compare_digest(jwt_secret, bot_token):
+        raise RuntimeError("CARCAR_JWT_SECRET должен отличаться от CARCAR_BOT_TOKEN")
     dev_tg_id = dev_tg_id or (
         int(os.environ["CARCAR_DEV_TG_ID"]) if os.environ.get("CARCAR_DEV_TG_ID") else None
     )
@@ -92,6 +94,8 @@ def create_app(
     public_url = os.environ.get("CARCAR_PUBLIC_URL", "").rstrip("/")
     api_url = os.environ.get("CARCAR_API_URL", "").rstrip("/")
     webhook_secret = os.environ.get("CARCAR_WEBHOOK_SECRET", "")
+    if bot_token and public_url and not webhook_secret:
+        raise RuntimeError("для Telegram webhook нужен CARCAR_WEBHOOK_SECRET")
 
     WARM_QUERIES = [
         "limit=20&offset=0&sort=new",
@@ -252,7 +256,9 @@ def create_app(
         update: dict[str, Any],
         secret: str | None = Header(default=None, alias="X-Telegram-Bot-Api-Secret-Token"),
     ) -> dict:
-        if webhook_secret and not hmac.compare_digest(secret or "", webhook_secret):
+        if not webhook_secret:
+            raise HTTPException(status_code=503, detail="webhook не настроен")
+        if not hmac.compare_digest(secret or "", webhook_secret):
             raise HTTPException(status_code=403, detail="плохой секрет")
         callback = update.get("callback_query")
         if callback:

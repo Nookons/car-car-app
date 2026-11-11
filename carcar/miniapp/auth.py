@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -19,7 +20,8 @@ import time
 from urllib.parse import parse_qsl
 
 TOKEN_TTL = 30 * 24 * 3600
-INIT_DATA_TTL = 24 * 3600
+INIT_DATA_TTL = 5 * 60
+MAX_FUTURE_AUTH_SKEW = 30
 
 
 class AuthError(ValueError):
@@ -51,8 +53,16 @@ def validate_init_data(init_data: str, bot_token: str, *, max_age: int = INIT_DA
     if not hmac.compare_digest(expected, received_hash):
         raise AuthError("подпись не совпадает")
 
-    auth_date = int(pairs.get("auth_date", "0") or 0)
-    if max_age and auth_date and time.time() - auth_date > max_age:
+    try:
+        auth_date = int(pairs.get("auth_date", "0") or 0)
+    except (TypeError, ValueError) as exc:
+        raise AuthError("неверный auth_date") from exc
+    if auth_date <= 0:
+        raise AuthError("нет auth_date")
+    age = time.time() - auth_date
+    if age < -MAX_FUTURE_AUTH_SKEW:
+        raise AuthError("auth_date из будущего")
+    if max_age and age > max_age:
         raise AuthError("initData просрочен")
 
     user_raw = pairs.get("user")
@@ -84,12 +94,34 @@ def verify_token(token: str, secret: str) -> int:
         header, payload, signature = token.split(".")
     except ValueError as exc:
         raise AuthError("битый токен") from exc
+    try:
+        header_data = json.loads(_unb64(header))
+        if header_data.get("alg") != "HS256" or header_data.get("typ") != "JWT":
+            raise AuthError("неподдерживаемый заголовок токена")
+        expected = hmac.new(
+            secret.encode(), f"{header}.{payload}".encode(), hashlib.sha256
+        ).digest()
+        if not hmac.compare_digest(expected, _unb64(signature)):
+            raise AuthError("подпись токена не совпадает")
 
-    expected = hmac.new(secret.encode(), f"{header}.{payload}".encode(), hashlib.sha256).digest()
-    if not hmac.compare_digest(expected, _unb64(signature)):
-        raise AuthError("подпись токена не совпадает")
-
-    data = json.loads(_unb64(payload))
-    if int(data.get("exp", 0)) < time.time():
-        raise AuthError("токен истёк")
-    return int(data["sub"])
+        data = json.loads(_unb64(payload))
+        now = int(time.time())
+        if int(data.get("exp", 0)) <= now:
+            raise AuthError("токен истёк")
+        if int(data.get("iat", 0)) > now + MAX_FUTURE_AUTH_SKEW:
+            raise AuthError("токен выпущен в будущем")
+        user_id = int(data["sub"])
+        if user_id <= 0:
+            raise AuthError("неверный пользователь в токене")
+        return user_id
+    except AuthError:
+        raise
+    except (
+        AttributeError,
+        KeyError,
+        TypeError,
+        ValueError,
+        UnicodeDecodeError,
+        binascii.Error,
+    ) as exc:
+        raise AuthError("битый токен") from exc

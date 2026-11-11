@@ -45,6 +45,7 @@ export function SimilarListings({ items, allHref }: { items: Listing[]; allHref:
               {photo ? (
                 <SmartImage
                   src={photoSize(photo, 320, 240)}
+                  sizes="(max-width: 768px) 45vw, 200px"
                   alt={item.title}
                   className="aspect-[4/3] w-full"
                 />
