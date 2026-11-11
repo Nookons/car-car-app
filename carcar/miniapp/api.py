@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -347,6 +347,7 @@ def create_app(
     @app.get("/api/listings")
     def listings(
         request: Request,
+        background: BackgroundTasks,
         user: dict | None = Depends(optional_user),
         limit: int = Query(default=20, ge=1, le=50),
         offset: int = Query(default=0, ge=0, le=10_000),
@@ -419,6 +420,11 @@ def create_app(
         key = f"list:{request.url.query}"
         cached = cache.get(key)
         if cached is not None:
+            # Показ был и при ответе из кэша: иначе CTR считался бы только
+            # по «счастливым» запросам, прошедшим мимо Redis.
+            background.add_task(
+                repo.record_impressions, [item["id"] for item in cached.get("items", [])]
+            )
             return cached
         items, total, approx = repo.search(
             limit=limit,
@@ -460,6 +466,7 @@ def create_app(
             "offset": offset,
         }
         cache.set(key, payload, ttl=120)
+        background.add_task(repo.record_impressions, [item["id"] for item in items])
         return payload
 
     @app.get("/api/listings/{listing_id}")

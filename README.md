@@ -24,6 +24,7 @@
 | [`docs/PERF-collector.md`](docs/PERF-collector.md) | аудит производительности сборщика: замеры «до/после», находки, проверка |
 | [`docs/PERF-images.md`](docs/PERF-images.md) | фото: замеры «до/после» и ресайз на CDN площадки |
 | [`docs/PERF-market.md`](docs/PERF-market.md) | рынок: почему `model_option` устарел и как лента считает оценку |
+| [`docs/RANKING.md`](docs/RANKING.md) | ранжирование: один «котёл» сигналов (показы, открытия, избранное), формула score, свежесть |
 
 ## Сборщик otomoto
 

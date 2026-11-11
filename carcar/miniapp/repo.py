@@ -38,6 +38,15 @@ LIST_FIELDS = """
     l.last_seen_at, l.status
 """
 
+# Порядок «интересно → свежо»: score из единой формулы (см. listing_stat_score
+# в schema.sql), поделённый на 1 + возраст_в_днях/21. Через три недели объявление
+# стоит в выдаче вдвое дешевле, но не исчезает: вечный хит не вытесняет рынок.
+SCORE_ORDER = (
+    "coalesce(st.score, 0) / (1 + greatest("
+    "extract(epoch from now() - coalesce(l.published_at, l.first_seen_at))"
+    " / 86400.0, 0) / 21.0)"
+)
+
 
 def _flt(value: Any) -> float | None:
     return float(value) if value is not None else None
@@ -1096,6 +1105,29 @@ class MiniAppRepo:
         return items
 
     # -- просмотры, реакции, популярность -----------------------------------
+    def record_impressions(self, listing_ids: list[int]) -> None:
+        """Показ объявления в выдаче: поиск, лента, похожие.
+
+        Именно показ отличает «видел в списке» от «открыл карточку»: без него
+        CTR посчитать нельзя, и объявление, которое никто не открывает, ничем
+        не хуже того, которое открывают. Один запрос на пачку.
+        """
+        ids = sorted({int(listing_id) for listing_id in listing_ids if listing_id})
+        if not ids:
+            return
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into listing_stat (listing_id, impressions)
+                select id, 1 from unnest(%s::bigint[]) as id
+                on conflict (listing_id) do update set
+                    impressions = listing_stat.impressions + 1,
+                    updated_at = now()
+                """,
+                (ids,),
+            )
+        conn.commit()
+
     def record_view(self, user_id: int, listing_id: int) -> int:
         """Один просмотр в день на пользователя; возвращает всего просмотров."""
         with self.pool.connection() as conn, conn.cursor() as cur:
@@ -1117,14 +1149,10 @@ class MiniAppRepo:
                 )
                 cur.execute(
                     """
-                    insert into listing_stat (listing_id, views, score)
-                    values (%s, 1, 1)
+                    insert into listing_stat (listing_id, views)
+                    values (%s, 1)
                     on conflict (listing_id) do update set
                         views = listing_stat.views + 1,
-                        score = (listing_stat.views + 1)
-                              + 3 * listing_stat.likes
-                              + 5 * listing_stat.comments
-                              + 2 * listing_stat.reposts,
                         updated_at = now()
                     returning views
                     """,
@@ -1150,14 +1178,10 @@ class MiniAppRepo:
                 if fresh:
                     cur.execute(
                         """
-                        insert into listing_stat (listing_id, likes, score)
-                        values (%s, 1, 3)
+                        insert into listing_stat (listing_id, likes)
+                        values (%s, 1)
                         on conflict (listing_id) do update set
                             likes = listing_stat.likes + 1,
-                            score = listing_stat.views
-                                  + 3 * (listing_stat.likes + 1)
-                                  + 5 * listing_stat.comments
-                                  + 2 * listing_stat.reposts,
                             updated_at = now()
                         """,
                         (listing_id,),
@@ -1173,10 +1197,6 @@ class MiniAppRepo:
                         """
                         update listing_stat set
                             likes = greatest(likes - 1, 0),
-                            score = views
-                                  + 3 * greatest(likes - 1, 0)
-                                  + 5 * comments
-                                  + 2 * reposts,
                             updated_at = now()
                         where listing_id = %s
                         """,
@@ -1198,14 +1218,10 @@ class MiniAppRepo:
             if fresh:
                 cur.execute(
                     """
-                    insert into listing_stat (listing_id, reposts, score)
-                    values (%s, 1, 2)
+                    insert into listing_stat (listing_id, reposts)
+                    values (%s, 1)
                     on conflict (listing_id) do update set
                         reposts = listing_stat.reposts + 1,
-                        score = listing_stat.views
-                              + 3 * listing_stat.likes
-                              + 5 * listing_stat.comments
-                              + 2 * (listing_stat.reposts + 1),
                         updated_at = now()
                     """,
                     (listing_id,),
@@ -1225,14 +1241,10 @@ class MiniAppRepo:
             row = cur.fetchone()
             cur.execute(
                 """
-                insert into listing_stat (listing_id, comments, score)
-                values (%s, 1, 5)
+                insert into listing_stat (listing_id, comments)
+                values (%s, 1)
                 on conflict (listing_id) do update set
                     comments = listing_stat.comments + 1,
-                    score = listing_stat.views
-                          + 3 * listing_stat.likes
-                          + 5 * (listing_stat.comments + 1)
-                          + 2 * listing_stat.reposts,
                     updated_at = now()
                 """,
                 (listing_id,),
@@ -1273,7 +1285,8 @@ class MiniAppRepo:
         ]
 
     def _taste(self, conn, user_id: int) -> dict[str, Any]:
-        """Вкус пользователя: сохранённые фильтры + просмотры + лайки."""
+        """Вкус пользователя: сохранённые фильтры + просмотры + лайки + избранное."""
+
         makes: dict[str, int] = {}
         bodies: dict[str, int] = {}
         fuels: dict[str, int] = {}
@@ -1334,6 +1347,24 @@ class MiniAppRepo:
                 if row["fuel"]:
                     fuels[row["fuel"]] = fuels.get(row["fuel"], 0) + 2
 
+            # Избранное — осознанный выбор: «сохранил себе» весит больше лайка,
+            # иначе подборка учится на случайных тапах в ленте.
+            cur.execute(
+                """
+                select l.make, l.body, l.fuel
+                from favorite f join listing l on l.id = f.listing_id
+                where f.user_id = %s order by f.created_at desc limit 50
+                """,
+                (user_id,),
+            )
+            for row in cur.fetchall():
+                if row["make"]:
+                    makes[row["make"]] = makes.get(row["make"], 0) + 5
+                if row["body"]:
+                    bodies[row["body"]] = bodies.get(row["body"], 0) + 4
+                if row["fuel"]:
+                    fuels[row["fuel"]] = fuels.get(row["fuel"], 0) + 3
+
         top_makes = [m for m, _ in sorted(makes.items(), key=lambda kv: -kv[1])[:6]]
         top_bodies = [b for b, _ in sorted(bodies.items(), key=lambda kv: -kv[1])[:3]]
         top_fuels = [f for f, _ in sorted(fuels.items(), key=lambda kv: -kv[1])[:2]]
@@ -1378,11 +1409,10 @@ class MiniAppRepo:
                         "where v.user_id = %(uid)s and v.listing_id = l.id)"
                     )
                     params["uid"] = user_id
-            order = (
-                "coalesce(st.score, 0) desc, l.published_at desc nulls last"
-                if mode == "popular" or not taste or not (taste["makes"] or taste["bodies"])
-                else "l.published_at desc nulls last, coalesce(st.score, 0) desc"
-            )
+            # Один порядок в обоих режимах: интерес (единый score) с поправкой
+            # на свежесть. Раньше for_you с вкусом сортировал только по дате,
+            # поэтому лайки, просмотры и избранное влияли лишь на «popular».
+            order = f"{SCORE_ORDER} desc, l.published_at desc nulls last"
             sql = f"""
                 select {LIST_FIELDS}, s.code as source_code,
                        coalesce(st.views, 0) views,
@@ -1398,6 +1428,10 @@ class MiniAppRepo:
             """
             cur.execute(sql, params)
             rows = cur.fetchall()
+
+        if rows:
+            # Карточки реально показаны в ленте — это показы, а не открытия.
+            self.record_impressions([int(row["id"]) for row in rows])
 
         items = []
         for row in rows:
@@ -1713,6 +1747,18 @@ class MiniAppRepo:
                          last_active_at = now()""",
                     (user_id,),
                 )
+                # «Добавил себе» — самый сильный сигнал интереса:
+                # объявление попадает в общий котёл, а не только в личное.
+                cur.execute(
+                    """
+                    insert into listing_stat (listing_id, favorites)
+                    values (%s, 1)
+                    on conflict (listing_id) do update set
+                        favorites = listing_stat.favorites + 1,
+                        updated_at = now()
+                    """,
+                    (listing_id,),
+                )
         conn.commit()
         return bool(added)
 
@@ -1723,5 +1769,15 @@ class MiniAppRepo:
                 (user_id, listing_id),
             )
             deleted = cur.rowcount
+            if deleted:
+                cur.execute(
+                    """
+                    update listing_stat set
+                        favorites = greatest(favorites - 1, 0),
+                        updated_at = now()
+                    where listing_id = %s
+                    """,
+                    (listing_id,),
+                )
         conn.commit()
         return bool(deleted)
