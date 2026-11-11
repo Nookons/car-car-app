@@ -119,7 +119,12 @@ def create_app(
             async with httpx.AsyncClient(timeout=45) as client:
                 for query in WARM_QUERIES:
                     try:
-                        await client.get(f"http://127.0.0.1:{port}/api/listings?{query}")
+                        # Разогрев — не показ пользователю: иначе «новинки»
+                        # получали бы тысячи показов без единого открытия.
+                        await client.get(
+                            f"http://127.0.0.1:{port}/api/listings?{query}",
+                            headers={"X-CarCar-Warm": "1"},
+                        )
                     except Exception:  # noqa: BLE001
                         break
             await asyncio.sleep(45)
@@ -348,6 +353,7 @@ def create_app(
     def listings(
         request: Request,
         background: BackgroundTasks,
+        warm: str | None = Header(default=None, alias="X-CarCar-Warm"),
         user: dict | None = Depends(optional_user),
         limit: int = Query(default=20, ge=1, le=50),
         offset: int = Query(default=0, ge=0, le=10_000),
@@ -422,9 +428,10 @@ def create_app(
         if cached is not None:
             # Показ был и при ответе из кэша: иначе CTR считался бы только
             # по «счастливым» запросам, прошедшим мимо Redis.
-            background.add_task(
-                repo.record_impressions, [item["id"] for item in cached.get("items", [])]
-            )
+            if not warm:
+                background.add_task(
+                    repo.record_impressions, [item["id"] for item in cached.get("items", [])]
+                )
             return cached
         items, total, approx = repo.search(
             limit=limit,
@@ -466,7 +473,8 @@ def create_app(
             "offset": offset,
         }
         cache.set(key, payload, ttl=120)
-        background.add_task(repo.record_impressions, [item["id"] for item in items])
+        if not warm:
+            background.add_task(repo.record_impressions, [item["id"] for item in items])
         return payload
 
     @app.get("/api/listings/{listing_id}")
