@@ -1747,18 +1747,8 @@ class MiniAppRepo:
                          last_active_at = now()""",
                     (user_id,),
                 )
-                # «Добавил себе» — самый сильный сигнал интереса:
-                # объявление попадает в общий котёл, а не только в личное.
-                cur.execute(
-                    """
-                    insert into listing_stat (listing_id, favorites)
-                    values (%s, 1)
-                    on conflict (listing_id) do update set
-                        favorites = listing_stat.favorites + 1,
-                        updated_at = now()
-                    """,
-                    (listing_id,),
-                )
+                # Счётчик favorites ведёт триггер favorite_stat_counter:
+                # каскадное удаление пользователя тоже не оставит его врать.
         conn.commit()
         return bool(added)
 
@@ -1769,15 +1759,5 @@ class MiniAppRepo:
                 (user_id, listing_id),
             )
             deleted = cur.rowcount
-            if deleted:
-                cur.execute(
-                    """
-                    update listing_stat set
-                        favorites = greatest(favorites - 1, 0),
-                        updated_at = now()
-                    where listing_id = %s
-                    """,
-                    (listing_id,),
-                )
         conn.commit()
         return bool(deleted)

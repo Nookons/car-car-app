@@ -435,6 +435,35 @@ create trigger listing_stat_score
     on listing_stat
     for each row execute function listing_stat_recalc_score();
 
+-- Избранное считает база: код, каскадное удаление и ручная чистка одинаково
+-- проходят через один счётчик.
+create or replace function favorite_stat_counter() returns trigger
+language plpgsql
+as $$
+begin
+    if tg_op = 'INSERT' then
+        insert into listing_stat (listing_id, favorites)
+        values (new.listing_id, 1)
+        on conflict (listing_id) do update set
+            favorites = listing_stat.favorites + 1,
+            updated_at = now();
+        return new;
+    elsif tg_op = 'DELETE' then
+        update listing_stat set
+            favorites = greatest(favorites - 1, 0),
+            updated_at = now()
+        where listing_id = old.listing_id;
+        return old;
+    end if;
+    return null;
+end;
+$$;
+
+drop trigger if exists favorite_stat_counter on favorite;
+create trigger favorite_stat_counter
+    after insert or delete on favorite
+    for each row execute function favorite_stat_counter();
+
 create table if not exists listing_view (
     user_id    bigint not null references app_user(id) on delete cascade,
     listing_id bigint not null references listing(id) on delete cascade,

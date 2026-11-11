@@ -568,13 +568,26 @@ def create_app(
     # -- лента и рекомендации ----------------------------------------------
     @app.get("/api/feed")
     def feed(
+        background: BackgroundTasks,
         mode: str = Query(default="for_you", pattern="^(for_you|popular)$"),
         limit: int = Query(default=10, ge=1, le=30),
         offset: int = Query(default=0, ge=0, le=5000),
         user: dict | None = Depends(optional_user),
     ) -> dict:
+        # Лента — самый дорогой запрос: поиск плюс оценка рынка на каждую
+        # карточку. 30 секунд кэша убирают секунды ожидания при скролле,
+        # а показы фиксируются и при ответе из кэша.
+        key = f"feed:v1:{mode}:{limit}:{offset}:{user['id'] if user else 0}"
+        cached = cache.get(key)
+        if cached is not None:
+            background.add_task(
+                repo.record_impressions, [item["id"] for item in cached.get("items", [])]
+            )
+            return cached
         items = repo.feed(user["id"] if user else None, mode=mode, limit=limit, offset=offset)
-        return {"items": items, "mode": mode}
+        payload = {"items": items, "mode": mode}
+        cache.set(key, payload, ttl=30)
+        return payload
 
     @app.get("/api/recommendations")
     def recommendations(
