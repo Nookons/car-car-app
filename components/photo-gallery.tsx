@@ -7,6 +7,9 @@ import { SmartImage } from "@/components/smart-image";
 import { useI18n } from "@/lib/i18n";
 import { photoSize } from "@/lib/photos";
 
+const GALLERY_WIDTHS = [640, 960, 1280];
+const THUMB_WIDTHS = [160, 320];
+
 export function PhotoGallery({ photos, title }: { photos: string[]; title: string }) {
   const { t } = useI18n();
   const [index, setIndex] = React.useState(0);
@@ -60,6 +63,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
           alt={title}
           priority
           sizes="(max-width: 768px) 100vw, 720px"
+          widths={GALLERY_WIDTHS}
           className="aspect-[4/5] w-full md:aspect-[16/10]"
         />
       </button>
@@ -87,6 +91,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
                 <SmartImage
                   src={photoSize(src, 160, 120)}
                   sizes="64px"
+                  widths={THUMB_WIDTHS}
                   className="h-full w-full"
                 />
               </button>

@@ -13,6 +13,8 @@ import type { Listing } from "@/lib/types";
  * Похожие объявления под карточкой: горизонтальная лента, чтобы не уводить
  * пользователя в отдельный экран и не терять контекст текущей машины.
  */
+const SIMILAR_WIDTHS = [320, 640];
+
 export function SimilarListings({ items, allHref }: { items: Listing[]; allHref: string }) {
   const { t } = useI18n();
   if (!items.length) return null;
@@ -46,6 +48,7 @@ export function SimilarListings({ items, allHref }: { items: Listing[]; allHref:
                 <SmartImage
                   src={photoSize(photo, 320, 240)}
                   sizes="(max-width: 768px) 45vw, 200px"
+                  widths={SIMILAR_WIDTHS}
                   alt={item.title}
                   className="aspect-[4/3] w-full"
                 />

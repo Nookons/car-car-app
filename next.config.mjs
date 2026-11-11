@@ -44,9 +44,10 @@ const nextConfig = {
     ];
   },
   images: {
-    formats: ["image/avif", "image/webp"],
-    minimumCacheTTL: 86400,
-    remotePatterns: [{ protocol: "https", hostname: "**.olxcdn.com" }],
+    // Оптимизатор Vercel считается в квоте (5 000 исходников/мес на бесплатном
+    // плане), а CDN площадки уже отдаёт нужный размер. Поэтому `next/image`
+    // выключен целиком: картинки идут напрямую с olxcdn через srcSet.
+    unoptimized: true,
   },
 };
 

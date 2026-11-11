@@ -20,3 +20,24 @@ export function photoSize(src: string, width: number, height: number): string {
     return src;
   }
 }
+
+/**
+ * Адаптивный srcSet без оптимизатора Vercel.
+ *
+ * CDN площадки сам умеет отдавать нужный размер через `;s=ШxВ`, поэтому
+ * браузеру достаточно предложить 2–3 варианта: он выберет под экран и DPR.
+ * Так мы не тратим квоту `/_next/image` и не делаем лишний хоп через Vercel.
+ * Неизвестные хосты возвращают пустую строку — там остаётся обычный `src`.
+ */
+export function photoSrcSet(src: string, widths: number[] = [320, 640, 960]): string {
+  if (!src) return "";
+  try {
+    const url = new URL(src);
+    if (!RESIZABLE_HOST.test(url.hostname)) return "";
+  } catch {
+    return "";
+  }
+  return widths
+    .map((width) => `${photoSize(src, width, Math.round(width * 0.75))} ${width}w`)
+    .join(", ");
+}
