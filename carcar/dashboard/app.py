@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from collections.abc import Callable
@@ -18,7 +19,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+import httpx
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -182,6 +184,9 @@ def create_app(
     source_code = source
     cache: dict[str, tuple[float, dict]] = {}
     repo: DatabaseRepo | None = None
+    api_base_url = os.environ.get(
+        "CARCAR_API_URL", "https://api-production-5bee.up.railway.app"
+    ).rstrip("/")
     if use_db:
         url = db_url or database_url()
         if not url:
@@ -342,6 +347,31 @@ def create_app(
         if repo is None:
             return {"available": False, "by_source": [], "daily": [], "monthly": [], "runs": []}
         return {"available": True, **repo.metrics(days=days, months=months)}
+
+    @app.get("/api/user-metrics")
+    def user_metrics(
+        days: int = Query(default=30, ge=1, le=90),
+        limit: int = Query(default=100, ge=1, le=200),
+        offset: int = Query(default=0, ge=0, le=100_000),
+        admin_token: str | None = Header(default=None, alias="X-Analytics-Admin-Token"),
+    ) -> dict:
+        """Проксирует закрытую аналитику Mini App в основной дашборд."""
+        if not admin_token:
+            raise HTTPException(status_code=401, detail="нужен токен аналитики")
+        try:
+            response = httpx.get(
+                f"{api_base_url}/api/admin/metrics",
+                params={"days": days, "limit": limit, "offset": offset},
+                headers={"X-Analytics-Admin-Token": admin_token},
+                timeout=10.0,
+            )
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail="API аналитики недоступно") from exc
+        if response.status_code == 401:
+            raise HTTPException(status_code=401, detail="неверный токен аналитики")
+        if response.status_code != 200:
+            raise HTTPException(status_code=502, detail="ошибка API аналитики")
+        return response.json()
 
     @app.get("/api/listings/{listing_id}")
     def listing_card(listing_id: str) -> dict:

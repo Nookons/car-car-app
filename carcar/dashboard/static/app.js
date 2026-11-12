@@ -3,6 +3,9 @@
 const I18N = {
   ru: {
     title: "сборщик",
+    userAnalytics: "Активность пользователей",
+    userAnalyticsHint: "Введите токен администратора аналитики.",
+    loadAnalytics: "Показать метрики",
     polls: "Опросов",
     newListings: "Новых объявлений",
     details: "Карточек в папке",
@@ -78,6 +81,9 @@ const I18N = {
   },
   en: {
     title: "collector",
+    userAnalytics: "User activity",
+    userAnalyticsHint: "Enter the analytics admin token.",
+    loadAnalytics: "Show metrics",
     polls: "Polls",
     newListings: "New listings",
     details: "Cached details",
@@ -652,6 +658,93 @@ async function loadMetrics() {
     /* графики не критичны для статуса */
   }
 }
+
+function addAnalyticsCell(row, value, className = "") {
+  const cell = document.createElement("td");
+  if (className) cell.className = className;
+  cell.textContent = value == null || value === "" ? "—" : String(value);
+  row.appendChild(cell);
+}
+
+function fillAnalyticsTable(id, rows, renderRow, emptyColumns) {
+  const body = $(id);
+  body.replaceChildren();
+  if (!rows?.length) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = emptyColumns;
+    td.className = "muted";
+    td.textContent = lang === "ru" ? "Пока нет данных" : "No data yet";
+    tr.appendChild(td);
+    body.appendChild(tr);
+    return;
+  }
+  rows.forEach((item) => {
+    const tr = document.createElement("tr");
+    renderRow(tr, item);
+    body.appendChild(tr);
+  });
+}
+
+function renderUserAnalytics(data) {
+  $("ua-registered").textContent = fmtInt(data.totals.registered_users);
+  $("ua-dau").textContent = fmtInt(data.totals.dau);
+  $("ua-wau").textContent = fmtInt(data.totals.wau);
+  $("ua-mau").textContent = fmtInt(data.totals.mau);
+  fillAnalyticsTable("ua-daily", data.daily, (tr, day) => {
+    addAnalyticsCell(tr, day.day);
+    addAnalyticsCell(tr, fmtInt(day.active_users));
+    addAnalyticsCell(tr, fmtInt(day.sessions));
+    addAnalyticsCell(tr, fmtInt(day.searches));
+    addAnalyticsCell(tr, fmtInt(day.listing_views));
+  }, 5);
+  fillAnalyticsTable("ua-listings", data.top_listings, (tr, item) => {
+    addAnalyticsCell(tr, item.title);
+    addAnalyticsCell(tr, fmtInt(item.views), "num");
+  }, 2);
+  fillAnalyticsTable("ua-users", data.users, (tr, user) => {
+    addAnalyticsCell(tr, user.username ? `@${user.username}` : `ID ${user.id}`);
+    const lastSeen = user.last_seen_at
+      ? new Date(user.last_seen_at).toLocaleString(lang === "ru" ? "ru-RU" : "en-GB")
+      : "—";
+    addAnalyticsCell(tr, lastSeen);
+    addAnalyticsCell(tr, fmtInt(user.sessions));
+    addAnalyticsCell(tr, fmtInt(user.searches));
+    addAnalyticsCell(tr, fmtInt(user.listing_views));
+    addAnalyticsCell(tr, fmtInt(user.favorites_added));
+    addAnalyticsCell(tr, fmtInt(user.subscriptions_created));
+  }, 7);
+  $("user-analytics-results").classList.remove("hidden");
+  $("user-analytics-error").classList.add("hidden");
+  $("user-analytics-status").textContent = lang === "ru" ? "Обновлено сейчас" : "Updated now";
+}
+
+$("user-analytics-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const token = $("user-analytics-token").value.trim();
+  if (!token) return;
+  const button = event.currentTarget.querySelector("button[type=submit]");
+  const error = $("user-analytics-error");
+  button.disabled = true;
+  error.classList.add("hidden");
+  $("user-analytics-status").textContent = lang === "ru" ? "Загрузка…" : "Loading…";
+  try {
+    const response = await fetch("/api/user-metrics?days=30&limit=100", {
+      cache: "no-store",
+      headers: { "X-Analytics-Admin-Token": token },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+    renderUserAnalytics(data);
+  } catch (exc) {
+    $("user-analytics-results").classList.add("hidden");
+    error.textContent = exc instanceof Error ? exc.message : "Не удалось загрузить метрики";
+    error.classList.remove("hidden");
+    $("user-analytics-status").textContent = "";
+  } finally {
+    button.disabled = false;
+  }
+});
 
 function renderCollectors(status) {
   const tbody = $("collectors");

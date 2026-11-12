@@ -60,6 +60,7 @@ h2 { font-size: 14px; margin: 0; font-weight: 650; letter-spacing: .01em; }
 .topbar p { margin: 2px 0 0; font-size: 13px; }
 
 .topbar-right { display: flex; align-items: center; gap: 10px; }
+.dashboard-nav { text-decoration: none; color: var(--text); white-space: nowrap; }
 
 .pill {
   display: inline-flex;
@@ -291,4 +292,16 @@ a.primary.link-btn:hover { background: #1f2937; }
 .charts { grid-template-columns: 1.6fr 1fr; }
 .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; font-size: 12px; color: var(--muted); }
 .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.analytics-controls { display: flex; gap: 8px; margin: 12px 0; }
+.analytics-controls input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font: inherit; }
+.analytics-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 12px 0; }
+.analytics-tables { margin: 12px 0; }
+.analytics-scroll { min-width: 0; overflow-x: auto; }
+.analytics-scroll table { min-width: 520px; }
+.user-analytics { scroll-margin-top: 88px; }
 @media (max-width: 860px) { .charts { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .analytics-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .analytics-controls { align-items: stretch; flex-direction: column; }
+  .dashboard-nav { font-size: 12px; padding: 6px 8px; }
+}

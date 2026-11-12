@@ -16,6 +16,7 @@
       </div>
     </div>
     <div class="topbar-right">
+      <a class="ghost dashboard-nav" href="#user-analytics" data-i18n="userAnalytics">Пользователи</a>
       <span class="pill" id="state-pill"><span class="dot"></span><span id="state-text">…</span></span>
       <button class="ghost" id="lang" title="Language">EN</button>
     </div>
@@ -69,6 +70,42 @@
         <strong id="kpi-sources">—</strong>
         <span class="hint" data-i18n="inWork">сбор идёт</span>
       </article>
+    </section>
+
+    <section class="card user-analytics" id="user-analytics">
+      <div class="card-head">
+        <h2 data-i18n="userAnalytics">Активность пользователей</h2>
+        <span class="muted" id="user-analytics-status"></span>
+      </div>
+      <p class="muted small" data-i18n="userAnalyticsHint">Введите токен администратора аналитики.</p>
+      <form id="user-analytics-form" class="analytics-controls">
+        <input id="user-analytics-token" type="password" autocomplete="off" aria-label="Токен администратора аналитики" placeholder="Токен администратора аналитики">
+        <button class="primary" type="submit" data-i18n="loadAnalytics">Показать метрики</button>
+      </form>
+      <p class="banner bad hidden" id="user-analytics-error" role="alert"></p>
+      <div id="user-analytics-results" class="hidden">
+        <div class="cards analytics-kpis">
+          <article class="card kpi"><span class="label">Регистрации</span><strong id="ua-registered">—</strong></article>
+          <article class="card kpi"><span class="label">DAU</span><strong id="ua-dau">—</strong></article>
+          <article class="card kpi"><span class="label">WAU</span><strong id="ua-wau">—</strong></article>
+          <article class="card kpi"><span class="label">MAU</span><strong id="ua-mau">—</strong></article>
+        </div>
+        <div class="grid two analytics-tables">
+          <article class="card analytics-scroll">
+            <h2>Активность по дням · 30 дней</h2>
+            <table><thead><tr><th>Дата</th><th>Активные</th><th>Сессии</th><th>Поиски</th><th>Просмотры</th></tr></thead><tbody id="ua-daily"></tbody></table>
+          </article>
+          <article class="card analytics-scroll">
+            <h2>Популярные объявления · 30 дней</h2>
+            <table><thead><tr><th>Объявление</th><th class="num">Просмотры</th></tr></thead><tbody id="ua-listings"></tbody></table>
+          </article>
+        </div>
+        <article class="card analytics-scroll">
+          <h2>Пользователи · 30 дней</h2>
+          <table><thead><tr><th>Пользователь</th><th>Последний визит</th><th>Сессии</th><th>Поиски</th><th>Просмотры</th><th>Избранное</th><th>Подписки</th></tr></thead><tbody id="ua-users"></tbody></table>
+          <p class="tiny muted">Поисковые фразы и параметры фильтров не сохраняются.</p>
+        </article>
+      </div>
     </section>
 
     <section class="grid charts">
