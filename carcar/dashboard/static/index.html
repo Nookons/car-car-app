@@ -57,6 +57,17 @@
       </table>
     </section>
 
+    <section class="card" id="app-announcement-section">
+      <div class="card-head"><h2>Объявление для всех пользователей</h2><span class="muted" id="announcement-state"></span></div>
+      <form id="announcement-form" class="announcement-form">
+        <label class="field wide">Текст сообщения<textarea id="announcement-message" maxlength="500" rows="2" required placeholder="Например: сегодня будут проводиться технические работы"></textarea></label>
+        <label class="field">Показывать с<input id="announcement-start" type="datetime-local" required></label>
+        <label class="field">Показывать до<input id="announcement-end" type="datetime-local" required></label>
+        <div class="announcement-actions"><button class="primary" type="submit">Сохранить расписание</button><button class="ghost" id="announcement-clear" type="button">Снять объявление</button></div>
+      </form>
+      <p class="muted small">Покажется в тонкой плашке вверху приложения в указанный период.</p>
+    </section>
+
     <section class="cards">
       <article class="card kpi">
         <span class="label">Активных объявлений</span>
@@ -160,15 +171,16 @@
     <section class="grid charts">
       <article class="card chart-card">
         <div class="card-head">
-          <h2 data-i18n="dailyChart">Новые объявления по дням</h2>
+          <h2>Динамика сбора</h2>
           <span class="muted" id="daily-range"></span>
         </div>
+        <div class="chart-controls"><select id="chart-days" aria-label="Период"><option value="7">7 дней</option><option value="30" selected>30 дней</option><option value="90">90 дней</option><option value="365">12 месяцев</option></select><select id="chart-metric" aria-label="Показатель"><option value="inserted">Новые объявления</option><option value="errors">Ошибки</option><option value="pages">Обработанные страницы</option></select><select id="chart-source" aria-label="Площадка"><option value="">Все площадки</option></select></div>
         <canvas id="chart-daily" height="150"></canvas>
         <div class="legend" id="legend-daily"></div>
       </article>
       <article class="card chart-card">
         <div class="card-head">
-          <h2 data-i18n="monthlyChart">По месяцам</h2>
+          <h2>Обзор по месяцам</h2>
           <span class="muted" id="monthly-range"></span>
         </div>
         <canvas id="chart-monthly" height="150"></canvas>
@@ -204,14 +216,11 @@
 
     <section class="card listings-card">
       <div class="card-head">
-        <h2 data-i18n="recentListings">Последние объявления</h2>
-        <div class="geo-controls">
-          <select id="source" aria-label="source"></select>
-          <button class="ghost" id="near" data-i18n="nearMe">Рядом со мной</button>
-          <select id="radius" aria-label="radius"></select>
-        </div>
+        <h2>Все объявления</h2>
+        <div class="listing-filters"><input id="listing-query" type="search" placeholder="Поиск по марке, модели, городу…"><select id="listing-status"><option value="all">Все статусы</option><option value="active">Активные</option><option value="removed">Неактивные</option></select><select id="listing-source"><option value="">Все площадки</option></select></div>
       </div>
-      <div class="listing-grid" id="listings"></div>
+      <div class="table-scroll"><table><thead><tr><th>Объявление</th><th>Площадка</th><th>Статус</th><th>Цена</th><th>Город</th><th>Последнее обновление</th></tr></thead><tbody id="managed-listings"></tbody></table></div>
+      <div class="user-pagination"><span id="listing-page" class="muted small"></span><div><button class="ghost" id="listing-prev" type="button">Назад</button><button class="ghost" id="listing-next" type="button">Дальше</button></div></div>
     </section>
 
     <section class="grid two">

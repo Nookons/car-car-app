@@ -367,7 +367,7 @@ def create_app(
     @app.get("/api/service-status")
     def service_status() -> dict:
         """Public, read-only maintenance state for the app's thin notice bar."""
-        return {"notices": repo.service_notices()}
+        return {"notices": repo.service_notices(), "announcement": repo.app_announcement()}
 
     @app.post("/bot/webhook")
     def bot_webhook(

@@ -57,6 +57,12 @@ class ServiceNoticeIn(BaseModel):
     ends_at: datetime
 
 
+class AppAnnouncementIn(BaseModel):
+    message: str = Field(min_length=1, max_length=500)
+    starts_at: datetime
+    ends_at: datetime
+
+
 class DashboardLoginIn(BaseModel):
     password: str = Field(min_length=1, max_length=200)
 
@@ -461,6 +467,21 @@ def create_app(
             items.sort(key=lambda i: i.get("distance_km", 1e9))
         return {"items": items[:limit], "total": len(items), "filtered": nearby}
 
+    @app.get("/api/manage/listings")
+    def manage_listings(
+        status: Literal["all", "active", "removed"] = "all",
+        source: str | None = Query(default=None, max_length=40),
+        query: str | None = Query(default=None, max_length=100),
+        limit: int = Query(default=50, ge=1, le=100),
+        offset: int = Query(default=0, ge=0, le=10_000_000),
+    ) -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="полный список требует PostgreSQL")
+        return repo.search_listings(
+            status=status, source=source, query=query.strip() if query else None,
+            limit=limit, offset=offset,
+        )
+
     @app.get("/api/funnel-metrics")
     def funnel_metrics(days: int = Query(default=30, ge=1, le=365)) -> dict:
         if repo is None:
@@ -651,5 +672,31 @@ def create_app(
             raise HTTPException(status_code=503, detail="для расписания нужна база данных")
         repo.set_service_notice(source, None, None, None, None)
         return {"ok": True, "source": source}
+
+    @app.get("/api/app-announcement")
+    def get_app_announcement() -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="для объявления нужна база данных")
+        return {"announcement": repo.app_announcement()}
+
+    @app.put("/api/app-announcement")
+    def save_app_announcement(payload: AppAnnouncementIn) -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="для объявления нужна база данных")
+        if payload.starts_at.tzinfo is None or payload.ends_at.tzinfo is None:
+            raise HTTPException(status_code=422, detail="укажите даты с часовым поясом")
+        if not payload.message.strip():
+            raise HTTPException(status_code=422, detail="текст объявления не может быть пустым")
+        if payload.ends_at <= payload.starts_at:
+            raise HTTPException(status_code=422, detail="окончание должно быть позже начала")
+        repo.set_app_announcement(payload.message.strip(), payload.starts_at, payload.ends_at)
+        return {"ok": True}
+
+    @app.delete("/api/app-announcement")
+    def delete_app_announcement() -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="для объявления нужна база данных")
+        repo.clear_app_announcement()
+        return {"ok": True}
 
     return app

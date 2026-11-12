@@ -12,6 +12,8 @@ type ServiceNotice = {
   ends_at: string;
 };
 
+type AppAnnouncement = { message: string; starts_at: string; ends_at: string };
+
 function formatWindow(start: string, end: string, locale: string) {
   const options: Intl.DateTimeFormatOptions = {
     day: "numeric",
@@ -27,6 +29,7 @@ function formatWindow(start: string, end: string, locale: string) {
 export function ServiceNoticeBar() {
   const { lang } = useI18n();
   const [notices, setNotices] = useState<ServiceNotice[]>([]);
+  const [announcement, setAnnouncement] = useState<AppAnnouncement | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -34,8 +37,11 @@ export function ServiceNoticeBar() {
       try {
         const response = await fetch("/api/service-status", { cache: "no-store" });
         if (!response.ok) return;
-        const data = (await response.json()) as { notices?: ServiceNotice[] };
-        if (alive) setNotices(Array.isArray(data.notices) ? data.notices : []);
+        const data = (await response.json()) as { notices?: ServiceNotice[]; announcement?: AppAnnouncement | null };
+        if (alive) {
+          setNotices(Array.isArray(data.notices) ? data.notices : []);
+          setAnnouncement(data.announcement || null);
+        }
       } catch {
         // The banner is informational; a temporary status API outage must not
         // block navigation or render a misleading maintenance state.
@@ -51,7 +57,7 @@ export function ServiceNoticeBar() {
     };
   }, []);
 
-  if (!notices.length) return null;
+  if (!notices.length && !announcement) return null;
 
   const locale = lang === "ru" ? "ru-RU" : lang === "pl" ? "pl-PL" : lang === "uk" ? "uk-UA" : "en-GB";
   return (
@@ -82,6 +88,7 @@ export function ServiceNoticeBar() {
             </span>
           );
         })}
+        {announcement && <span className="inline-flex flex-wrap items-center gap-x-1.5" key="app-announcement"><strong>{lang === "ru" ? "Объявление" : lang === "pl" ? "Komunikat" : "Announcement"}:</strong><span>{announcement.message}</span><span className="tabular-nums text-amber-900/75 dark:text-amber-200/75">· {formatWindow(announcement.starts_at, announcement.ends_at, locale)}</span></span>}
       </div>
     </aside>
   );

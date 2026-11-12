@@ -331,6 +331,17 @@ class MiniAppRepo:
                 if isinstance(row["notice"], dict)
             ]
 
+    def app_announcement(self) -> dict[str, Any] | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """select message, starts_at, ends_at from public.app_announcement
+                   where id = 1 and starts_at <= now() and ends_at > now()"""
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            return {**row, "starts_at": _iso(row["starts_at"]), "ends_at": _iso(row["ends_at"])}
+
     def record_session(self, user_id: int) -> None:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(

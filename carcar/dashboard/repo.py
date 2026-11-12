@@ -153,6 +153,60 @@ class DatabaseRepo:
                     raise ValueError("неизвестная площадка")
         conn.commit()
 
+    def app_announcement(self) -> dict[str, Any] | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute("select message, starts_at, ends_at, updated_at from public.app_announcement where id = 1")
+            row = cur.fetchone()
+        if not row:
+            return None
+        return {**row, **{key: _iso(row[key]) for key in ("starts_at", "ends_at", "updated_at")}}
+
+    def set_app_announcement(self, message: str, starts_at: datetime, ends_at: datetime) -> None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """insert into public.app_announcement (id, message, starts_at, ends_at, updated_at)
+                   values (1, %s, %s, %s, now()) on conflict (id) do update set
+                     message = excluded.message, starts_at = excluded.starts_at,
+                     ends_at = excluded.ends_at, updated_at = now()""",
+                (message, starts_at, ends_at),
+            )
+        conn.commit()
+
+    def clear_app_announcement(self) -> None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute("delete from public.app_announcement where id = 1")
+        conn.commit()
+
+    def search_listings(
+        self, *, status: str = "all", source: str | None = None,
+        query: str | None = None, limit: int = 50, offset: int = 0,
+    ) -> dict[str, Any]:
+        conds: list[str] = []
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
+        if status in {"active", "removed"}:
+            conds.append("l.status = %(status)s")
+            params["status"] = status
+        if source:
+            conds.append("s.code = %(source)s")
+            params["source"] = source
+        if query:
+            conds.append("(l.title ilike %(query)s or l.make ilike %(query)s or l.model ilike %(query)s or l.city ilike %(query)s or l.external_id ilike %(query)s)")
+            params["query"] = f"%{query.strip()}%"
+        where = " where " + " and ".join(conds) if conds else ""
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(f"select count(*)::int total from listing l join source s on s.id=l.source_id{where}", params)
+            total = int(cur.fetchone()["total"])
+            cur.execute(
+                f"""select l.id, l.external_id, s.code source_code, l.url, l.title, l.price,
+                           l.currency, l.make, l.model, l.year, l.mileage_km, l.city,
+                           l.thumb_url, l.photos_count, l.status, l.published_at, l.last_seen_at
+                    from listing l join source s on s.id=l.source_id{where}
+                    order by l.last_seen_at desc nulls last, l.id desc limit %(limit)s offset %(offset)s""",
+                params,
+            )
+            items = [{**row, "published_at": _iso(row["published_at"]), "last_seen_at": _iso(row["last_seen_at"])} for row in cur.fetchall()]
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
+
     # -- список ------------------------------------------------------------
     def recent(
         self,

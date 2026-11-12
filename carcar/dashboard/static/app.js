@@ -258,8 +258,6 @@ function applyLang() {
   });
   $("lang").textContent = lang === "ru" ? "EN" : "RU";
   document.title = `CarCar · ${t("title")}`;
-  fillRadius();
-  updateGeoButton();
 }
 
 function renderState(status) {
@@ -466,22 +464,41 @@ function renderListings(items) {
 
 async function loadListings() {
   try {
-    const params = new URLSearchParams({ limit: "8" });
-    const source = $("source").value;
+    const params = new URLSearchParams({ limit: "50", offset: String(listingOffset) });
+    const source = $("listing-source").value;
     if (source) params.set("source", source);
-    if (geo) {
-      params.set("lat", geo.lat);
-      params.set("lon", geo.lon);
-      const radius = $("radius").value;
-      if (radius !== "0") params.set("radius_km", radius);
-    }
-    const response = await fetch(`/api/listings?${params.toString()}`, { cache: "no-store" });
+    params.set("status", $("listing-status").value);
+    const query = $("listing-query").value.trim();
+    if (query) params.set("query", query);
+    const response = await fetch(`/api/manage/listings?${params.toString()}`, { cache: "no-store" });
     if (!response.ok) return;
     const data = await response.json();
-    renderListings(data.items || []);
+    renderManagedListings(data);
   } catch {
-    /* карточки не критичны для статуса */
+    $("listing-page").textContent = "Не удалось загрузить объявления";
   }
+}
+
+let listingOffset = 0;
+let listingSearchTimer;
+function renderManagedListings(data) {
+  const body = $("managed-listings");
+  body.replaceChildren();
+  (data.items || []).forEach((item) => {
+    const row = document.createElement("tr");
+    const link = document.createElement("a");
+    link.href = `/listing/${encodeURIComponent(item.id)}`;
+    link.textContent = item.title || `${item.make || ""} ${item.model || ""}`.trim() || `Объявление #${item.id}`;
+    const title = document.createElement("td"); title.appendChild(link); row.appendChild(title);
+    [item.source, item.status === "active" ? "Активно" : "Неактивно", item.price ? fmtPrice(item.price, item.currency) : "—", item.city || "—", item.last_seen_at ? new Date(item.last_seen_at).toLocaleString(lang === "ru" ? "ru-RU" : "en-GB") : "—"].forEach((value) => {
+      const cell = document.createElement("td"); cell.textContent = String(value); row.appendChild(cell);
+    });
+    body.appendChild(row);
+  });
+  const total = Number(data.total || 0), start = total ? data.offset + 1 : 0, end = Math.min(data.offset + data.limit, total);
+  $("listing-page").textContent = `${start}–${end} из ${fmtInt(total)}`;
+  $("listing-prev").disabled = data.offset <= 0;
+  $("listing-next").disabled = data.offset + data.limit >= total;
 }
 
 const SOURCE_COLORS = {
@@ -497,10 +514,11 @@ function sourceColor(source, index) {
   return SOURCE_COLORS[source] || PALETTE[index % PALETTE.length];
 }
 
-function buildSeries(rows, key) {
+function buildSeries(rows, key, valueKey = "count", sourceFilter = "") {
+  if (sourceFilter) rows = rows.filter((r) => r.source === sourceFilter);
   const labels = [...new Set(rows.map((r) => r[key]))].sort();
   const sources = [...new Set(rows.map((r) => r.source))].sort();
-  const index = new Map(rows.map((r) => [`${r[key]}|${r.source}`, r.count]));
+  const index = new Map(rows.map((r) => [`${r[key]}|${r.source}`, Number(r[valueKey] || 0)]));
   const series = sources
     .map((src, i) => ({
       source: src,
@@ -522,32 +540,40 @@ function drawStack(canvas, labels, series, labelFmt) {
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
   ctx.clearRect(0, 0, width, height);
 
-  const pad = 8;
+  const left = 42;
+  const right = 8;
+  const top = 10;
+  const bottom = 24;
   const count = Math.max(labels.length, 1);
   const totals = labels.map((_, i) =>
     series.reduce((sum, item) => sum + (item.values[i] || 0), 0),
   );
   const max = Math.max(1, ...totals);
   const gap = count > 20 ? 2 : 4;
-  const barWidth = Math.max(2, (width - pad * 2 - gap * (count - 1)) / count);
+  const plotHeight = height - top - bottom;
+  const plotWidth = width - left - right;
+  const barWidth = Math.max(2, (plotWidth - gap * (count - 1)) / count);
 
   ctx.strokeStyle = "#eef0f3";
   ctx.lineWidth = 1;
   for (let i = 1; i <= 3; i += 1) {
-    const y = pad + ((height - pad * 2) * i) / 4;
+    const y = top + (plotHeight * i) / 4;
     ctx.beginPath();
-    ctx.moveTo(pad, y);
-    ctx.lineTo(width - pad, y);
+    ctx.moveTo(left, y);
+    ctx.lineTo(width - right, y);
     ctx.stroke();
+    ctx.fillStyle = "#9ca3af";
+    ctx.textAlign = "right";
+    ctx.fillText(fmtInt(Math.round((max * (4 - i)) / 4)), left - 6, y + 4);
   }
 
   labels.forEach((label, i) => {
-    let y = height - pad;
+    let y = height - bottom;
     series.forEach((item) => {
       const value = item.values[i] || 0;
       if (!value) return;
-      const barHeight = ((height - pad * 2) * value) / max;
-      const x = pad + i * (barWidth + gap);
+      const barHeight = (plotHeight * value) / max;
+      const x = left + i * (barWidth + gap);
       ctx.fillStyle = item.color;
       ctx.fillRect(x, y - barHeight, barWidth, barHeight);
       y -= barHeight;
@@ -556,13 +582,11 @@ function drawStack(canvas, labels, series, labelFmt) {
 
   ctx.fillStyle = "#9ca3af";
   ctx.font = "11px -apple-system, BlinkMacSystemFont, sans-serif";
-  ctx.textAlign = "right";
-  ctx.fillText(String(max), width - pad, 12);
 
   const step = Math.ceil(count / 6);
   labels.forEach((label, i) => {
     if (i % step !== 0 && i !== count - 1) return;
-    const x = pad + i * (barWidth + gap) + barWidth / 2;
+    const x = left + i * (barWidth + gap) + barWidth / 2;
     ctx.textAlign = i === 0 ? "left" : i === count - 1 ? "right" : "center";
     ctx.fillStyle = "#9ca3af";
     ctx.fillText(labelFmt(label), x, height - 2);
@@ -598,10 +622,15 @@ function renderMetrics() {
     $("kpi-active-listings").textContent = fmtInt(data.totals.active);
   }
 
-  const daily = buildSeries(data.daily, "day");
-  drawStack($("chart-daily"), daily.labels, daily.series, (d) => `${d.slice(8, 10)}.${d.slice(5, 7)}`);
+  const days = Number($("chart-days").value || 30);
+  const metric = $("chart-metric").value || "inserted";
+  const sourceFilter = $("chart-source").value;
+  const monthlyMode = days > 90;
+  const chartRows = monthlyMode ? data.monthly : (metric === "inserted" ? data.daily : data.runs);
+  const daily = buildSeries(chartRows, monthlyMode ? "month" : "day", monthlyMode || metric === "inserted" ? "count" : metric, sourceFilter);
+  drawStack($("chart-daily"), daily.labels, daily.series, (d) => monthlyMode ? d.slice(2).replace("-", "/") : `${d.slice(8, 10)}.${d.slice(5, 7)}`);
   renderLegend($("legend-daily"), daily.series);
-  $("daily-range").textContent = `${daily.labels.length} ${lang === "ru" ? "дней" : "days"}`;
+  $("daily-range").textContent = `${daily.labels.length} ${monthlyMode ? "месяцев" : "дней"}`;
 
   const monthly = buildSeries(data.monthly, "month");
   drawStack($("chart-monthly"), monthly.labels, monthly.series, (m) => m.slice(2).replace("-", "/"));
@@ -623,7 +652,7 @@ function renderMetrics() {
     tbody.appendChild(tr);
   });
 
-  const select = $("source");
+  const select = $("chart-source");
   const current = select.value;
   select.innerHTML = `<option value="">${t("allSources")}</option>`;
   data.by_source.forEach((row) => {
@@ -633,11 +662,19 @@ function renderMetrics() {
     select.appendChild(option);
   });
   select.value = current;
+  const listingSource = $("listing-source");
+  const selectedListingSource = listingSource.value;
+  listingSource.innerHTML = `<option value="">${t("allSources")}</option>`;
+  data.by_source.forEach((row) => {
+    const option = document.createElement("option"); option.value = row.source; option.textContent = row.source; listingSource.appendChild(option);
+  });
+  listingSource.value = selectedListingSource;
 }
 
 async function loadMetrics() {
   try {
-    const response = await fetch("/api/metrics?days=30&months=12", { cache: "no-store" });
+    const days = Number($("chart-days").value || 30);
+    const response = await fetch(`/api/metrics?days=${days}&months=12`, { cache: "no-store" });
     if (!response.ok) return;
     lastMetrics = await response.json();
     renderMetrics();
@@ -1117,38 +1154,67 @@ async function load() {
   }
 }
 
-$("near").addEventListener("click", () => {
-  if (geo) {
-    saveGeo(null);
-    updateGeoButton();
-    loadListings();
-    return;
-  }
-  if (!navigator.geolocation) {
-    alert(t("geoDenied"));
-    return;
-  }
-  const button = $("near");
-  button.textContent = t("locating");
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      saveGeo({ lat: position.coords.latitude, lon: position.coords.longitude });
-      updateGeoButton();
-      loadListings();
-    },
-    () => {
-      button.textContent = t("nearMe");
-      alert(t("geoDenied"));
-    },
-    { timeout: 8000, maximumAge: 600000 },
-  );
+function toLocalInput(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+async function loadAnnouncement() {
+  try {
+    const response = await fetch("/api/app-announcement", { cache: "no-store" });
+    if (!response.ok) return;
+    const { announcement } = await response.json();
+    if (announcement) {
+      $("announcement-message").value = announcement.message;
+      $("announcement-start").value = toLocalInput(announcement.starts_at);
+      $("announcement-end").value = toLocalInput(announcement.ends_at);
+      $("announcement-state").textContent = `Расписание: ${new Date(announcement.starts_at).toLocaleString()} — ${new Date(announcement.ends_at).toLocaleString()}`;
+    } else {
+      $("announcement-state").textContent = "Не запланировано";
+    }
+  } catch { $("announcement-state").textContent = "Не удалось загрузить расписание"; }
+}
+
+$("announcement-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("announcement-form").querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/app-announcement", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: $("announcement-message").value,
+        starts_at: new Date($("announcement-start").value).toISOString(),
+        ends_at: new Date($("announcement-end").value).toISOString(),
+      }),
+    });
+    if (!response.ok) throw new Error((await response.json()).detail || "Ошибка сохранения");
+    $("announcement-state").textContent = "Сохранено";
+  } catch (error) { $("announcement-state").textContent = error.message || "Ошибка сохранения"; }
+  finally { button.disabled = false; }
 });
 
-$("radius").addEventListener("change", () => {
-  if (geo) loadListings();
+$("announcement-clear").addEventListener("click", async () => {
+  const response = await fetch("/api/app-announcement", { method: "DELETE" });
+  if (response.ok) {
+    $("announcement-form").reset();
+    $("announcement-state").textContent = "Объявление снято";
+  } else $("announcement-state").textContent = "Не удалось снять объявление";
 });
 
-$("source").addEventListener("change", () => loadListings());
+$("listing-status").addEventListener("change", () => { listingOffset = 0; loadListings(); });
+$("listing-source").addEventListener("change", () => { listingOffset = 0; loadListings(); });
+$("listing-query").addEventListener("input", () => {
+  clearTimeout(listingSearchTimer);
+  listingSearchTimer = setTimeout(() => { listingOffset = 0; loadListings(); }, 350);
+});
+$("listing-prev").addEventListener("click", () => { listingOffset = Math.max(0, listingOffset - 50); loadListings(); });
+$("listing-next").addEventListener("click", () => { listingOffset += 50; loadListings(); });
+$("chart-days").addEventListener("change", () => loadMetrics());
+$("chart-metric").addEventListener("change", () => renderMetrics());
+$("chart-source").addEventListener("change", () => renderMetrics());
 $("lang").addEventListener("click", () => {
   lang = lang === "ru" ? "en" : "ru";
   localStorage.setItem("carcar.lang", lang);
@@ -1183,6 +1249,7 @@ function showDashboard() {
   showUserFromHash();
   loadLogs();
   loadListings();
+  loadAnnouncement();
   dashboardIntervals = [setInterval(load, 5000), setInterval(loadMetrics, 30000), setInterval(loadLogs, 15000), setInterval(loadListings, 60000)];
 }
 
