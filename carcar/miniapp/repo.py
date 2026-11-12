@@ -1353,6 +1353,7 @@ class MiniAppRepo:
         lat: float | None = None,
         lon: float | None = None,
         radius_km: float | None = None,
+        exact_total: bool = False,
         sort: str = "new",
     ) -> tuple[list[dict[str, Any]], int, bool]:
         limit = max(1, min(limit, 50))
@@ -1517,8 +1518,29 @@ class MiniAppRepo:
                 estimate = int(row["n"] or 0) if row else 0
             cur.execute(items_sql, params)
             rows = cur.fetchall()
+            exact_value: int | None = None
+            if exact_total:
+                count_params = {
+                    key: value
+                    for key, value in params.items()
+                    if key not in {"limit", "offset"}
+                }
+                try:
+                    cur.execute(
+                        "select count(*) as n from listing l "
+                        "join source s on s.id = l.source_id "
+                        f"where {where}{radius_cond}",
+                        count_params,
+                    )
+                    count_row = cur.fetchone()
+                    exact_value = int(count_row["n"]) if count_row else None
+                except Exception:  # noqa: BLE001 - точный счётчик не должен ронять выдачу
+                    exact_value = None
 
-        if len(rows) < limit:
+        if exact_value is not None:
+            total = exact_value
+            approx = False
+        elif len(rows) < limit:
             total = offset + len(rows)
             approx = False
         elif not filtered:

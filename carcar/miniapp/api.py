@@ -94,6 +94,16 @@ class FavoritePatch(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
+def _split_multi(values: list[str] | None) -> list[str] | None:
+    """Принимает и повторяющиеся, и comma-separated значения."""
+    if not values:
+        return None
+    result: list[str] = []
+    for value in values:
+        result.extend(part.strip() for part in value.split(",") if part.strip())
+    return result or None
+
+
 def create_app(
     *,
     db_url: str | None = None,
@@ -645,6 +655,7 @@ def create_app(
         engine_max: int | None = None,
         source: str | None = None,
         published_days: int | None = Query(default=None, ge=1, le=90),
+        exact: bool = Query(default=False),
         lat: float | None = None,
         lon: float | None = None,
         radius_km: float | None = Query(default=None, ge=0, le=1000),
@@ -653,6 +664,10 @@ def create_app(
             pattern="^(new|price_asc|price_desc|distance|year_desc|mileage_asc)$",
         ),
     ) -> dict:
+        makes = _split_multi(makes)
+        fuels = _split_multi(fuels)
+        gearboxes = _split_multi(gearboxes)
+        bodies = _split_multi(bodies)
         search_filters = {
             key: value
             for key, value in {
@@ -729,6 +744,7 @@ def create_app(
             lat=lat,
             lon=lon,
             radius_km=radius_km,
+            exact_total=exact,
             sort=sort,
         )
         payload = {

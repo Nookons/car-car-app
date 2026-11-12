@@ -112,7 +112,7 @@ export default function OnboardingPage() {
     if (step !== 2) return;
     let cancelled = false;
     api<{ items: Listing[]; total: number; approx?: boolean }>(
-      `/listings?${filtersToQuery(draft, 0, 3)}`,
+      `/listings?${filtersToQuery(draft, 0, 3)}&exact=1&_=${Date.now()}`,
     )
       .then((data) => {
         if (cancelled) return;
