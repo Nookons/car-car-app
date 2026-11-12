@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
 from datetime import datetime
 from typing import Any
@@ -251,6 +252,11 @@ class MiniAppRepo:
             raise RuntimeError("это складская эко-система — Mini App сюда не подключаем")
         # Кэш ставит API; в скриптах и тестах его может не быть.
         self.cache: Any | None = None
+        # Оценка рынка для списков (лента, похожие) стоит ~70 % трафика из базы:
+        # на 10 карточек это до 600 сравнимых машин с полями. Пока квота egress
+        # впритык, считаем её только в карточке; вернуть спискам —
+        # CARCAR_LIST_MARKET=1 в Railway.
+        self.list_market = os.environ.get("CARCAR_LIST_MARKET", "0") == "1"
         self.pool = ConnectionPool(
             url,
             min_size=1,
@@ -1096,15 +1102,16 @@ class MiniAppRepo:
             # Ленте похожих хватает одного фото: не тащим 6 URL на каждую карточку.
             for item in items:
                 item["photos"] = item["photos"][:1]
-            try:
-                analyses = self._market_analyses(rows)
-            except Exception:
-                # Оценка рынка вспомогательная: без неё список всё равно нужен.
-                analyses = {}
-            for item in items:
-                analysis = analyses.get(item["id"])
-                if analysis:
-                    item["price_analysis"] = analysis
+            if self.list_market:
+                try:
+                    analyses = self._market_analyses(rows)
+                except Exception:
+                    # Оценка рынка вспомогательная: без неё список всё равно нужен.
+                    analyses = {}
+                for item in items:
+                    analysis = analyses.get(item["id"])
+                    if analysis:
+                        item["price_analysis"] = analysis
         return items
 
     # -- просмотры, реакции, популярность -----------------------------------
@@ -1446,7 +1453,7 @@ class MiniAppRepo:
                 reposts=int(row["reposts"]),
             )
             items.append(item)
-        if rows:
+        if rows and self.list_market:
             try:
                 analyses = self._market_analyses(rows)
             except Exception:
