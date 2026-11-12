@@ -165,6 +165,9 @@ let geo = readGeo();
 let lastMetrics = null;
 let dashboardStarted = false;
 let dashboardIntervals = [];
+let userSearchTimer = null;
+let userAnalyticsRequest = 0;
+let userDetailRequest = 0;
 
 // Ссылку «рядом со мной» можно открыть с координатами: /?lat=52.23&lon=21.01&radius=50
 (() => {
@@ -710,6 +713,10 @@ function renderFunnel(funnel) {
 }
 
 function renderUserAnalytics(data, funnel) {
+  const filter = $("ua-user-search").value.trim();
+  $("ua-users-title").textContent = filter
+    ? `Найдено пользователей: ${fmtInt(data.total_users)}`
+    : `Пользователи · 30 дней (${fmtInt(data.total_users)})`;
   $("ua-registered").textContent = fmtInt(data.totals.registered_users);
   $("ua-dau").textContent = fmtInt(data.totals.dau);
   $("ua-wau").textContent = fmtInt(data.totals.wau);
@@ -726,7 +733,10 @@ function renderUserAnalytics(data, funnel) {
     addAnalyticsCell(tr, fmtInt(item.views), "num");
   }, 2);
   fillAnalyticsTable("ua-users", data.users, (tr, user) => {
-    addAnalyticsCell(tr, user.username ? `@${user.username}` : `ID ${user.id}`);
+    const label = user.username
+      ? `@${user.username}`
+      : [user.first_name, user.last_name].filter(Boolean).join(" ") || `ID ${user.id}`;
+    addAnalyticsCell(tr, label);
     const lastSeen = user.last_seen_at
       ? new Date(user.last_seen_at).toLocaleString(lang === "ru" ? "ru-RU" : "en-GB")
       : "—";
@@ -736,7 +746,14 @@ function renderUserAnalytics(data, funnel) {
     addAnalyticsCell(tr, fmtInt(user.listing_views));
     addAnalyticsCell(tr, fmtInt(user.favorites_added));
     addAnalyticsCell(tr, fmtInt(user.subscriptions_created));
-  }, 7);
+    const cell = document.createElement("td");
+    const link = document.createElement("a");
+    link.href = `#user=${encodeURIComponent(user.id)}`;
+    link.className = "user-detail-link";
+    link.textContent = "Статистика";
+    cell.appendChild(link);
+    tr.appendChild(cell);
+  }, 8);
   if (funnel) renderFunnel(funnel);
   $("user-analytics-results").classList.remove("hidden");
   $("user-analytics-error").classList.add("hidden");
@@ -744,32 +761,107 @@ function renderUserAnalytics(data, funnel) {
 }
 
 async function loadUserAnalytics() {
+  const requestId = ++userAnalyticsRequest;
   const button = $("refresh-user-analytics");
   const error = $("user-analytics-error");
   button.disabled = true;
   error.classList.add("hidden");
   $("user-analytics-status").textContent = lang === "ru" ? "Загрузка…" : "Loading…";
   try {
+    const params = new URLSearchParams({ days: "30", limit: "100" });
+    const query = $("ua-user-search").value.trim();
+    if (query) params.set("query", query);
     const [response, funnelResponse] = await Promise.all([
-      fetch("/api/user-metrics?days=30&limit=100", { cache: "no-store" }),
+      fetch(`/api/user-metrics?${params}`, { cache: "no-store" }),
       fetch("/api/funnel-metrics?days=30", { cache: "no-store" }),
     ]);
     const data = await response.json().catch(() => ({}));
     const funnel = funnelResponse.ok ? await funnelResponse.json().catch(() => null) : null;
+    if (requestId !== userAnalyticsRequest) return;
     if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
     renderUserAnalytics(data, funnel);
   } catch (exc) {
+    if (requestId !== userAnalyticsRequest) return;
     $("user-analytics-results").classList.add("hidden");
     error.textContent = exc instanceof Error ? exc.message : "Не удалось загрузить метрики";
     error.classList.remove("hidden");
     $("user-analytics-status").textContent = "";
     if (error.textContent.includes("401")) showDashboardLogin();
   } finally {
-    button.disabled = false;
+    if (requestId === userAnalyticsRequest) button.disabled = false;
   }
 }
 
 $("refresh-user-analytics").addEventListener("click", loadUserAnalytics);
+
+$("ua-user-search").addEventListener("input", () => {
+  clearTimeout(userSearchTimer);
+  userSearchTimer = setTimeout(loadUserAnalytics, 350);
+});
+
+async function loadUserDetail(userId) {
+  const requestId = ++userDetailRequest;
+  const dialog = $("ua-user-dialog");
+  const error = $("ua-user-error");
+  const content = $("ua-user-content");
+  if (!dialog.open) dialog.showModal();
+  error.classList.add("hidden");
+  content.classList.add("hidden");
+  $("ua-user-meta").textContent = "Загрузка…";
+  $("ua-user-title").textContent = `Пользователь #${userId}`;
+  try {
+    const response = await fetch(`/api/user-metrics/${encodeURIComponent(userId)}?days=30&search_limit=100`, { cache: "no-store" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+    if (requestId !== userDetailRequest) return;
+    const user = data.user;
+    const label = user.username ? `@${user.username}` : [user.first_name, user.last_name].filter(Boolean).join(" ") || `ID ${user.id}`;
+    $("ua-user-title").textContent = label;
+    const lastSeen = user.last_seen_at ? new Date(user.last_seen_at).toLocaleString("ru-RU") : "—";
+    $("ua-user-meta").textContent = `ID ${user.id} · регистрация ${fmtDateTime(user.created_at)} · последний визит ${lastSeen}`;
+    const totals = data.totals || {};
+    $("ua-user-sessions").textContent = fmtInt(totals.sessions);
+    $("ua-user-searches").textContent = fmtInt(totals.searches);
+    $("ua-user-views").textContent = fmtInt(totals.listing_views);
+    $("ua-user-favorites").textContent = fmtInt(totals.favorites_added);
+    $("ua-user-subscriptions").textContent = fmtInt(totals.subscriptions_created);
+    $("ua-user-days").textContent = fmtInt(totals.active_days);
+    fillAnalyticsTable("ua-user-searches-list", data.searches, (tr, item) => {
+      addAnalyticsCell(tr, new Date(item.at).toLocaleString("ru-RU"));
+      addAnalyticsCell(tr, item.query || "—");
+      const filters = Object.entries(item.filters || {}).map(([key, value]) => `${key}: ${value}`).join(" · ");
+      addAnalyticsCell(tr, filters || "—");
+      addAnalyticsCell(tr, item.sort || "new");
+    }, 4);
+    fillAnalyticsTable("ua-user-daily", data.daily, (tr, day) => {
+      addAnalyticsCell(tr, day.day);
+      addAnalyticsCell(tr, fmtInt(day.sessions));
+      addAnalyticsCell(tr, fmtInt(day.searches));
+      addAnalyticsCell(tr, fmtInt(day.listing_views));
+      addAnalyticsCell(tr, fmtInt(day.favorites_added));
+      addAnalyticsCell(tr, fmtInt(day.subscriptions_created));
+    }, 6);
+    content.classList.remove("hidden");
+    $("ua-user-meta").classList.remove("muted");
+  } catch (cause) {
+    if (requestId !== userDetailRequest) return;
+    $("ua-user-meta").textContent = "";
+    error.textContent = cause instanceof Error ? cause.message : "Не удалось загрузить статистику";
+    error.classList.remove("hidden");
+  }
+}
+
+function showUserFromHash() {
+  const match = location.hash.match(/^#user=(\d+)$/);
+  if (match && dashboardStarted) void loadUserDetail(match[1]);
+  else if ($("ua-user-dialog").open) $("ua-user-dialog").close();
+}
+
+window.addEventListener("hashchange", showUserFromHash);
+$("ua-user-close").addEventListener("click", () => $("ua-user-dialog").close());
+$("ua-user-dialog").addEventListener("close", () => {
+  if (location.hash.startsWith("#user=")) location.hash = "#user-analytics";
+});
 
 function renderCollectors(status) {
   const tbody = $("collectors");
@@ -1036,6 +1128,7 @@ function showDashboard() {
   load();
   loadMetrics();
   loadUserAnalytics();
+  showUserFromHash();
   loadLogs();
   dashboardIntervals = [setInterval(load, 3000), setInterval(loadMetrics, 30000), setInterval(loadLogs, 15000)];
 }

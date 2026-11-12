@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from datetime import datetime
 from typing import Any
@@ -90,29 +91,30 @@ class DatabaseRepo:
         self.pool.close()
 
     def service_notices(self, *, active_only: bool = False) -> list[dict[str, Any]]:
-        where = "where n.starts_at <= now() and n.ends_at > now()" if active_only else ""
-        try:
-            with self.pool.connection() as conn, conn.cursor() as cur:
-                cur.execute(
-                    f"""
-                    select s.code as source, n.mode, n.reason, n.starts_at, n.ends_at,
-                           n.updated_by, n.updated_at,
-                           (n.starts_at <= now() and n.ends_at > now()) as active
-                    from public.service_notice n
-                    join public.source s on s.id = n.source_id
-                    {where}
-                    order by n.starts_at, s.code
-                    """
-                )
-                return [
-                    {key: _iso(value) if key in {"starts_at", "ends_at", "updated_at"} else value
-                     for key, value in row.items()}
-                    for row in cur.fetchall()
-                ]
-        except Exception as exc:  # noqa: BLE001
-            if getattr(exc, "sqlstate", None) == "42P01":
-                return []
-            raise
+        active = "and (c.stats #>> '{service_notice,starts_at}')::timestamptz <= now() " \
+                 "and (c.stats #>> '{service_notice,ends_at}')::timestamptz > now()" \
+                 if active_only else ""
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                select s.code as source, c.stats->'service_notice' as notice,
+                       (c.stats #>> '{{service_notice,starts_at}}')::timestamptz <= now()
+                           and (c.stats #>> '{{service_notice,ends_at}}')::timestamptz > now() as active
+                from public.source s join public.collector c on c.source_id = s.id
+                where c.stats ? 'service_notice' {active}
+                order by s.code
+                """
+            )
+            rows = cur.fetchall()
+        return [
+            {
+                "source": row["source"],
+                **row["notice"],
+                "active": bool(row["active"]),
+            }
+            for row in rows
+            if isinstance(row["notice"], dict)
+        ]
 
     def set_service_notice(
         self, source: str, mode: str | None, reason: str | None,
@@ -120,22 +122,32 @@ class DatabaseRepo:
     ) -> None:
         with self.pool.connection() as conn, conn.cursor() as cur:
             if mode is None:
+                cur.execute("select id from public.source where code = %s", (source,))
+                source_row = cur.fetchone()
+                if not source_row:
+                    raise ValueError("неизвестная площадка")
                 cur.execute(
-                    "delete from public.service_notice n using public.source s "
-                    "where n.source_id = s.id and s.code = %s", (source,)
+                    "update public.collector set stats = coalesce(stats, '{}'::jsonb) - 'service_notice', "
+                    "updated_at = now() where source_id = %s", (source_row["id"],)
                 )
             else:
+                notice = json.dumps({
+                    "mode": mode,
+                    "reason": reason,
+                    "starts_at": starts_at.isoformat(),
+                    "ends_at": ends_at.isoformat(),
+                    "updated_by": by,
+                })
                 cur.execute(
                     """
-                    insert into public.service_notice
-                        (source_id, mode, reason, starts_at, ends_at, updated_by, updated_at)
-                    select id, %s, %s, %s, %s, %s, now() from public.source where code = %s
-                    on conflict (source_id) do update set mode = excluded.mode,
-                        reason = excluded.reason, starts_at = excluded.starts_at,
-                        ends_at = excluded.ends_at, updated_by = excluded.updated_by,
+                    insert into public.collector (source_id, stats, updated_at)
+                    select id, jsonb_build_object('service_notice', %s::jsonb), now()
+                    from public.source where code = %s
+                    on conflict (source_id) do update set
+                        stats = coalesce(collector.stats, '{}'::jsonb) || excluded.stats,
                         updated_at = now()
                     """,
-                    (mode, reason, starts_at, ends_at, by, source),
+                    (notice, source),
                 )
                 if cur.rowcount == 0:
                     raise ValueError("неизвестная площадка")

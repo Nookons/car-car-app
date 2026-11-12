@@ -91,6 +91,16 @@ h2 { font-size: 14px; margin: 0; font-weight: 650; letter-spacing: .01em; }
 #logs-section table { min-width: 700px; }
 #logs-section td:last-child { max-width: 380px; white-space: normal; overflow-wrap: anywhere; }
 #logs-section td:nth-child(4) { min-width: 220px; }
+.user-search-head { align-items: center; }
+.user-search-head input { width: min(100%, 320px); }
+.user-detail-link { color: var(--accent); font-weight: 600; text-decoration: none; }
+.user-detail-link:hover { text-decoration: underline; }
+.user-detail-dialog { width: min(980px, calc(100vw - 28px)); }
+.user-detail-dialog .service-form { max-height: min(88vh, 900px); overflow-y: auto; }
+.user-detail-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.user-detail-scroll { overflow-x: auto; margin-top: 18px; }
+.user-detail-scroll h3 { margin: 0 0 10px; font-size: 13px; }
+.user-detail-scroll table { min-width: 580px; }
 
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 .dashboard-nav { text-decoration: none; color: var(--text); white-space: nowrap; }
@@ -223,6 +233,9 @@ footer { max-width: 1120px; margin: 0 auto; padding: 0 28px 30px; }
   .service-actions { grid-template-columns: 1fr 1fr; }
   .service-actions > span { display: none; }
   .service-actions #service-clear { grid-column: 1 / -1; }
+  .user-search-head { align-items: stretch; flex-direction: column; }
+  .user-search-head input { width: 100%; }
+  .user-detail-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 

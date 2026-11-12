@@ -458,8 +458,21 @@ def create_app(
         days: int = Query(default=30, ge=1, le=90),
         limit: int = Query(default=50, ge=1, le=200),
         offset: int = Query(default=0, ge=0, le=100_000),
+        query: str | None = Query(default=None, max_length=100),
     ) -> dict:
-        return repo.user_activity_metrics(days, limit, offset)
+        return repo.user_activity_metrics(days, limit, offset, query)
+
+    @app.get("/api/admin/users/{user_id}")
+    def admin_user_metrics(
+        user_id: int,
+        _: None = Depends(analytics_admin),
+        days: int = Query(default=30, ge=1, le=90),
+        search_limit: int = Query(default=100, ge=1, le=200),
+    ) -> dict:
+        detail = repo.user_activity_detail(user_id, days=days, search_limit=search_limit)
+        if detail is None:
+            raise HTTPException(status_code=404, detail="пользователь не найден")
+        return detail
 
     @app.get("/api/admin/funnel")
     def admin_funnel(
@@ -513,6 +526,7 @@ def create_app(
             "subscriptions": repo.subscriptions(user["id"]),
             "favorites": repo.favorites(user["id"]),
             "identities": repo.list_identities(user["id"]),
+            "search_history": repo.account_search_history(user["id"]),
         }
 
     @app.delete("/api/account")
@@ -548,9 +562,8 @@ def create_app(
                     headers={"Retry-After": str(retry)},
                 )
 
-        # В meta кладём только короткие служебные поля. Никаких поисковых
-        # фраз, заметок и текстов — иначе «обезличенная» воронка перестаёт
-        # быть обезличенной.
+        # Generic client events accept only short metadata. Search text and
+        # filters are recorded separately by the authenticated listings route.
         meta_in = payload.meta or {}
         meta: dict[str, Any] = {}
         if isinstance(meta_in.get("step"), int) and 1 <= meta_in["step"] <= 6:
@@ -613,40 +626,30 @@ def create_app(
             pattern="^(new|price_asc|price_desc|distance|year_desc|mileage_asc)$",
         ),
     ) -> dict:
-        if (
-            user
-            and offset == 0
-            and any(
-                (
-                    q,
-                    make,
-                    model,
-                    price_min,
-                    price_max,
-                    year_min,
-                    year_max,
-                    mileage_min,
-                    mileage_max,
-                    fuel,
-                    gearbox,
-                    body,
-                    drive,
-                    condition,
-                    seller_type,
-                    color,
-                    doors,
-                    seats,
-                    power_min,
-                    power_max,
-                    engine_min,
-                    engine_max,
-                    source,
-                    published_days,
-                    radius_km,
-                )
-            )
-        ):
-            repo.record_search(user["id"])
+        search_filters = {
+            key: value
+            for key, value in {
+                "make": make, "model": model, "price_min": price_min,
+                "price_max": price_max, "year_min": year_min, "year_max": year_max,
+                "mileage_min": mileage_min, "mileage_max": mileage_max,
+                "fuel": fuel, "gearbox": gearbox, "body": body, "drive": drive,
+                "condition": condition, "seller_type": seller_type, "color": color,
+                "doors": doors, "seats": seats, "power_min": power_min,
+                "power_max": power_max, "engine_min": engine_min,
+                "engine_max": engine_max, "source": source,
+                "published_days": published_days,
+                # Store an approximate area, not the browser's exact location.
+                "lat": round(lat, 2) if lat is not None else None,
+                "lon": round(lon, 2) if lon is not None else None,
+                "radius_km": radius_km,
+            }.items()
+            if value is not None
+        }
+        # Filter-dialog live-count previews use limit=1; only log searches that
+        # are actually used to render a results page.
+        search_query = q.strip() if q else None
+        if user and not warm and limit > 1 and offset == 0 and (search_query or search_filters):
+            repo.record_search(user["id"], query=search_query or None, filters=search_filters, sort=sort)
         key = f"list:{request.url.query}"
         cached = cache.get(key)
         if cached is not None:

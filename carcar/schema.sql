@@ -283,8 +283,9 @@ begin
     end if;
 end $$;
 
--- Обезличенная воронка: тип события и случайный visitor_id. Ни IP, ни
--- поисковых фраз, ни текста заметок здесь нет.
+-- События продукта. Общие события не содержат сырого текста; для авторизованного
+-- поиска kind='search' содержит query/filters в meta, связанные с user_id.
+-- Срок таких данных ограничен 400 днями функцией carcar_purge().
 create table if not exists funnel_event (
     id         bigint generated always as identity primary key,
     user_id    bigint references app_user(id) on delete set null,
@@ -400,18 +401,6 @@ create table if not exists collector (
     updated_at       timestamptz not null default now()
 );
 
--- Planned per-source pause/maintenance windows shown in the web app.
-create table if not exists service_notice (
-    source_id smallint primary key references source(id) on delete cascade,
-    mode text not null check (mode in ('paused', 'maintenance')),
-    reason text not null check (length(trim(reason)) between 1 and 500),
-    starts_at timestamptz not null,
-    ends_at timestamptz not null,
-    updated_by text not null default 'dashboard',
-    updated_at timestamptz not null default now(),
-    check (ends_at > starts_at)
-);
-
 create table if not exists sweep_state (
     source_id   smallint primary key references source(id) on delete cascade,
     next_page   integer not null default 1,
@@ -423,15 +412,6 @@ create table if not exists sweep_state (
 
 alter table collector    enable row level security;
 alter table sweep_state  enable row level security;
-alter table service_notice enable row level security;
-revoke all privileges on table public.service_notice from anon, authenticated;
-do $service_notice_grant$
-begin
-    if exists (select 1 from pg_roles where rolname = 'carcar_runtime') then
-        grant select, insert, update, delete on table public.service_notice to carcar_runtime;
-    end if;
-end;
-$service_notice_grant$;
 
 -- ---------------------------------------------------------------------------
 -- Очистка: чтобы база не росла бесконечно

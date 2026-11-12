@@ -6,6 +6,7 @@ import json
 import math
 import os
 import re
+import uuid
 from datetime import datetime
 from typing import Any
 
@@ -313,25 +314,22 @@ class MiniAppRepo:
         self.pool.close()
 
     def service_notices(self) -> list[dict[str, Any]]:
-        try:
-            with self.pool.connection() as conn, conn.cursor() as cur:
-                cur.execute(
-                    """
-                    select s.code as source, n.mode, n.reason, n.starts_at, n.ends_at
-                    from public.service_notice n
-                    join public.source s on s.id = n.source_id
-                    where n.starts_at <= now() and n.ends_at > now()
-                    order by n.starts_at, s.code
-                    """
-                )
-                return [
-                    {**row, "starts_at": _iso(row["starts_at"]), "ends_at": _iso(row["ends_at"])}
-                    for row in cur.fetchall()
-                ]
-        except Exception as exc:  # noqa: BLE001
-            if getattr(exc, "sqlstate", None) == "42P01":
-                return []
-            raise
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select s.code as source, c.stats->'service_notice' as notice
+                from public.source s join public.collector c on c.source_id = s.id
+                where c.stats ? 'service_notice'
+                  and (c.stats #>> '{service_notice,starts_at}')::timestamptz <= now()
+                  and (c.stats #>> '{service_notice,ends_at}')::timestamptz > now()
+                order by s.code
+                """
+            )
+            return [
+                {"source": row["source"], **row["notice"]}
+                for row in cur.fetchall()
+                if isinstance(row["notice"], dict)
+            ]
 
     def record_session(self, user_id: int) -> None:
         with self.pool.connection() as conn, conn.cursor() as cur:
@@ -353,8 +351,12 @@ class MiniAppRepo:
             )
         conn.commit()
 
-    def record_search(self, user_id: int) -> None:
-        # Count search activity without persisting the search term or filters.
+    def record_search(
+        self, user_id: int, *, query: str | None, filters: dict[str, Any], sort: str
+    ) -> None:
+        # Store a privacy-bounded per-user history; coalesce exact retries.
+        meta = json.dumps({"query": query, "filters": filters, "sort": sort})
+        visitor_id = uuid.uuid5(uuid.NAMESPACE_URL, f"carcar-user:{user_id}")
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
                 """insert into user_activity_daily
@@ -368,9 +370,37 @@ class MiniAppRepo:
                      last_active_at = now()""",
                 (user_id,),
             )
+            cur.execute(
+                """
+                insert into funnel_event (user_id, visitor_id, kind, meta)
+                select %s, %s, 'search', %s::jsonb
+                where not exists (
+                    select 1 from funnel_event
+                    where user_id = %s and kind = 'search' and meta = %s::jsonb
+                      and created_at >= now() - interval '10 seconds'
+                )
+                """,
+                (user_id, visitor_id, meta, user_id, meta),
+            )
         conn.commit()
 
-    def user_activity_metrics(self, days: int, limit: int, offset: int) -> dict[str, Any]:
+    def user_activity_metrics(
+        self, days: int, limit: int, offset: int, query: str | None = None
+    ) -> dict[str, Any]:
+        query = (query or "").strip()[:100]
+        user_filter = ""
+        user_args: list[Any] = []
+        if query:
+            pattern = f"%{query}%"
+            predicates = [
+                "u.username ilike %s", "u.first_name ilike %s",
+                "u.last_name ilike %s", "u.email ilike %s",
+            ]
+            user_args = [pattern] * len(predicates)
+            if query.isdigit():
+                predicates.extend(["u.id::text = %s", "u.tg_id::text = %s"])
+                user_args.extend([query, query])
+            user_filter = "where (" + " or ".join(predicates) + ")"
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
                 """select
@@ -395,7 +425,8 @@ class MiniAppRepo:
             )
             daily = cur.fetchall()
             cur.execute(
-                """select u.id, u.username, u.created_at, u.last_seen_at,
+                f"""select u.id, u.username, u.first_name, u.last_name,
+                          u.created_at, u.last_seen_at,
                           coalesce(sum(a.sessions), 0)::int sessions,
                           coalesce(sum(a.searches), 0)::int searches,
                           coalesce(sum(a.listing_views), 0)::int listing_views,
@@ -403,11 +434,14 @@ class MiniAppRepo:
                           coalesce(sum(a.subscriptions_created), 0)::int subscriptions_created
                    from app_user u left join user_activity_daily a
                      on a.user_id = u.id and a.day >= current_date - %s
+                   {user_filter}
                    group by u.id order by u.last_seen_at desc
                    limit %s offset %s""",
-                (days - 1, limit, offset),
+                (days - 1, *user_args, limit, offset),
             )
             users = cur.fetchall()
+            cur.execute(f"select count(*) as total from app_user u {user_filter}", user_args)
+            total_users = int(cur.fetchone()["total"])
             cur.execute(
                 """select l.id, l.title, count(*)::int views
                    from listing_view v join listing l on l.id = v.listing_id
@@ -416,7 +450,81 @@ class MiniAppRepo:
                 (days - 1,),
             )
             top_listings = cur.fetchall()
-        return {"totals": totals, "daily": daily, "users": users, "top_listings": top_listings}
+        return {
+            "totals": totals, "daily": daily, "users": users,
+            "total_users": total_users, "top_listings": top_listings,
+        }
+
+    def user_activity_detail(
+        self, user_id: int, days: int = 30, search_limit: int = 100
+    ) -> dict[str, Any] | None:
+        days = max(1, min(days, 90))
+        search_limit = max(1, min(search_limit, 200))
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """select id, username, first_name, last_name, created_at, last_seen_at
+                   from app_user where id = %s""",
+                (user_id,),
+            )
+            user = cur.fetchone()
+            if not user:
+                return None
+            cur.execute(
+                """select coalesce(sum(sessions), 0)::int sessions,
+                          coalesce(sum(searches), 0)::int searches,
+                          coalesce(sum(listing_views), 0)::int listing_views,
+                          coalesce(sum(favorites_added), 0)::int favorites_added,
+                          coalesce(sum(subscriptions_created), 0)::int subscriptions_created,
+                          count(*)::int active_days
+                   from user_activity_daily
+                   where user_id = %s and day >= current_date - %s""",
+                (user_id, days - 1),
+            )
+            totals = cur.fetchone()
+            cur.execute(
+                """select day, sessions, searches, listing_views, favorites_added,
+                          subscriptions_created, last_active_at
+                   from user_activity_daily where user_id = %s
+                     and day >= current_date - %s
+                   order by day desc""",
+                (user_id, days - 1),
+            )
+            daily = [
+                {**row, "day": row["day"].isoformat(), "last_active_at": _iso(row["last_active_at"])}
+                for row in cur.fetchall()
+            ]
+            cur.execute(
+                """select created_at, meta from funnel_event
+                   where user_id = %s and kind = 'search'
+                     and created_at >= now() - make_interval(days => %s)
+                   order by created_at desc limit %s""",
+                (user_id, days, search_limit),
+            )
+            searches = [
+                {"at": _iso(row["created_at"]), **(row["meta"] or {})}
+                for row in cur.fetchall()
+            ]
+        return {
+            "user": {**user, "created_at": _iso(user["created_at"]), "last_seen_at": _iso(user["last_seen_at"])},
+            "days": days,
+            "totals": totals,
+            "daily": daily,
+            "searches": searches,
+        }
+
+    def account_search_history(self, user_id: int) -> list[dict[str, Any]]:
+        """All retained search records, for the account's data export."""
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """select created_at, meta from funnel_event
+                   where user_id = %s and kind = 'search'
+                   order by created_at desc""",
+                (user_id,),
+            )
+            return [
+                {"searched_at": _iso(row["created_at"]), **(row["meta"] or {})}
+                for row in cur.fetchall()
+            ]
 
     # -- воронка -----------------------------------------------------------
     def record_funnel_event(
@@ -550,6 +658,12 @@ class MiniAppRepo:
 
     def delete_user(self, user_id: int) -> bool:
         with self.pool.connection() as conn, conn.cursor() as cur:
+            # Search rows contain user-entered terms and must not be anonymized
+            # into retained funnel data when the account is deleted.
+            cur.execute(
+                "delete from funnel_event where user_id = %s and kind = 'search'",
+                (user_id,),
+            )
             cur.execute("delete from app_user where id = %s", (user_id,))
             deleted = cur.rowcount
         conn.commit()

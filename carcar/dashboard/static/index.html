@@ -146,9 +146,12 @@
           </article>
         </div>
         <article class="card analytics-scroll">
-          <h2>Пользователи · 30 дней</h2>
-          <table><thead><tr><th>Пользователь</th><th>Последний визит</th><th>Сессии</th><th>Поиски</th><th>Просмотры</th><th>Избранное</th><th>Подписки</th></tr></thead><tbody id="ua-users"></tbody></table>
-          <p class="tiny muted">Поисковые фразы и параметры фильтров не сохраняются.</p>
+          <div class="card-head user-search-head">
+            <h2 id="ua-users-title">Пользователи · 30 дней</h2>
+            <input id="ua-user-search" type="search" autocomplete="off" placeholder="Имя, username, ID или Telegram ID">
+          </div>
+          <table><thead><tr><th>Пользователь</th><th>Последний визит</th><th>Сессии</th><th>Поиски</th><th>Просмотры</th><th>Избранное</th><th>Подписки</th><th>Профиль</th></tr></thead><tbody id="ua-users"></tbody></table>
+          <p class="tiny muted">Поисковая фраза и выбранные фильтры доступны в карточке пользователя.</p>
         </article>
       </div>
     </section>
@@ -257,6 +260,35 @@
       </article>
     </section>
   </main>
+
+  <dialog class="service-dialog user-detail-dialog" id="ua-user-dialog">
+    <div class="service-form">
+      <div class="card-head">
+        <div><p class="eyebrow">АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЯ</p><h2 id="ua-user-title">Статистика</h2></div>
+        <button class="ghost" type="button" id="ua-user-close" aria-label="Закрыть">✕</button>
+      </div>
+      <p class="muted small" id="ua-user-meta">Загрузка…</p>
+      <p class="banner bad hidden" id="ua-user-error" role="alert"></p>
+      <div id="ua-user-content" class="hidden">
+        <div class="cards analytics-kpis user-detail-kpis">
+          <article class="card kpi"><span class="label">Сессии</span><strong id="ua-user-sessions">—</strong></article>
+          <article class="card kpi"><span class="label">Поиски</span><strong id="ua-user-searches">—</strong></article>
+          <article class="card kpi"><span class="label">Просмотры</span><strong id="ua-user-views">—</strong></article>
+          <article class="card kpi"><span class="label">Избранное</span><strong id="ua-user-favorites">—</strong></article>
+          <article class="card kpi"><span class="label">Подписки</span><strong id="ua-user-subscriptions">—</strong></article>
+          <article class="card kpi"><span class="label">Активных дней</span><strong id="ua-user-days">—</strong></article>
+        </div>
+        <div class="user-detail-scroll">
+          <h3>Поисковые запросы и фильтры · 30 дней</h3>
+          <table><thead><tr><th>Время</th><th>Фраза</th><th>Фильтры</th><th>Сортировка</th></tr></thead><tbody id="ua-user-searches-list"></tbody></table>
+        </div>
+        <div class="user-detail-scroll">
+          <h3>Активность по дням</h3>
+          <table><thead><tr><th>Дата</th><th>Сессии</th><th>Поиски</th><th>Просмотры</th><th>Избранное</th><th>Подписки</th></tr></thead><tbody id="ua-user-daily"></tbody></table>
+        </div>
+      </div>
+    </div>
+  </dialog>
 
   <dialog class="service-dialog" id="service-dialog">
     <form id="service-form" class="service-form">

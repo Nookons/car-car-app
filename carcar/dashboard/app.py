@@ -465,6 +465,7 @@ def create_app(
         days: int = Query(default=30, ge=1, le=90),
         limit: int = Query(default=100, ge=1, le=200),
         offset: int = Query(default=0, ge=0, le=100_000),
+        query: str | None = Query(default=None, max_length=100),
     ) -> dict:
         """Проксирует закрытую аналитику Mini App в основной дашборд."""
         if not analytics_admin_token:
@@ -472,12 +473,37 @@ def create_app(
         try:
             response = httpx.get(
                 f"{api_base_url}/api/admin/metrics",
-                params={"days": days, "limit": limit, "offset": offset},
+                params={"days": days, "limit": limit, "offset": offset, "query": query},
                 headers={"X-Analytics-Admin-Token": analytics_admin_token},
                 timeout=10.0,
             )
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=502, detail="API аналитики недоступно") from exc
+        if response.status_code == 401:
+            raise HTTPException(status_code=401, detail="неверный токен аналитики")
+        if response.status_code != 200:
+            raise HTTPException(status_code=502, detail="ошибка API аналитики")
+        return response.json()
+
+    @app.get("/api/user-metrics/{user_id}")
+    def user_metrics_detail(
+        user_id: int,
+        days: int = Query(default=30, ge=1, le=90),
+        search_limit: int = Query(default=100, ge=1, le=200),
+    ) -> dict:
+        if not analytics_admin_token:
+            raise HTTPException(status_code=503, detail="аналитика не настроена")
+        try:
+            response = httpx.get(
+                f"{api_base_url}/api/admin/users/{user_id}",
+                params={"days": days, "search_limit": search_limit},
+                headers={"X-Analytics-Admin-Token": analytics_admin_token},
+                timeout=10.0,
+            )
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail="API аналитики недоступно") from exc
+        if response.status_code == 404:
+            raise HTTPException(status_code=404, detail="пользователь не найден")
         if response.status_code == 401:
             raise HTTPException(status_code=401, detail="неверный токен аналитики")
         if response.status_code != 200:
@@ -581,28 +607,13 @@ def create_app(
             )
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        except Exception as exc:  # noqa: BLE001
-            if getattr(exc, "sqlstate", None) == "42P01":
-                raise HTTPException(
-                    status_code=503,
-                    detail="нужно применить db/migrations/20261112_service_notices.sql",
-                ) from exc
-            raise
         return {"ok": True, "source": source}
 
     @app.delete("/api/service-notices/{source}")
     def clear_service_notice(source: str) -> dict:
         if repo is None:
             raise HTTPException(status_code=503, detail="для расписания нужна база данных")
-        try:
-            repo.set_service_notice(source, None, None, None, None)
-        except Exception as exc:  # noqa: BLE001
-            if getattr(exc, "sqlstate", None) == "42P01":
-                raise HTTPException(
-                    status_code=503,
-                    detail="нужно применить db/migrations/20261112_service_notices.sql",
-                ) from exc
-            raise
+        repo.set_service_notice(source, None, None, None, None)
         return {"ok": True, "source": source}
 
     return app
