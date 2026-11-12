@@ -4,8 +4,9 @@ const I18N = {
   ru: {
     title: "сборщик",
     userAnalytics: "Активность пользователей",
-    userAnalyticsHint: "Введите токен администратора аналитики.",
-    loadAnalytics: "Показать метрики",
+    userAnalyticsHint: "Сводка активности приложения.",
+    loadAnalytics: "Обновить",
+    logout: "Выйти",
     polls: "Опросов",
     newListings: "Новых объявлений",
     details: "Карточек в папке",
@@ -82,8 +83,9 @@ const I18N = {
   en: {
     title: "collector",
     userAnalytics: "User activity",
-    userAnalyticsHint: "Enter the analytics admin token.",
-    loadAnalytics: "Show metrics",
+    userAnalyticsHint: "Application activity summary.",
+    loadAnalytics: "Refresh",
+    logout: "Log out",
     polls: "Polls",
     newListings: "New listings",
     details: "Cached details",
@@ -161,6 +163,8 @@ let current = null;
 let busy = false;
 let geo = readGeo();
 let lastMetrics = null;
+let dashboardStarted = false;
+let dashboardIntervals = [];
 
 // Ссылку «рядом со мной» можно открыть с координатами: /?lat=52.23&lon=21.01&radius=50
 (() => {
@@ -719,11 +723,8 @@ function renderUserAnalytics(data) {
   $("user-analytics-status").textContent = lang === "ru" ? "Обновлено сейчас" : "Updated now";
 }
 
-$("user-analytics-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const token = $("user-analytics-token").value.trim();
-  if (!token) return;
-  const button = event.currentTarget.querySelector("button[type=submit]");
+async function loadUserAnalytics() {
+  const button = $("refresh-user-analytics");
   const error = $("user-analytics-error");
   button.disabled = true;
   error.classList.add("hidden");
@@ -731,7 +732,6 @@ $("user-analytics-form").addEventListener("submit", async (event) => {
   try {
     const response = await fetch("/api/user-metrics?days=30&limit=100", {
       cache: "no-store",
-      headers: { "X-Analytics-Admin-Token": token },
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
@@ -741,10 +741,13 @@ $("user-analytics-form").addEventListener("submit", async (event) => {
     error.textContent = exc instanceof Error ? exc.message : "Не удалось загрузить метрики";
     error.classList.remove("hidden");
     $("user-analytics-status").textContent = "";
+    if (error.textContent.includes("401")) showDashboardLogin();
   } finally {
     button.disabled = false;
   }
-});
+}
+
+$("refresh-user-analytics").addEventListener("click", loadUserAnalytics);
 
 function renderCollectors(status) {
   const tbody = $("collectors");
@@ -808,6 +811,10 @@ async function load() {
     if (!response.ok) throw new Error(String(response.status));
     render(await response.json());
   } catch (error) {
+    if (error.message === "401") {
+      showDashboardLogin();
+      return;
+    }
     const pill = $("state-pill");
     pill.dataset.state = "stale";
     $("state-text").textContent = t("states").stale;
@@ -881,8 +888,75 @@ $("lang").addEventListener("click", () => {
   renderMetrics();
 });
 
+function showDashboardLogin(message = "") {
+  dashboardIntervals.forEach(clearInterval);
+  dashboardIntervals = [];
+  dashboardStarted = false;
+  $("dashboard-login").classList.remove("hidden");
+  $("dashboard-header").classList.add("hidden");
+  $("dashboard-main").classList.add("hidden");
+  $("dashboard-footer").classList.add("hidden");
+  $("dashboard-password").value = "";
+  $("dashboard-login-error").textContent = message;
+  $("dashboard-login-error").classList.toggle("hidden", !message);
+}
+
+function showDashboard() {
+  $("dashboard-login").classList.add("hidden");
+  $("dashboard-header").classList.remove("hidden");
+  $("dashboard-main").classList.remove("hidden");
+  $("dashboard-footer").classList.remove("hidden");
+  if (dashboardStarted) return;
+  dashboardStarted = true;
+  load();
+  loadMetrics();
+  loadUserAnalytics();
+  dashboardIntervals = [setInterval(load, 3000), setInterval(loadMetrics, 30000)];
+}
+
+async function checkDashboardSession() {
+  try {
+    const response = await fetch("/api/session", { cache: "no-store" });
+    const session = await response.json();
+    if (response.ok && session.authenticated) showDashboard();
+    else showDashboardLogin();
+  } catch {
+    showDashboardLogin(lang === "ru" ? "Не удалось проверить вход" : "Could not check session");
+  }
+}
+
+$("dashboard-login-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("dashboard-login-button");
+  const error = $("dashboard-login-error");
+  button.disabled = true;
+  error.classList.add("hidden");
+  try {
+    const response = await fetch("/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: $("dashboard-password").value }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.detail || "HTTP " + response.status);
+    $("dashboard-password").value = "";
+    showDashboard();
+  } catch (exc) {
+    error.textContent = exc instanceof Error ? exc.message : "Ошибка входа";
+    error.classList.remove("hidden");
+    $("dashboard-password").focus();
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("dashboard-logout").addEventListener("click", async () => {
+  try {
+    await fetch("/api/session/logout", { method: "POST" });
+  } finally {
+    showDashboardLogin();
+  }
+});
+
 applyLang();
-load();
-loadMetrics();
-setInterval(load, 3000);
-setInterval(loadMetrics, 30000);
+checkDashboardSession();

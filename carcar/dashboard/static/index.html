@@ -7,7 +7,19 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header class="topbar">
+  <section class="login-screen" id="dashboard-login">
+    <form class="login-card" id="dashboard-login-form">
+      <div class="logo">CC</div>
+      <h1>CarCar dashboard</h1>
+      <p class="muted">Введи пароль, чтобы открыть панель приложения.</p>
+      <label class="login-label" for="dashboard-password">Пароль</label>
+      <input id="dashboard-password" type="password" autocomplete="current-password" required>
+      <button class="primary" type="submit" id="dashboard-login-button">Войти</button>
+      <p class="banner bad hidden" id="dashboard-login-error" role="alert"></p>
+    </form>
+  </section>
+
+  <header class="topbar hidden" id="dashboard-header">
     <div class="brand">
       <div class="logo">CC</div>
       <div>
@@ -18,11 +30,12 @@
     <div class="topbar-right">
       <a class="ghost dashboard-nav" href="#user-analytics" data-i18n="userAnalytics">Пользователи</a>
       <span class="pill" id="state-pill"><span class="dot"></span><span id="state-text">…</span></span>
+      <button class="ghost" id="dashboard-logout" type="button" data-i18n="logout">Выйти</button>
       <button class="ghost" id="lang" title="Language">EN</button>
     </div>
   </header>
 
-  <main>
+  <main class="hidden" id="dashboard-main">
     <section class="banner hidden" id="banner"></section>
 
     <section class="cards">
@@ -77,11 +90,10 @@
         <h2 data-i18n="userAnalytics">Активность пользователей</h2>
         <span class="muted" id="user-analytics-status"></span>
       </div>
-      <p class="muted small" data-i18n="userAnalyticsHint">Введите токен администратора аналитики.</p>
-      <form id="user-analytics-form" class="analytics-controls">
-        <input id="user-analytics-token" type="password" autocomplete="off" aria-label="Токен администратора аналитики" placeholder="Токен администратора аналитики">
-        <button class="primary" type="submit" data-i18n="loadAnalytics">Показать метрики</button>
-      </form>
+      <div class="card-head analytics-refresh">
+        <p class="muted small" data-i18n="userAnalyticsHint">Сводка активности приложения.</p>
+        <button class="ghost" type="button" id="refresh-user-analytics" data-i18n="loadAnalytics">Обновить</button>
+      </div>
       <p class="banner bad hidden" id="user-analytics-error" role="alert"></p>
       <div id="user-analytics-results" class="hidden">
         <div class="cards analytics-kpis">
@@ -230,7 +242,7 @@
     </section>
   </main>
 
-  <footer class="muted tiny">
+  <footer class="muted tiny hidden" id="dashboard-footer">
     <span data-i18n="footer">Данные — локально, папка data. Дашборд только для владельца, слушает 127.0.0.1.</span>
   </footer>
 

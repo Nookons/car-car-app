@@ -11,6 +11,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import hmac
 import os
 import re
 import time
@@ -20,8 +22,8 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, Header, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -45,6 +47,10 @@ class ControlIn(BaseModel):
     source: str = Field(default="otomoto", max_length=40)
     reason: str | None = Field(default=None, max_length=200)
     by: str = Field(default="dashboard", max_length=40)
+
+
+class DashboardLoginIn(BaseModel):
+    password: str = Field(min_length=1, max_length=200)
 
 
 def _safe(call, fallback, errors: list[str], name: str):
@@ -187,6 +193,28 @@ def create_app(
     api_base_url = os.environ.get(
         "CARCAR_API_URL", "https://api-production-5bee.up.railway.app"
     ).rstrip("/")
+    dashboard_password = os.environ.get("CARCAR_DASHBOARD_PASSWORD", "")
+    analytics_admin_token = os.environ.get("CARCAR_ANALYTICS_ADMIN_TOKEN", "")
+    session_cookie = "carcar_dashboard_session"
+    session_ttl = 8 * 60 * 60
+
+    def session_signature(issued_at: str) -> str:
+        return hmac.new(
+            dashboard_password.encode(), issued_at.encode(), hashlib.sha256
+        ).hexdigest()
+
+    def has_dashboard_session(request: Request) -> bool:
+        value = request.cookies.get(session_cookie, "")
+        try:
+            issued_at, signature = value.split(".", 1)
+            age = time.time() - int(issued_at)
+        except (ValueError, TypeError):
+            return False
+        return (
+            dashboard_password != ""
+            and 0 <= age <= session_ttl
+            and hmac.compare_digest(signature, session_signature(issued_at))
+        )
     if use_db:
         url = db_url or database_url()
         if not url:
@@ -195,6 +223,22 @@ def create_app(
         db_url = url
 
     app = FastAPI(title="CarCar dashboard", docs_url=None, redoc_url=None)
+
+    @app.middleware("http")
+    async def protect_dashboard(request: Request, call_next):
+        path = request.url.path
+        if (
+            not dashboard_password
+            or path.startswith("/static/")
+            or path in {"/api/session", "/api/session/logout", "/"}
+        ):
+            return await call_next(request)
+        if has_dashboard_session(request):
+            return await call_next(request)
+        if path.startswith("/api/"):
+            return JSONResponse({"detail": "нужен вход в дашборд"}, status_code=401)
+        return RedirectResponse("/", status_code=303)
+
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     def make_client() -> Client:
@@ -204,6 +248,33 @@ def create_app(
     @app.get("/")
     def index() -> FileResponse:
         return FileResponse(STATIC / "index.html")
+
+    @app.get("/api/session")
+    def session_status(request: Request) -> dict:
+        return {"authenticated": not dashboard_password or has_dashboard_session(request)}
+
+    @app.post("/api/session")
+    def login(payload: DashboardLoginIn, response: Response) -> dict:
+        if not dashboard_password:
+            raise HTTPException(status_code=503, detail="вход по паролю не настроен")
+        if not hmac.compare_digest(payload.password, dashboard_password):
+            raise HTTPException(status_code=401, detail="неверный пароль")
+        issued_at = str(int(time.time()))
+        response.set_cookie(
+            session_cookie,
+            f"{issued_at}.{session_signature(issued_at)}",
+            max_age=session_ttl,
+            httponly=True,
+            secure=True,
+            samesite="strict",
+            path="/",
+        )
+        return {"ok": True}
+
+    @app.post("/api/session/logout")
+    def logout(response: Response) -> dict:
+        response.delete_cookie(session_cookie, path="/", secure=True, httponly=True, samesite="strict")
+        return {"ok": True}
 
     @app.get("/listing/{listing_id}")
     def listing_page(listing_id: str) -> FileResponse:
@@ -353,16 +424,15 @@ def create_app(
         days: int = Query(default=30, ge=1, le=90),
         limit: int = Query(default=100, ge=1, le=200),
         offset: int = Query(default=0, ge=0, le=100_000),
-        admin_token: str | None = Header(default=None, alias="X-Analytics-Admin-Token"),
     ) -> dict:
         """Проксирует закрытую аналитику Mini App в основной дашборд."""
-        if not admin_token:
-            raise HTTPException(status_code=401, detail="нужен токен аналитики")
+        if not analytics_admin_token:
+            raise HTTPException(status_code=503, detail="аналитика не настроена")
         try:
             response = httpx.get(
                 f"{api_base_url}/api/admin/metrics",
                 params={"days": days, "limit": limit, "offset": offset},
-                headers={"X-Analytics-Admin-Token": admin_token},
+                headers={"X-Analytics-Admin-Token": analytics_admin_token},
                 timeout=10.0,
             )
         except httpx.HTTPError as exc:
