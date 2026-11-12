@@ -20,16 +20,17 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Lock
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from ..client import BlockedError, Client, FetchError
 from ..config import Settings
-from ..control import load_control, save_control
+from ..control import Control, load_control, save_control
 from ..db import DatabaseSink, database_url
 from ..geo import distance_km, get_geo
 from ..parse import Listing, ParseError, html_to_text
@@ -63,11 +64,7 @@ class AppAnnouncementIn(BaseModel):
     ends_at: datetime
 
 
-class ListingAdminIn(BaseModel):
-    title: str = Field(min_length=1, max_length=500)
-    price: int = Field(gt=0, le=2_000_000_000)
-    city: str | None = Field(default=None, max_length=120)
-    mileage_km: int | None = Field(default=None, ge=0, le=2_000_000)
+class ListingStatusIn(BaseModel):
     status: Literal["active", "removed"]
 
 
@@ -218,6 +215,7 @@ def create_app(
     store = Store(root=Path(root), source=source)
     source_code = source
     cache: dict[str, tuple[float, dict]] = {}
+    metrics_lock = Lock()
     repo: DatabaseRepo | None = None
     dashboard_password = os.environ.get("CARCAR_DASHBOARD_PASSWORD", "")
     session_cookie = "carcar_dashboard_session"
@@ -273,9 +271,16 @@ def create_app(
         settings = Settings(rps=rps)
         return client_factory(settings) if client_factory else Client(settings)
 
+    def dashboard_page(filename: str) -> HTMLResponse:
+        body = (STATIC / filename).read_text(encoding="utf-8")
+        for asset in ("style.css", "app.js", "listing.js"):
+            version = hashlib.sha256((STATIC / asset).read_bytes()).hexdigest()[:12]
+            body = body.replace(f'/static/{asset}"', f'/static/{asset}?v={version}"')
+        return HTMLResponse(body, headers={"Cache-Control": "no-store"})
+
     @app.get("/")
-    def index() -> FileResponse:
-        return FileResponse(STATIC / "index.html")
+    def index() -> HTMLResponse:
+        return dashboard_page("index.html")
 
     @app.get("/api/session")
     def session_status(request: Request) -> dict:
@@ -307,8 +312,8 @@ def create_app(
         return {"ok": True}
 
     @app.get("/listing/{listing_id}")
-    def listing_page(listing_id: str) -> FileResponse:
-        return FileResponse(STATIC / "listing.html")
+    def listing_page(listing_id: str) -> HTMLResponse:
+        return dashboard_page("listing.html")
 
     def storage_stats() -> dict:
         now = time.monotonic()
@@ -321,8 +326,8 @@ def create_app(
 
     @app.get("/api/status")
     def status() -> dict:
-        heartbeat = store.read_heartbeat()
-        control = load_control(store.control_path)
+        heartbeat = {} if repo is not None else store.read_heartbeat()
+        control = Control() if repo is not None else load_control(store.control_path)
         now = datetime.now(UTC)
 
         age = None
@@ -350,7 +355,7 @@ def create_app(
             except Exception as exc:  # noqa: BLE001
                 errors.append(f"sweep: {exc}")
         sweep_path = store.state_dir / "sweep.json"
-        if sweep_path.exists():
+        if repo is None and sweep_path.exists():
             try:
                 sweep = json.loads(sweep_path.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
@@ -500,7 +505,15 @@ def create_app(
     def metrics(days: int = 30, months: int = 12) -> dict:
         if repo is None:
             return {"available": False, "by_source": [], "daily": [], "monthly": [], "runs": []}
-        return {"available": True, **repo.metrics(days=days, months=months)}
+        days, months = max(1, min(days, 365)), max(1, min(months, 36))
+        key = f"metrics:{days}:{months}"
+        with metrics_lock:
+            cached = cache.get(key)
+            if cached and time.monotonic() - cached[0] < 30:
+                return cached[1]
+            result = {"available": True, **repo.metrics(days=days, months=months)}
+            cache[key] = (time.monotonic(), result)
+            return result
 
     @app.get("/api/logs")
     def logs(limit: int = Query(default=100, ge=1, le=200)) -> dict:
@@ -582,17 +595,13 @@ def create_app(
             raise HTTPException(status_code=404, detail="объявление не найдено")
         return card
 
-    @app.put("/api/listings/{listing_id}")
-    def admin_update_listing(listing_id: int, payload: ListingAdminIn) -> dict:
+    @app.patch("/api/listings/{listing_id}/status")
+    def admin_listing_status(listing_id: int, payload: ListingStatusIn) -> dict:
         if repo is None:
             raise HTTPException(status_code=503, detail="управление требует PostgreSQL")
-        fields = payload.model_dump()
-        fields["title"] = fields["title"].strip()
-        if not fields["title"]:
-            raise HTTPException(status_code=422, detail="укажите название")
-        if not repo.update_listing_admin(listing_id, fields):
+        if not repo.update_listing_admin(listing_id, {"status": payload.status}):
             raise HTTPException(status_code=404, detail="объявление не найдено")
-        admin_audit.info("action=admin_update_listing listing_id=%s status=%s", listing_id, fields["status"])
+        admin_audit.info("action=admin_listing_status listing_id=%s status=%s", listing_id, payload.status)
         return {"ok": True}
 
     @app.delete("/api/listings/{listing_id}")

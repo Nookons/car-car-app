@@ -318,59 +318,11 @@ function renderKpi(status) {
 }
 
 function renderChart(polls) {
-  const canvas = $("chart");
-  const ctx = canvas.getContext("2d");
-  const ratio = window.devicePixelRatio || 1;
-  const width = canvas.clientWidth || 600;
-  const height = 140;
-  canvas.width = width * ratio;
-  canvas.height = height * ratio;
-  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-  ctx.clearRect(0, 0, width, height);
-
-  const data = polls.slice(-40);
-  const hint = $("chart-hint");
-  if (!data.length) {
-    hint.textContent = t("noData");
-    return;
-  }
-  hint.textContent = lang === "ru" ? `журнал: ${data.length}` : `history: ${data.length}`;
-
-  const max = Math.max(1, ...data.map((p) => p.new || 0));
-  const pad = 6;
-  const gap = 3;
-  const barWidth = Math.min(
-    26,
-    Math.max(2, (width - pad * 2 - gap * (data.length - 1)) / data.length),
-  );
-
-  // Сетка: три горизонтальные линии по шкале «новых».
-  ctx.strokeStyle = "#eef0f3";
-  ctx.lineWidth = 1;
-  for (let i = 1; i <= 3; i += 1) {
-    const y = pad + ((height - pad * 2) * i) / 4;
-    ctx.beginPath();
-    ctx.moveTo(pad, y);
-    ctx.lineTo(width - pad, y);
-    ctx.stroke();
-  }
-
-  data.forEach((poll, index) => {
-    const value = poll.new || 0;
-    const barHeight = Math.round(((height - pad * 2) * value) / max);
-    const x = pad + index * (barWidth + gap);
-    const y = height - pad - barHeight;
-    ctx.fillStyle = value > 0 ? "#2563eb" : "#dbe3ef";
-    ctx.beginPath();
-    ctx.roundRect(x, y, barWidth, Math.max(2, barHeight), 2);
-    ctx.fill();
-  });
-
-  ctx.fillStyle = "#9ca3af";
-  ctx.font = "11px -apple-system, BlinkMacSystemFont, sans-serif";
-  ctx.textAlign = "right";
-  ctx.fillText(String(max), width - pad, 12);
-  ctx.textAlign = "left";
+  const data = [...polls].filter(p => p.at || p.ts).sort((a,b) => new Date(a.at || a.ts) - new Date(b.at || b.ts)).slice(-40);
+  const labels = data.map(p => p.at || p.ts);
+  const series = [{source: "Новых объявлений", color:"#2563eb", values:data.map(p => Number(p.new || 0))}];
+  $("chart-hint").textContent = data.length ? `Последние ${data.length} опросов` : "Опросов пока нет";
+  drawStack($("chart"), labels, series, d => fmtTime(d));
 }
 
 function renderPolls(polls) {
@@ -462,7 +414,18 @@ function renderListings(items) {
   });
 }
 
+const pendingDashboardReads = new Map();
+function dashboardFetch(url, options = {}) {
+  if (pendingDashboardReads.has(url)) return pendingDashboardReads.get(url).then(r => r.clone());
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  const request = fetch(url, {...options, signal:controller.signal}).finally(() => { clearTimeout(timer); pendingDashboardReads.delete(url); });
+  pendingDashboardReads.set(url, request);
+  return request.then(r => r.clone());
+}
+let listingRequest = 0;
 async function loadListings() {
+  const requestId = ++listingRequest;
   try {
     const params = new URLSearchParams({ limit: "50", offset: String(listingOffset) });
     const source = $("listing-source").value;
@@ -470,10 +433,10 @@ async function loadListings() {
     params.set("status", $("listing-status").value);
     const query = $("listing-query").value.trim();
     if (query) params.set("query", query);
-    const response = await fetch(`/api/manage/listings?${params.toString()}`, { cache: "no-store" });
-    if (!response.ok) return;
+    const response = await dashboardFetch(`/api/manage/listings?${params.toString()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
-    renderManagedListings(data);
+    if (requestId === listingRequest) renderManagedListings(data);
   } catch {
     $("listing-page").textContent = "Не удалось загрузить объявления";
   }
@@ -496,24 +459,27 @@ function renderManagedListings(data) {
     const actions = document.createElement("td");
     actions.className = "listing-row-actions";
     const toggle = document.createElement("button");
-    toggle.className = "ghost"; toggle.type = "button";
+    toggle.className = "admin-button admin-button-outline"; toggle.type = "button";
     toggle.textContent = item.status === "active" ? "Деактивировать" : "Восстановить";
     toggle.addEventListener("click", async () => {
       toggle.disabled = true;
       try {
-        const detail = await fetch(`/api/listings/${item.id}`, { cache: "no-store" }).then((r) => r.json());
-        const response = await fetch(`/api/listings/${item.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: detail.title, price: detail.price, city: detail.city || null, mileage_km: detail.mileage_km ?? null, status: item.status === "active" ? "removed" : "active" }) });
+        const response = await fetch(`/api/listings/${item.id}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: item.status === "active" ? "removed" : "active" }) });
         if (!response.ok) throw new Error("Не удалось изменить статус");
         await loadListings();
-      } catch { toggle.disabled = false; }
+      } catch (error) { toggle.disabled = false; $("listing-page").textContent = error.message || "Не удалось изменить статус"; }
     });
     const remove = document.createElement("button");
-    remove.className = "danger"; remove.type = "button"; remove.textContent = "Удалить";
+    remove.className = "admin-button admin-button-destructive"; remove.type = "button"; remove.textContent = "Удалить";
     remove.addEventListener("click", async () => {
       if (!confirm("Удалить объявление навсегда вместе с избранным и статистикой?")) return;
       remove.disabled = true;
-      const response = await fetch(`/api/listings/${item.id}`, { method: "DELETE" });
-      if (response.ok) await loadListings(); else remove.disabled = false;
+      try {
+        const response = await fetch(`/api/listings/${item.id}`, { method: "DELETE" });
+        if (!response.ok) { const result = await response.json(); throw new Error(result.detail || "Не удалось удалить"); }
+        if (data.items.length === 1 && listingOffset > 0) listingOffset -= 50;
+        await loadListings();
+      } catch (error) { remove.disabled = false; $("listing-page").textContent = error.message; }
     });
     actions.append(toggle, remove); row.appendChild(actions);
     body.appendChild(row);
@@ -571,6 +537,12 @@ function drawStack(canvas, labels, series, labelFmt) {
   const totals = labels.map((_, i) =>
     series.reduce((sum, item) => sum + (item.values[i] || 0), 0),
   );
+  canvas.setAttribute("aria-label", labels.length ? labels.map((label, i) => `${label}: ${totals[i]}`).join("; ") : "Нет данных за выбранный период");
+  canvas.onmousemove = (event) => {
+    const rect = canvas.getBoundingClientRect();
+    const i = Math.min(labels.length - 1, Math.max(0, Math.floor((event.clientX - rect.left - 42) / ((width - 50) / Math.max(1, labels.length)))));
+    canvas.title = labels[i] ? `${labels[i]} · ${series.map(item => `${item.source}: ${fmtInt(item.values[i])}`).join(" · ")}` : "Нет данных";
+  };
   const max = Math.max(1, ...totals);
   const gap = count > 20 ? 2 : 4;
   const plotHeight = height - top - bottom;
@@ -608,7 +580,7 @@ function drawStack(canvas, labels, series, labelFmt) {
 
   const step = Math.ceil(count / 6);
   labels.forEach((label, i) => {
-    if (i % step !== 0 && i !== count - 1) return;
+    if (i !== count - 1 && (i % step !== 0 || count - 1 - i < step)) return;
     const x = left + i * (barWidth + gap) + barWidth / 2;
     ctx.textAlign = i === 0 ? "left" : i === count - 1 ? "right" : "center";
     ctx.fillStyle = "#9ca3af";
@@ -634,7 +606,7 @@ function renderMetrics() {
     if (charts) charts.hidden = true;
     return;
   }
-  if (charts) charts.hidden = false;
+  if (charts) charts.hidden = dashboardView() !== "overview";
 
   $("kpi-today").textContent = fmtInt(data.totals.today);
   $("kpi-week").textContent = fmtInt(data.totals.week);
@@ -644,21 +616,6 @@ function renderMetrics() {
     $("kpi-total-listings").textContent = fmtInt(current.storage.listings);
     $("kpi-active-listings").textContent = fmtInt(data.totals.active);
   }
-
-  const days = Number($("chart-days").value || 30);
-  const metric = $("chart-metric").value || "inserted";
-  const sourceFilter = $("chart-source").value;
-  const monthlyMode = days > 90;
-  const chartRows = monthlyMode ? data.monthly : (metric === "inserted" ? data.daily : data.runs);
-  const daily = buildSeries(chartRows, monthlyMode ? "month" : "day", monthlyMode || metric === "inserted" ? "count" : metric, sourceFilter);
-  drawStack($("chart-daily"), daily.labels, daily.series, (d) => monthlyMode ? d.slice(2).replace("-", "/") : `${d.slice(8, 10)}.${d.slice(5, 7)}`);
-  renderLegend($("legend-daily"), daily.series);
-  $("daily-range").textContent = `${daily.labels.length} ${monthlyMode ? "месяцев" : "дней"}`;
-
-  const monthly = buildSeries(data.monthly, "month");
-  drawStack($("chart-monthly"), monthly.labels, monthly.series, (m) => m.slice(2).replace("-", "/"));
-  renderLegend($("legend-monthly"), monthly.series);
-  $("monthly-range").textContent = `${monthly.labels.length} ${lang === "ru" ? "мес." : "mo"}`;
 
   const tbody = $("platforms");
   tbody.innerHTML = "";
@@ -676,7 +633,7 @@ function renderMetrics() {
   });
 
   const select = $("chart-source");
-  const current = select.value;
+  const selectedChartSource = select.value;
   select.innerHTML = `<option value="">${t("allSources")}</option>`;
   data.by_source.forEach((row) => {
     const option = document.createElement("option");
@@ -684,7 +641,7 @@ function renderMetrics() {
     option.textContent = row.source;
     select.appendChild(option);
   });
-  select.value = current;
+  select.value = selectedChartSource;
   const listingSource = $("listing-source");
   const selectedListingSource = listingSource.value;
   listingSource.innerHTML = `<option value="">${t("allSources")}</option>`;
@@ -692,17 +649,42 @@ function renderMetrics() {
     const option = document.createElement("option"); option.value = row.source; option.textContent = row.source; listingSource.appendChild(option);
   });
   listingSource.value = selectedListingSource;
+  if (dashboardView() !== "overview") return;
+  const days = Number($("chart-days").value || 30);
+  const metric = $("chart-metric").value || "inserted";
+  const sourceFilter = $("chart-source").value;
+  const monthlyMode = days > 90;
+  const runs = new Map();
+  (data.runs || []).forEach((r) => {
+    const key = `${monthlyMode ? r.day.slice(0, 7) : r.day}|${r.source}`;
+    runs.set(key, (runs.get(key) || 0) + Number(r[metric] || 0));
+  });
+  const dateKey = monthlyMode ? "month" : "day";
+  const chartRows = (monthlyMode ? data.monthly : data.daily).map((r) => ({...r, count: metric === "inserted" ? r.count : runs.get(`${r[dateKey]}|${r.source}`) || 0}));
+  const daily = buildSeries(chartRows, dateKey, "count", sourceFilter);
+  drawStack($("chart-daily"), daily.labels, daily.series, (d) => monthlyMode ? d.slice(2).replace("-", "/") : `${d.slice(8, 10)}.${d.slice(5, 7)}`);
+  renderLegend($("legend-daily"), daily.series);
+  $("daily-range").textContent = `${daily.labels.length} ${monthlyMode ? "месяцев" : "дней"}`;
+
+  const monthly = buildSeries(data.monthly, "month", "count", sourceFilter);
+  drawStack($("chart-monthly"), monthly.labels, monthly.series, (m) => m.slice(2).replace("-", "/"));
+  renderLegend($("legend-monthly"), monthly.series);
+  $("monthly-range").textContent = `${monthly.labels.length} ${lang === "ru" ? "мес." : "mo"}`;
+
+
 }
 
 async function loadMetrics() {
   try {
     const days = Number($("chart-days").value || 30);
-    const response = await fetch(`/api/metrics?days=${days}&months=12`, { cache: "no-store" });
-    if (!response.ok) return;
+    const response = await dashboardFetch(`/api/metrics?days=${days}&months=12`, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     lastMetrics = await response.json();
     renderMetrics();
   } catch {
-    /* графики не критичны для статуса */
+    $("daily-range").textContent = "Не удалось загрузить график";
+    if (!lastMetrics) $("platforms").innerHTML = '<tr><td colspan="7" class="muted">Не удалось загрузить данные. <button type="button" id="retry-platforms" class="ghost">Повторить</button></td></tr>';
+    $("retry-platforms")?.addEventListener("click", loadMetrics);
   }
 }
 
@@ -737,10 +719,10 @@ function renderFunnel(funnel) {
   const box = $("ua-funnel");
   if (!box || !funnel?.stages) return;
   const labels = lang === "ru"
-    ? { visit: "Визиты", search: "Поиски", saved_search: "Сохранённые", alert_open: "Алерты" }
+    ? { visit: "Посетители", search: "Искали", saved_search: "Сохраняли поиск", alert_open: "Открывали алерты" }
     : { visit: "Visits", search: "Searches", saved_search: "Saved searches", alert_open: "Alerts" };
   box.innerHTML = funnel.stages.map((stage) => {
-    const conv = stage.conversion == null ? "" : ` · ${Math.round(stage.conversion * 100)}%`;
+    const conv = "";
     return `<article class="card kpi"><span class="label">${labels[stage.kind] ?? stage.kind}</span><strong>${fmtInt(stage.visitors)}</strong><span class="tiny muted">${fmtInt(stage.events)} ${lang === "ru" ? "событий" : "events"}${conv}</span></article>`;
   }).join("");
 }
@@ -1043,7 +1025,7 @@ async function loadLogs() {
   const body = $("service-logs");
   if (!body) return;
   try {
-    const response = await fetch("/api/logs?limit=100", { cache: "no-store" });
+    const response = await dashboardFetch("/api/logs?limit=100", { cache: "no-store" });
     if (!response.ok) throw new Error(String(response.status));
     const { items = [] } = await response.json();
     body.replaceChildren();
@@ -1160,9 +1142,10 @@ function render(status) {
 
 async function load() {
   try {
-    const response = await fetch("/api/status", { cache: "no-store" });
+    const response = await dashboardFetch("/api/status", { cache: "no-store" });
     if (!response.ok) throw new Error(String(response.status));
     render(await response.json());
+    $("dashboard-main").classList.remove("is-loading");
   } catch (error) {
     if (error.message === "401") {
       showDashboardLogin();
@@ -1193,8 +1176,12 @@ async function loadAnnouncement() {
       $("announcement-message").value = announcement.message;
       $("announcement-start").value = toLocalInput(announcement.starts_at);
       $("announcement-end").value = toLocalInput(announcement.ends_at);
-      $("announcement-state").textContent = `Расписание: ${new Date(announcement.starts_at).toLocaleString()} — ${new Date(announcement.ends_at).toLocaleString()}`;
+      const from = new Date(announcement.starts_at), until = new Date(announcement.ends_at), now = new Date();
+      const state = until <= now ? "Завершено" : from > now ? "Запланировано" : "Показывается";
+      const locale = lang === "ru" ? "ru-RU" : "en-GB";
+      $("announcement-state").textContent = `${state} · ${from.toLocaleString(locale, {timeZone:"Europe/Warsaw"})} — ${until.toLocaleString(locale, {timeZone:"Europe/Warsaw"})} (Варшава)`;
     } else {
+      $("announcement-form").reset();
       $("announcement-state").textContent = "Не запланировано";
     }
   } catch { $("announcement-state").textContent = "Не удалось загрузить расписание"; }
@@ -1214,7 +1201,7 @@ $("announcement-form").addEventListener("submit", async (event) => {
       }),
     });
     if (!response.ok) throw new Error((await response.json()).detail || "Ошибка сохранения");
-    $("announcement-state").textContent = "Сохранено";
+    await loadAnnouncement();
   } catch (error) { $("announcement-state").textContent = error.message || "Ошибка сохранения"; }
   finally { button.disabled = false; }
 });
@@ -1250,6 +1237,7 @@ function showDashboardLogin(message = "") {
   dashboardIntervals.forEach(clearInterval);
   dashboardIntervals = [];
   dashboardStarted = false;
+  $("dashboard-sidebar").classList.add("hidden");
   $("dashboard-login").classList.remove("hidden");
   $("dashboard-header").classList.add("hidden");
   $("dashboard-main").classList.add("hidden");
@@ -1263,9 +1251,12 @@ function showDashboard() {
   $("dashboard-login").classList.add("hidden");
   $("dashboard-header").classList.remove("hidden");
   $("dashboard-main").classList.remove("hidden");
+  $("dashboard-sidebar").classList.remove("hidden");
+  renderDashboardView();
   $("dashboard-footer").classList.remove("hidden");
   if (dashboardStarted) return;
   dashboardStarted = true;
+  $("dashboard-main").classList.add("is-loading");
   load();
   loadMetrics();
   loadUserAnalytics();
@@ -1273,7 +1264,7 @@ function showDashboard() {
   loadLogs();
   loadListings();
   loadAnnouncement();
-  dashboardIntervals = [setInterval(load, 5000), setInterval(loadMetrics, 30000), setInterval(loadLogs, 15000), setInterval(loadListings, 60000)];
+  dashboardIntervals = [setInterval(() => { if (!document.hidden) load(); }, 15000), setInterval(() => { if (!document.hidden && ["overview", "services"].includes(dashboardView())) loadMetrics(); }, 60000), setInterval(() => { if (!document.hidden && dashboardView() === "logs") loadLogs(); }, 30000), setInterval(() => { if (!document.hidden && dashboardView() === "listings" && !$("listing-query").matches(":focus")) loadListings(); }, 60000)];
 }
 
 async function checkDashboardSession() {
@@ -1320,5 +1311,25 @@ $("dashboard-logout").addEventListener("click", async () => {
   }
 });
 
+const viewTitles = {overview:"Обзор",users:"Пользователи",listings:"Объявления",services:"Сервисы сбора",logs:"Ошибки и события",notices:"Уведомления"};
+function dashboardView() {
+  const hash = location.hash.slice(1);
+  if (hash.startsWith("user=") || hash === "user-analytics") return "users";
+  if (hash === "collectors-section") return "services";
+  return Object.hasOwn(viewTitles, hash) ? hash : "overview";
+}
+function renderDashboardView() {
+  const view = dashboardView();
+  $("dashboard-main").dataset.view = view;
+  document.querySelectorAll("[data-views]").forEach(el => { el.hidden = !el.dataset.views.split(" ").includes(view); });
+  document.querySelectorAll(".sidebar-link").forEach(el => { const selected = el.dataset.view === view; el.classList.toggle("selected", selected); if (selected) el.setAttribute("aria-current", "page"); else el.removeAttribute("aria-current"); });
+  $("dashboard-view-title").textContent = viewTitles[view];
+  if (lastMetrics && ["overview", "services"].includes(view)) renderMetrics();
+  else if (dashboardStarted && ["overview", "services"].includes(view)) loadMetrics();
+  if (current && view === "services") renderChart(current.polls || []);
+}
+window.addEventListener("hashchange", renderDashboardView);
+let resizeTimer;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (lastMetrics && ["overview", "services"].includes(dashboardView())) renderMetrics(); if (current && dashboardView() === "services") renderChart(current.polls || []); }, 150); });
 applyLang();
 checkDashboardSession();

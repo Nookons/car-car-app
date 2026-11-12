@@ -28,20 +28,32 @@
       </div>
     </div>
     <div class="topbar-right">
-      <a class="ghost dashboard-nav" href="#user-analytics" data-i18n="userAnalytics">Пользователи</a>
-      <a class="ghost dashboard-nav" href="#collectors-section">Сборщики</a>
+
       <span class="pill" id="state-pill"><span class="dot"></span><span id="state-text">…</span></span>
       <button class="ghost" id="dashboard-logout" type="button" data-i18n="logout">Выйти</button>
       <button class="ghost" id="lang" title="Language">EN</button>
     </div>
   </header>
 
+  <aside class="dashboard-sidebar hidden" id="dashboard-sidebar" aria-label="Разделы панели">
+    <span class="sidebar-caption">УПРАВЛЕНИЕ</span>
+    <nav>
+      <a class="sidebar-link selected" href="#overview" data-view="overview">Обзор</a>
+      <a class="sidebar-link" href="#users" data-view="users">Пользователи</a>
+      <a class="sidebar-link" href="#listings" data-view="listings">Объявления</a>
+      <a class="sidebar-link" href="#services" data-view="services">Сервисы сбора</a>
+      <a class="sidebar-link" href="#logs" data-view="logs">Ошибки и события</a>
+      <a class="sidebar-link" href="#notices" data-view="notices">Уведомления</a>
+    </nav>
+    <p class="sidebar-note">CarCar · панель управления</p>
+  </aside>
   <main class="hidden" id="dashboard-main">
+    <div class="dashboard-page-head"><h1 id="dashboard-view-title">Обзор</h1><span class="muted small">Состояние приложения и активность</span></div>
     <section class="banner hidden" id="banner"></section>
 
-    <section class="card" id="collectors-section">
+    <section class="card" id="collectors-section" data-views="overview services">
       <div class="card-head"><h2 data-i18n="collectors">Коллекторы объявлений</h2></div>
-      <table>
+      <div class="table-scroll"><table>
         <thead>
           <tr>
             <th data-i18n="source">Площадка</th>
@@ -54,10 +66,10 @@
           </tr>
         </thead>
         <tbody id="collectors"></tbody>
-      </table>
+      </table></div>
     </section>
 
-    <section class="card announcement-card" id="app-announcement-section">
+    <section class="card announcement-card" id="app-announcement-section" data-views="notices">
       <div class="card-head"><h2>Объявление для всех пользователей</h2><span class="muted" id="announcement-state"></span></div>
       <form id="announcement-form" class="announcement-form">
         <label class="field wide">Текст сообщения<textarea id="announcement-message" maxlength="500" rows="2" required placeholder="Например: сегодня будут проводиться технические работы"></textarea></label>
@@ -68,7 +80,7 @@
       <p class="muted small">Покажется в тонкой плашке вверху приложения в указанный период.</p>
     </section>
 
-    <section class="cards">
+    <section class="cards" data-views="overview">
       <article class="card kpi">
         <span class="label">Активных объявлений</span>
         <strong id="kpi-active-listings">—</strong>
@@ -92,7 +104,7 @@
     </section>
 
 
-    <section class="cards">
+    <section class="cards" data-views="overview">
       <article class="card kpi">
         <span class="label" data-i18n="today">Сегодня</span>
         <strong id="kpi-today">—</strong>
@@ -109,13 +121,13 @@
         <span class="hint" data-i18n="newShort">новых</span>
       </article>
       <article class="card kpi">
-        <span class="label" data-i18n="sources">Платформ</span>
+        <span class="label">Площадки с объявлениями</span>
         <strong id="kpi-sources">—</strong>
         <span class="hint">есть объявления</span>
       </article>
     </section>
 
-    <section class="card user-analytics" id="user-analytics">
+    <section class="card user-analytics" id="user-analytics" data-views="users">
       <div class="card-head">
         <h2>Пользователи и поддержка</h2>
         <span class="muted" id="user-analytics-status"></span>
@@ -155,7 +167,7 @@
       </div>
     </section>
 
-    <section class="card" id="logs-section">
+    <section class="card" id="logs-section" data-views="logs">
       <div class="card-head">
         <h2>Ошибки и события сбора</h2>
         <div class="topbar-right"><span class="muted tiny" id="logs-updated"></span><button class="ghost" type="button" id="refresh-logs">Обновить</button></div>
@@ -168,7 +180,7 @@
       </div>
     </section>
 
-    <section class="grid charts">
+    <section class="grid charts" data-views="overview">
       <article class="card chart-card">
         <div class="card-head">
           <h2>Динамика сбора</h2>
@@ -180,7 +192,7 @@
       </article>
       <article class="card chart-card">
         <div class="card-head">
-          <h2>Обзор по месяцам</h2>
+          <h2>Новые объявления по месяцам</h2>
           <span class="muted" id="monthly-range"></span>
         </div>
         <canvas id="chart-monthly" height="150"></canvas>
@@ -188,9 +200,9 @@
       </article>
     </section>
 
-    <section class="card">
+    <section class="card" id="platforms-section" data-views="services">
       <div class="card-head"><h2 data-i18n="platforms">Платформы</h2></div>
-      <table>
+      <div class="table-scroll"><table>
         <thead>
           <tr>
             <th data-i18n="source">Площадка</th>
@@ -202,11 +214,11 @@
             <th class="num" data-i18n="median">Медиана</th>
           </tr>
         </thead>
-        <tbody id="platforms"></tbody>
-      </table>
+        <tbody id="platforms"><tr><td colspan="7" class="muted">Загрузка данных площадок…</td></tr></tbody>
+      </table></div>
     </section>
 
-    <section class="card chart-card poll-chart-card">
+    <section class="card chart-card poll-chart-card" id="poll-chart-section" data-views="services">
         <div class="card-head">
           <h2 data-i18n="chart">Новые объявления по опросам</h2>
           <span class="muted" id="chart-hint"></span>
@@ -214,16 +226,16 @@
         <canvas id="chart" height="140"></canvas>
     </section>
 
-    <section class="card listings-card">
+    <section class="card listings-card" data-views="listings">
       <div class="card-head">
         <h2>Все объявления</h2>
-        <div class="listing-filters"><input id="listing-query" type="search" placeholder="Поиск по марке, модели, городу…"><select id="listing-status"><option value="all">Все статусы</option><option value="active">Активные</option><option value="removed">Неактивные</option></select><select id="listing-source"><option value="">Все площадки</option></select></div>
+        <div class="listing-filters"><input id="listing-query" aria-label="Поиск объявлений" type="search" placeholder="Поиск по марке, модели, городу…"><select id="listing-status" aria-label="Статус объявлений"><option value="all">Все статусы</option><option value="active">Активные</option><option value="removed">Неактивные</option></select><select id="listing-source" aria-label="Площадка объявлений"><option value="">Все площадки</option></select></div>
       </div>
       <div class="table-scroll"><table><thead><tr><th>Объявление</th><th>Площадка</th><th>Статус</th><th>Цена</th><th>Город</th><th>Последнее обновление</th><th>Действия</th></tr></thead><tbody id="managed-listings"></tbody></table></div>
       <div class="user-pagination"><span id="listing-page" class="muted small"></span><div><button class="ghost" id="listing-prev" type="button">Назад</button><button class="ghost" id="listing-next" type="button">Дальше</button></div></div>
     </section>
 
-    <section class="grid two">
+    <section class="grid two" id="poll-tables-section" data-views="services">
       <article class="card">
         <div class="card-head"><h2 data-i18n="recentPolls">Последние опросы</h2></div>
         <table>

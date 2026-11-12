@@ -197,7 +197,7 @@ class DatabaseRepo:
             cur.execute(f"select count(*)::int total from listing l join source s on s.id=l.source_id{where}", params)
             total = int(cur.fetchone()["total"])
             cur.execute(
-                f"""select l.id, l.external_id, s.code source_code, l.url, l.title, l.price,
+                f"""select l.id, l.external_id, s.code as source, l.url, l.title, l.price,
                            l.currency, l.make, l.model, l.year, l.mileage_km, l.city,
                            l.thumb_url, l.photos_count, l.status, l.published_at, l.last_seen_at
                     from listing l join source s on s.id=l.source_id{where}
@@ -208,24 +208,37 @@ class DatabaseRepo:
         return {"items": items, "total": total, "limit": limit, "offset": offset}
 
     def update_listing_admin(self, listing_id: int, fields: dict[str, Any]) -> bool:
-        allowed = {"title", "price", "city", "mileage_km", "status"}
-        updates = {key: value for key, value in fields.items() if key in allowed}
-        if not updates:
+        status = fields.get("status")
+        if status not in {"active", "removed"}:
             return False
-        assignments = ", ".join(f"{key} = %({key})s" for key in updates)
-        updates["id"] = listing_id
         with self.pool.connection() as conn, conn.cursor() as cur:
-            cur.execute(f"update public.listing set {assignments}, updated_at = now() where id = %(id)s", updates)
-            changed = cur.rowcount > 0
+            cur.execute("select source_id, external_id from public.listing where id = %s for update", (listing_id,))
+            row = cur.fetchone()
+            if not row:
+                return False
+            key = (row["source_id"], row["external_id"])
+            if status == "removed":
+                cur.execute("""insert into public.listing_moderation (source_id, external_id, action)
+                               values (%s, %s, 'hidden') on conflict (source_id, external_id)
+                               do update set action='hidden', updated_at=now()""", key)
+            else:
+                cur.execute("delete from public.listing_moderation where source_id=%s and external_id=%s", key)
+            cur.execute("update public.listing set status=%s, updated_at=now() where id=%s", (status, listing_id))
         conn.commit()
-        return changed
+        return True
 
     def delete_listing_admin(self, listing_id: int) -> bool:
         with self.pool.connection() as conn, conn.cursor() as cur:
-            cur.execute("delete from public.listing where id = %s", (listing_id,))
-            changed = cur.rowcount > 0
+            cur.execute("select source_id, external_id from public.listing where id=%s for update", (listing_id,))
+            row = cur.fetchone()
+            if not row:
+                return False
+            cur.execute("""insert into public.listing_moderation (source_id, external_id, action)
+                           values (%s, %s, 'deleted') on conflict (source_id, external_id)
+                           do update set action='deleted', updated_at=now()""", (row["source_id"], row["external_id"]))
+            cur.execute("delete from public.listing where id=%s", (listing_id,))
         conn.commit()
-        return changed
+        return True
 
     # -- список ------------------------------------------------------------
     def recent(
@@ -754,20 +767,19 @@ class DatabaseRepo:
 
             cur.execute(
                 """
-                select to_char(d at time zone 'Europe/Warsaw', 'YYYY-MM-DD') as day,
+                select to_char(d, 'YYYY-MM-DD') as day,
                        s.code as source,
                        coalesce(sum(r.inserted), 0)::int as count
                 from generate_series(
                         (date_trunc('day', now() at time zone 'Europe/Warsaw')
-                          - (%(days)s - 1) * interval '1 day') at time zone 'Europe/Warsaw',
-                        date_trunc('day', now() at time zone 'Europe/Warsaw')
-                          at time zone 'Europe/Warsaw', interval '1 day') d
+                          - (%(days)s - 1) * interval '1 day'),
+                        date_trunc('day', now() at time zone 'Europe/Warsaw'), interval '1 day') d
                 cross join source s
                 left join crawl_run r
                        on r.source_id = s.id
                       and r.finished_at is not null
-                      and r.started_at >= d
-                      and r.started_at < d + interval '1 day'
+                      and r.started_at >= (d at time zone 'Europe/Warsaw')
+                      and r.started_at < ((d + interval '1 day') at time zone 'Europe/Warsaw')
                 group by 1, 2
                 order by 1, 2
                 """,
@@ -777,20 +789,19 @@ class DatabaseRepo:
 
             cur.execute(
                 """
-                select to_char(d at time zone 'Europe/Warsaw', 'YYYY-MM') as month,
+                select to_char(d, 'YYYY-MM') as month,
                        s.code as source,
                        coalesce(sum(r.inserted), 0)::int as count
                 from generate_series(
                         (date_trunc('month', now() at time zone 'Europe/Warsaw')
-                            - (%(months)s - 1) * interval '1 month') at time zone 'Europe/Warsaw',
-                        date_trunc('month', now() at time zone 'Europe/Warsaw')
-                            at time zone 'Europe/Warsaw', interval '1 month') d
+                            - (%(months)s - 1) * interval '1 month'),
+                        date_trunc('month', now() at time zone 'Europe/Warsaw'), interval '1 month') d
                 cross join source s
                 left join crawl_run r
                        on r.source_id = s.id
                       and r.finished_at is not null
-                      and r.started_at >= d
-                      and r.started_at < d + interval '1 month'
+                      and r.started_at >= (d at time zone 'Europe/Warsaw')
+                      and r.started_at < ((d + interval '1 month') at time zone 'Europe/Warsaw')
                 group by 1, 2
                 order by 1, 2
                 """,
