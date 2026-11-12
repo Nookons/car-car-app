@@ -296,8 +296,10 @@ class DatabaseRepo:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
                 """
-                select started_at, finished_at, pages, items, inserted, errors, notes
-                from crawl_run order by started_at desc limit %s
+                select r.started_at, r.finished_at, r.pages, r.items, r.inserted,
+                       r.errors, r.notes, s.code as source
+                from crawl_run r join source s on s.id = r.source_id
+                order by r.started_at desc limit %s
                 """,
                 (limit,),
             )
@@ -305,6 +307,7 @@ class DatabaseRepo:
                 {
                     "started_at": _iso(r["started_at"]),
                     "finished_at": _iso(r["finished_at"]),
+                    "source": r["source"],
                     "pages": r["pages"],
                     "items": r["items"],
                     "new": r["inserted"],
@@ -319,7 +322,8 @@ class DatabaseRepo:
             cur.execute(
                 """
                 select started_at, inserted, errors from crawl_run
-                where notes = 'watch' order by started_at desc limit %s
+                where notes = 'watch' and started_at is not null and finished_at is not null
+                order by started_at desc limit %s
                 """,
                 (limit,),
             )
@@ -408,6 +412,219 @@ class DatabaseRepo:
             )
         conn.commit()
 
+    # -- поддержка пользователей -----------------------------------------
+    def user_activity_metrics(
+        self, days: int, limit: int, offset: int, query: str | None = None
+    ) -> dict[str, Any]:
+        days = max(1, min(days, 90))
+        limit = max(1, min(limit, 200))
+        offset = max(0, min(offset, 100_000))
+        query = (query or "").strip()[:100]
+        user_filter = ""
+        user_args: list[Any] = []
+        if query:
+            pattern = f"%{query}%"
+            predicates = [
+                "u.username ilike %s", "u.first_name ilike %s",
+                "u.last_name ilike %s", "u.email ilike %s",
+            ]
+            user_args = [pattern] * len(predicates)
+            if query.isdigit():
+                predicates.extend(["u.id::text = %s", "u.tg_id::text = %s"])
+                user_args.extend([query, query])
+            user_filter = "where (" + " or ".join(predicates) + ")"
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """select count(*)::int registered_users,
+                    count(*) filter (where last_seen_at >= now() - interval '1 day')::int dau,
+                    count(*) filter (where last_seen_at >= now() - interval '7 days')::int wau,
+                    count(*) filter (where last_seen_at >= now() - interval '30 days')::int mau
+                    from app_user"""
+            )
+            totals = cur.fetchone()
+            cur.execute(
+                """select day, sum(sessions)::int sessions, sum(searches)::int searches,
+                          sum(listing_views)::int listing_views,
+                          sum(favorites_added)::int favorites_added,
+                          sum(subscriptions_created)::int subscriptions_created,
+                          count(distinct user_id)::int active_users
+                   from user_activity_daily where day >= current_date - %s
+                   group by day order by day""",
+                (days - 1,),
+            )
+            daily = cur.fetchall()
+            cur.execute(
+                f"""select u.id, u.tg_id, u.username, u.email, u.phone,
+                          u.first_name, u.last_name, u.created_at, u.last_seen_at,
+                          (u.password_hash is not null) as has_password,
+                          coalesce(sum(a.sessions), 0)::int sessions,
+                          coalesce(sum(a.searches), 0)::int searches,
+                          coalesce(sum(a.listing_views), 0)::int listing_views,
+                          coalesce(sum(a.favorites_added), 0)::int favorites_added,
+                          coalesce(sum(a.subscriptions_created), 0)::int subscriptions_created
+                   from app_user u left join user_activity_daily a
+                     on a.user_id = u.id and a.day >= current_date - %s
+                   {user_filter}
+                   group by u.id order by u.last_seen_at desc nulls last
+                   limit %s offset %s""",
+                (days - 1, *user_args, limit, offset),
+            )
+            users = cur.fetchall()
+            cur.execute(f"select count(*)::int as total from app_user u {user_filter}", user_args)
+            total_users = int(cur.fetchone()["total"])
+            cur.execute(
+                """select l.id, l.title, count(*)::int views
+                   from listing_view v join listing l on l.id = v.listing_id
+                   where v.day >= current_date - %s
+                   group by l.id, l.title order by views desc limit 20""",
+                (days - 1,),
+            )
+            top_listings = cur.fetchall()
+        return {
+            "totals": totals, "daily": daily, "users": users,
+            "total_users": total_users, "top_listings": top_listings,
+            "limit": limit, "offset": offset,
+        }
+
+    def user_activity_detail(
+        self, user_id: int, days: int = 30, search_limit: int = 100
+    ) -> dict[str, Any] | None:
+        days = max(1, min(days, 90))
+        search_limit = max(1, min(search_limit, 200))
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """select id, tg_id, username, email, phone, first_name, last_name,
+                          created_at, last_seen_at, (password_hash is not null) has_password,
+                          (email is not null or phone_verified_at is not null) can_set_password
+                   from app_user where id = %s""", (user_id,)
+            )
+            user = cur.fetchone()
+            if not user:
+                return None
+            cur.execute(
+                """select coalesce(sum(sessions), 0)::int sessions,
+                          coalesce(sum(searches), 0)::int searches,
+                          coalesce(sum(listing_views), 0)::int listing_views,
+                          coalesce(sum(favorites_added), 0)::int favorites_added,
+                          coalesce(sum(subscriptions_created), 0)::int subscriptions_created,
+                          count(*)::int active_days
+                   from user_activity_daily
+                   where user_id = %s and day >= current_date - %s""",
+                (user_id, days - 1),
+            )
+            totals = cur.fetchone()
+            cur.execute(
+                """select day, sessions, searches, listing_views, favorites_added,
+                          subscriptions_created, last_active_at
+                   from user_activity_daily where user_id = %s
+                     and day >= current_date - %s order by day desc""",
+                (user_id, days - 1),
+            )
+            daily = [
+                {**row, "day": row["day"].isoformat(), "last_active_at": _iso(row["last_active_at"])}
+                for row in cur.fetchall()
+            ]
+            cur.execute(
+                """select created_at, meta from funnel_event
+                   where user_id = %s and kind = 'search'
+                     and created_at >= now() - make_interval(days => %s)
+                   order by created_at desc limit %s""",
+                (user_id, days, search_limit),
+            )
+            searches = [{"at": _iso(row["created_at"]), **(row["meta"] or {})} for row in cur.fetchall()]
+        return {
+            "user": {**user, "created_at": _iso(user["created_at"]), "last_seen_at": _iso(user["last_seen_at"])},
+            "days": days, "totals": totals, "daily": daily, "searches": searches,
+        }
+
+    def user_web_sessions(self, user_id: int) -> list[dict[str, Any]]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """select id, user_agent, created_at, last_seen_at, expires_at
+                   from web_session where user_id = %s and revoked_at is null
+                     and expires_at > now()
+                   order by last_seen_at desc limit 100""",
+                (user_id,),
+            )
+            return [{**row, **{key: _iso(row[key]) for key in ("created_at", "last_seen_at", "expires_at")}}
+                    for row in cur.fetchall()]
+
+    def revoke_user_web_session(self, user_id: int, session_id: int | None = None) -> int:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            if session_id is None:
+                cur.execute(
+                    """update web_session set revoked_at = now()
+                       where user_id = %s and revoked_at is null and expires_at > now()""",
+                    (user_id,),
+                )
+            else:
+                cur.execute(
+                    """update web_session set revoked_at = now()
+                       where user_id = %s and id = %s and revoked_at is null""",
+                    (user_id, session_id),
+                )
+            return cur.rowcount
+
+    def set_user_password(self, user_id: int, password_hash: str) -> bool:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """update app_user set password_hash = %s
+                   where id = %s and (email is not null or phone_verified_at is not null)""",
+                (password_hash, user_id),
+            )
+            updated = cur.rowcount
+            if updated:
+                cur.execute(
+                    """update web_session set revoked_at = now()
+                       where user_id = %s and revoked_at is null""", (user_id,)
+                )
+        return updated == 1
+
+    def funnel_metrics(self, days: int = 30) -> dict[str, Any]:
+        days = max(1, min(days, 365))
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """select kind, count(*)::int events,
+                          count(distinct visitor_id)::int visitors,
+                          count(distinct user_id)::int users
+                   from funnel_event where created_at >= now() - make_interval(days => %s)
+                   group by kind order by kind""", (days,)
+            )
+            by_kind = {row["kind"]: row for row in cur.fetchall()}
+            cur.execute(
+                """select created_at::date day, kind, count(*)::int events
+                   from funnel_event where created_at >= now() - make_interval(days => %s)
+                   group by 1, 2 order by 1, 2""", (days,)
+            )
+            daily = cur.fetchall()
+            cur.execute(
+                """select count(*)::int registered from app_user
+                   where created_at >= now() - make_interval(days => %s)""", (days,)
+            )
+            registered = int(cur.fetchone()["registered"])
+            cur.execute(
+                """select count(distinct e.user_id)::int activated_7d
+                   from funnel_event e join app_user u on u.id = e.user_id
+                   where e.kind in ('saved_search', 'favorite_add')
+                     and e.created_at >= u.created_at
+                     and e.created_at <= u.created_at + interval '7 days'
+                     and u.created_at >= now() - make_interval(days => %s)""", (days,)
+            )
+            activated = int(cur.fetchone()["activated_7d"])
+        stages = []
+        previous = None
+        for kind in ("visit", "search", "saved_search", "alert_open"):
+            row = by_kind.get(kind, {"events": 0, "visitors": 0, "users": 0})
+            visitors = int(row["visitors"] or 0)
+            stages.append({
+                "kind": kind, "events": int(row["events"] or 0),
+                "visitors": visitors, "users": int(row["users"] or 0),
+                "conversion": round(visitors / previous, 4) if previous else None,
+            })
+            previous = visitors
+        return {"days": days, "registered": registered, "activated_7d": activated,
+                "stages": stages, "daily": daily}
+
     # -- метрики -----------------------------------------------------------
     def metrics(self, days: int = 30, months: int = 12) -> dict[str, Any]:
         days = max(1, min(days, 365))
@@ -418,20 +635,23 @@ class DatabaseRepo:
                 select s.code as source,
                        count(l.id) filter (where l.status = 'active') as active,
                        count(l.id) as total,
-                       count(l.id) filter (
-                           where l.first_seen_at >= date_trunc('day', now())
-                       ) as today,
-                       count(l.id) filter (
-                           where l.first_seen_at >= now() - interval '7 days'
-                       ) as week,
-                       count(l.id) filter (
-                           where l.first_seen_at >= now() - interval '30 days'
-                       ) as month,
+                       coalesce(max(r.today), 0)::int as today,
+                       coalesce(max(r.week), 0)::int as week,
+                       coalesce(max(r.month), 0)::int as month,
                        percentile_cont(0.5) within group (order by l.price)
                            filter (where l.status = 'active') as median_price,
                        max(l.last_seen_at) as last_seen
                 from source s
                 left join listing l on l.source_id = s.id
+                left join lateral (
+                    select
+                      sum(inserted) filter (where started_at >=
+                        (date_trunc('day', now() at time zone 'Europe/Warsaw')
+                          at time zone 'Europe/Warsaw'))::int as today,
+                      sum(inserted) filter (where started_at >= now() - interval '7 days')::int as week,
+                      sum(inserted) filter (where started_at >= now() - interval '30 days')::int as month
+                    from crawl_run where source_id = s.id and finished_at is not null
+                ) r on true
                 group by s.code
                 order by s.code
                 """
@@ -452,17 +672,20 @@ class DatabaseRepo:
 
             cur.execute(
                 """
-                select to_char(d::date, 'YYYY-MM-DD') as day,
+                select to_char(d at time zone 'Europe/Warsaw', 'YYYY-MM-DD') as day,
                        s.code as source,
-                       count(l.id)::int as count
+                       coalesce(sum(r.inserted), 0)::int as count
                 from generate_series(
-                        current_date - (%(days)s - 1) * interval '1 day',
-                        current_date, interval '1 day') d
+                        (date_trunc('day', now() at time zone 'Europe/Warsaw')
+                          - (%(days)s - 1) * interval '1 day') at time zone 'Europe/Warsaw',
+                        date_trunc('day', now() at time zone 'Europe/Warsaw')
+                          at time zone 'Europe/Warsaw', interval '1 day') d
                 cross join source s
-                left join listing l
-                       on l.source_id = s.id
-                      and l.first_seen_at >= d
-                      and l.first_seen_at < d + interval '1 day'
+                left join crawl_run r
+                       on r.source_id = s.id
+                      and r.finished_at is not null
+                      and r.started_at >= d
+                      and r.started_at < d + interval '1 day'
                 group by 1, 2
                 order by 1, 2
                 """,
@@ -472,18 +695,20 @@ class DatabaseRepo:
 
             cur.execute(
                 """
-                select to_char(d, 'YYYY-MM') as month,
+                select to_char(d at time zone 'Europe/Warsaw', 'YYYY-MM') as month,
                        s.code as source,
-                       count(l.id)::int as count
+                       coalesce(sum(r.inserted), 0)::int as count
                 from generate_series(
-                        date_trunc('month', current_date)
-                            - (%(months)s - 1) * interval '1 month',
-                        date_trunc('month', current_date), interval '1 month') d
+                        (date_trunc('month', now() at time zone 'Europe/Warsaw')
+                            - (%(months)s - 1) * interval '1 month') at time zone 'Europe/Warsaw',
+                        date_trunc('month', now() at time zone 'Europe/Warsaw')
+                            at time zone 'Europe/Warsaw', interval '1 month') d
                 cross join source s
-                left join listing l
-                       on l.source_id = s.id
-                      and l.first_seen_at >= d
-                      and l.first_seen_at < d + interval '1 month'
+                left join crawl_run r
+                       on r.source_id = s.id
+                      and r.finished_at is not null
+                      and r.started_at >= d
+                      and r.started_at < d + interval '1 month'
                 group by 1, 2
                 order by 1, 2
                 """,
@@ -493,14 +718,17 @@ class DatabaseRepo:
 
             cur.execute(
                 """
-                select to_char(r.started_at::date, 'YYYY-MM-DD') as day,
+                select to_char(r.started_at at time zone 'Europe/Warsaw', 'YYYY-MM-DD') as day,
                        s.code as source,
                        sum(r.pages)::int as pages,
                        sum(r.inserted)::int as inserted,
                        sum(r.errors)::int as errors
                 from crawl_run r
                 join source s on s.id = r.source_id
-                where r.started_at >= current_date - (%(days)s - 1) * interval '1 day'
+                where r.started_at >=
+                      ((date_trunc('day', now() at time zone 'Europe/Warsaw')
+                        - (%(days)s - 1) * interval '1 day') at time zone 'Europe/Warsaw')
+                  and r.finished_at is not null
                 group by 1, 2
                 order by 1, 2
                 """,

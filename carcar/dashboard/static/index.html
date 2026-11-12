@@ -57,39 +57,26 @@
       </table>
     </section>
 
-    <section class="card" id="logs-section">
-      <div class="card-head">
-        <h2>Ошибки и события сбора</h2>
-        <div class="topbar-right"><span class="muted tiny" id="logs-updated"></span><button class="ghost" type="button" id="refresh-logs">Обновить</button></div>
-      </div>
-      <div class="table-scroll">
-        <table>
-          <thead><tr><th>Время</th><th>Площадка</th><th>Тип</th><th>Сообщение</th><th>Детали</th></tr></thead>
-          <tbody id="service-logs"></tbody>
-        </table>
-      </div>
-    </section>
-
     <section class="cards">
       <article class="card kpi">
-        <span class="label" data-i18n="polls">Опросов</span>
-        <strong id="kpi-polls">—</strong>
-        <span class="hint" data-i18n="perSession">за сессию</span>
+        <span class="label">Активных объявлений</span>
+        <strong id="kpi-active-listings">—</strong>
+        <span class="hint">сейчас в базе</span>
       </article>
       <article class="card kpi">
-        <span class="label" data-i18n="newListings">Новых объявлений</span>
-        <strong id="kpi-new">—</strong>
-        <span class="hint" data-i18n="perSession">за сессию</span>
+        <span class="label">Всего объявлений</span>
+        <strong id="kpi-total-listings">—</strong>
+        <span class="hint" id="kpi-total-hint">в базе</span>
       </article>
       <article class="card kpi">
-        <span class="label" data-i18n="details">Карточек в папке</span>
-        <strong id="kpi-details">—</strong>
-        <span class="hint" id="kpi-details-size">—</span>
+        <span class="label">Сервисы сбора</span>
+        <strong id="kpi-collectors">—</strong>
+        <span class="hint">всего площадок</span>
       </article>
       <article class="card kpi">
-        <span class="label" data-i18n="errors">Ошибок</span>
-        <strong id="kpi-errors">—</strong>
-        <span class="hint" id="kpi-traffic">—</span>
+        <span class="label">Требуют внимания</span>
+        <strong id="kpi-collector-issues">—</strong>
+        <span class="hint">сбой или нет связи</span>
       </article>
     </section>
 
@@ -113,13 +100,13 @@
       <article class="card kpi">
         <span class="label" data-i18n="sources">Платформ</span>
         <strong id="kpi-sources">—</strong>
-        <span class="hint" data-i18n="inWork">сбор идёт</span>
+        <span class="hint">есть объявления</span>
       </article>
     </section>
 
     <section class="card user-analytics" id="user-analytics">
       <div class="card-head">
-        <h2 data-i18n="userAnalytics">Активность пользователей</h2>
+        <h2>Пользователи и поддержка</h2>
         <span class="muted" id="user-analytics-status"></span>
       </div>
       <div class="card-head analytics-refresh">
@@ -148,11 +135,25 @@
         <article class="card analytics-scroll">
           <div class="card-head user-search-head">
             <h2 id="ua-users-title">Пользователи · 30 дней</h2>
-            <input id="ua-user-search" type="search" autocomplete="off" placeholder="Имя, username, ID или Telegram ID">
+            <input id="ua-user-search" type="search" autocomplete="off" placeholder="Имя, email, username, ID или Telegram ID">
           </div>
-          <table><thead><tr><th>Пользователь</th><th>Последний визит</th><th>Сессии</th><th>Поиски</th><th>Просмотры</th><th>Избранное</th><th>Подписки</th><th>Профиль</th></tr></thead><tbody id="ua-users"></tbody></table>
+          <table><thead><tr><th>Пользователь</th><th>Последний визит</th><th>Сессии</th><th>Поиски</th><th>Просмотры</th><th>Избранное</th><th>Подписки</th><th>Аккаунт</th></tr></thead><tbody id="ua-users"></tbody></table>
+          <div class="user-pagination"><span id="ua-user-page" class="muted small"></span><div><button class="ghost" id="ua-user-prev" type="button">Назад</button><button class="ghost" id="ua-user-next" type="button">Дальше</button></div></div>
           <p class="tiny muted">Поисковая фраза и выбранные фильтры доступны в карточке пользователя.</p>
         </article>
+      </div>
+    </section>
+
+    <section class="card" id="logs-section">
+      <div class="card-head">
+        <h2>Ошибки и события сбора</h2>
+        <div class="topbar-right"><span class="muted tiny" id="logs-updated"></span><button class="ghost" type="button" id="refresh-logs">Обновить</button></div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Время</th><th>Площадка</th><th>Тип</th><th>Сообщение</th><th>Детали</th></tr></thead>
+          <tbody id="service-logs"></tbody>
+        </table>
       </div>
     </section>
 
@@ -193,27 +194,12 @@
       </table>
     </section>
 
-    <section class="grid">
-      <article class="card chart-card">
+    <section class="card chart-card poll-chart-card">
         <div class="card-head">
           <h2 data-i18n="chart">Новые объявления по опросам</h2>
           <span class="muted" id="chart-hint"></span>
         </div>
         <canvas id="chart" height="140"></canvas>
-      </article>
-
-      <article class="card control-card">
-        <div class="card-head"><h2 data-i18n="control">Управление</h2></div>
-        <p class="muted small" id="control-note">—</p>
-        <label class="field">
-          <span data-i18n="reason">Причина паузы</span>
-          <input id="reason" maxlength="200" autocomplete="off" placeholder="например: чиним парсер">
-        </label>
-        <button id="toggle" class="primary">…</button>
-        <p class="tiny muted" data-i18n="pauseHint">
-          Сборщик проверяет паузу перед каждым опросом — на площадку запросы перестают идти в пределах одного интервала.
-        </p>
-      </article>
     </section>
 
     <section class="card listings-card">
@@ -234,10 +220,9 @@
         <table>
           <thead>
             <tr>
-              <th data-i18n="time">Время</th>
+              <th data-i18n="time">Дата и время</th>
               <th data-i18n="new">Новых</th>
-              <th data-i18n="sec">Секунд</th>
-              <th data-i18n="kb">КБ</th>
+              <th>Ошибок</th>
             </tr>
           </thead>
           <tbody id="polls"></tbody>
@@ -249,10 +234,10 @@
         <table>
           <thead>
             <tr>
-              <th data-i18n="mode">Режим</th>
-              <th data-i18n="time">Время</th>
+              <th>Площадка</th>
+              <th data-i18n="time">Начало</th>
               <th data-i18n="new">Новых</th>
-              <th data-i18n="detailsShort">Карточек</th>
+              <th>Ошибок</th>
             </tr>
           </thead>
           <tbody id="runs"></tbody>
@@ -286,6 +271,22 @@
           <h3>Активность по дням</h3>
           <table><thead><tr><th>Дата</th><th>Сессии</th><th>Поиски</th><th>Просмотры</th><th>Избранное</th><th>Подписки</th></tr></thead><tbody id="ua-user-daily"></tbody></table>
         </div>
+        <section class="support-tools">
+          <div class="card-head"><div><h3>Доступ и безопасность</h3><p class="muted small">Управление веб-сессиями и паролем пользователя</p></div><button class="ghost" id="ua-sessions-refresh" type="button">Обновить сессии</button></div>
+          <div class="support-actions">
+            <form id="ua-password-form" class="password-reset-form">
+              <label class="field"><span>Новый пароль · от 12 символов</span><input id="ua-new-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+              <button class="primary" type="submit">Задать пароль и завершить сессии</button>
+            </form>
+            <div class="sessions-panel">
+              <div class="sessions-heading"><strong>Активные веб-сессии</strong><button class="ghost" id="ua-sessions-revoke-all" type="button">Завершить все</button></div>
+              <p class="muted tiny" id="ua-sessions-status">—</p>
+              <div class="table-scroll"><table><thead><tr><th>Устройство</th><th>Последняя активность</th><th></th></tr></thead><tbody id="ua-sessions"></tbody></table></div>
+            </div>
+          </div>
+          <p class="banner bad hidden" id="ua-admin-action-error" role="alert"></p>
+          <p class="banner hidden" id="ua-admin-action-success" role="status"></p>
+        </section>
       </div>
     </div>
   </dialog>

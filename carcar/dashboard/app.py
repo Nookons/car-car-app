@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
 import re
 import time
@@ -21,7 +22,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-import httpx
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -35,6 +35,7 @@ from ..geo import distance_km, get_geo
 from ..parse import Listing, ParseError, html_to_text
 from ..runner import fetch_detail
 from ..store import Store
+from .. import webauth
 from .repo import DatabaseRepo
 
 STATIC = Path(__file__).parent / "static"
@@ -58,6 +59,13 @@ class ServiceNoticeIn(BaseModel):
 
 class DashboardLoginIn(BaseModel):
     password: str = Field(min_length=1, max_length=200)
+
+
+class UserPasswordIn(BaseModel):
+    password: str = Field(min_length=12, max_length=128)
+
+
+admin_audit = logging.getLogger("carcar.dashboard.admin")
 
 
 def _safe(call, fallback, errors: list[str], name: str):
@@ -197,11 +205,7 @@ def create_app(
     source_code = source
     cache: dict[str, tuple[float, dict]] = {}
     repo: DatabaseRepo | None = None
-    api_base_url = os.environ.get(
-        "CARCAR_API_URL", "https://api-production-5bee.up.railway.app"
-    ).rstrip("/")
     dashboard_password = os.environ.get("CARCAR_DASHBOARD_PASSWORD", "")
-    analytics_admin_token = os.environ.get("CARCAR_ANALYTICS_ADMIN_TOKEN", "")
     session_cookie = "carcar_dashboard_session"
     session_ttl = 8 * 60 * 60
 
@@ -234,12 +238,15 @@ def create_app(
     @app.middleware("http")
     async def protect_dashboard(request: Request, call_next):
         path = request.url.path
-        if (
-            not dashboard_password
-            or path.startswith("/static/")
-            or path in {"/api/session", "/api/session/logout", "/"}
-        ):
+        if path.startswith("/static/") or path in {"/api/session", "/api/session/logout", "/"}:
             return await call_next(request)
+        if not dashboard_password:
+            if path.startswith("/api/"):
+                return JSONResponse(
+                    {"detail": "администрирование выключено: не задан CARCAR_DASHBOARD_PASSWORD"},
+                    status_code=503,
+                )
+            return RedirectResponse("/", status_code=303)
         if has_dashboard_session(request):
             return await call_next(request)
         if path.startswith("/api/"):
@@ -258,7 +265,7 @@ def create_app(
 
     @app.get("/api/session")
     def session_status(request: Request) -> dict:
-        return {"authenticated": not dashboard_password or has_dashboard_session(request)}
+        return {"authenticated": bool(dashboard_password and has_dashboard_session(request))}
 
     @app.post("/api/session")
     def login(payload: DashboardLoginIn, response: Response) -> dict:
@@ -341,21 +348,47 @@ def create_app(
             collectors = []
             errors.append(f"collectors: {exc}")
 
+        for collector in collectors:
+            checked_at = _parse_iso(collector.get("heartbeat_at") or collector.get("last_poll_at"))
+            interval = max(15.0, float(collector.get("interval_seconds") or 60))
+            if checked_at and collector.get("status") == "running":
+                if (now - checked_at).total_seconds() > max(60.0, interval * 4):
+                    collector["status"] = "stale"
+
         notices = _safe(
             lambda: repo.service_notices() if repo is not None else [],
             [], errors, "service notices",
         )
 
-        # На Railway heartbeat-файла нет: состояние берём из записи коллектора.
         if not heartbeat and collectors:
-            active = next((c for c in collectors if c.get("last_poll_at")), None)
-            if active:
-                started_at = _parse_iso(active["last_poll_at"])
-                if started_at:
-                    age = max(0.0, (now - started_at).total_seconds())
-                state = str(active.get("status") or "running")
-                if age is not None and age > stale_after:
-                    state = "stale"
+            active_notices = {
+                notice["source"] for notice in notices
+                if notice.get("active") and notice.get("source")
+            }
+            states = [
+                "paused" if collector.get("paused") or collector.get("source") in active_notices
+                else str(collector.get("status") or "never")
+                for collector in collectors
+            ]
+            if "error" in states:
+                state = "error"
+            elif "stale" in states:
+                state = "stale"
+            elif "running" in states:
+                state = "running"
+            elif all(item == "paused" for item in states):
+                state = "paused"
+            elif any(item == "paused" for item in states):
+                state = "paused"
+            elif all(item == "never" for item in states):
+                state = "never"
+            else:
+                state = "idle"
+            timestamps = [_parse_iso(item.get("last_poll_at")) for item in collectors]
+            timestamps = [item for item in timestamps if item]
+            if timestamps:
+                started_at = max(timestamps)
+                age = max(0.0, (now - started_at).total_seconds())
 
         return {
             "now": now.isoformat(),
@@ -430,23 +463,9 @@ def create_app(
 
     @app.get("/api/funnel-metrics")
     def funnel_metrics(days: int = Query(default=30, ge=1, le=365)) -> dict:
-        """Проксирует воронку визит → поиск → сохранённый поиск → алерт."""
-        if not analytics_admin_token:
-            raise HTTPException(status_code=503, detail="аналитика не настроена")
-        try:
-            response = httpx.get(
-                f"{api_base_url}/api/admin/funnel",
-                params={"days": days},
-                headers={"X-Analytics-Admin-Token": analytics_admin_token},
-                timeout=10.0,
-            )
-        except httpx.HTTPError as exc:
-            raise HTTPException(status_code=502, detail="API аналитики недоступно") from exc
-        if response.status_code == 401:
-            raise HTTPException(status_code=401, detail="неверный токен аналитики")
-        if response.status_code != 200:
-            raise HTTPException(status_code=502, detail="ошибка API аналитики")
-        return response.json()
+        if repo is None:
+            raise HTTPException(status_code=503, detail="аналитика требует PostgreSQL")
+        return repo.funnel_metrics(days)
 
     @app.get("/api/metrics")
     def metrics(days: int = 30, months: int = 12) -> dict:
@@ -467,23 +486,10 @@ def create_app(
         offset: int = Query(default=0, ge=0, le=100_000),
         query: str | None = Query(default=None, max_length=100),
     ) -> dict:
-        """Проксирует закрытую аналитику Mini App в основной дашборд."""
-        if not analytics_admin_token:
-            raise HTTPException(status_code=503, detail="аналитика не настроена")
-        try:
-            response = httpx.get(
-                f"{api_base_url}/api/admin/metrics",
-                params={"days": days, "limit": limit, "offset": offset, "query": query},
-                headers={"X-Analytics-Admin-Token": analytics_admin_token},
-                timeout=10.0,
-            )
-        except httpx.HTTPError as exc:
-            raise HTTPException(status_code=502, detail="API аналитики недоступно") from exc
-        if response.status_code == 401:
-            raise HTTPException(status_code=401, detail="неверный токен аналитики")
-        if response.status_code != 200:
-            raise HTTPException(status_code=502, detail="ошибка API аналитики")
-        return response.json()
+        """Пользовательская аналитика читается из той же БД, что и объявления."""
+        if repo is None:
+            raise HTTPException(status_code=503, detail="управление пользователями требует PostgreSQL")
+        return repo.user_activity_metrics(days, limit, offset, query)
 
     @app.get("/api/user-metrics/{user_id}")
     def user_metrics_detail(
@@ -491,24 +497,54 @@ def create_app(
         days: int = Query(default=30, ge=1, le=90),
         search_limit: int = Query(default=100, ge=1, le=200),
     ) -> dict:
-        if not analytics_admin_token:
-            raise HTTPException(status_code=503, detail="аналитика не настроена")
-        try:
-            response = httpx.get(
-                f"{api_base_url}/api/admin/users/{user_id}",
-                params={"days": days, "search_limit": search_limit},
-                headers={"X-Analytics-Admin-Token": analytics_admin_token},
-                timeout=10.0,
-            )
-        except httpx.HTTPError as exc:
-            raise HTTPException(status_code=502, detail="API аналитики недоступно") from exc
-        if response.status_code == 404:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="управление пользователями требует PostgreSQL")
+        detail = repo.user_activity_detail(user_id, days, search_limit)
+        if detail is None:
             raise HTTPException(status_code=404, detail="пользователь не найден")
-        if response.status_code == 401:
-            raise HTTPException(status_code=401, detail="неверный токен аналитики")
-        if response.status_code != 200:
-            raise HTTPException(status_code=502, detail="ошибка API аналитики")
-        return response.json()
+        return detail
+
+    @app.get("/api/users/{user_id}/sessions")
+    def user_sessions(user_id: int) -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="управление пользователями требует PostgreSQL")
+        if repo.user_activity_detail(user_id, days=1, search_limit=1) is None:
+            raise HTTPException(status_code=404, detail="пользователь не найден")
+        return {"items": repo.user_web_sessions(user_id)}
+
+    @app.post("/api/users/{user_id}/sessions/revoke")
+    def revoke_user_sessions(user_id: int) -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="управление пользователями требует PostgreSQL")
+        revoked = repo.revoke_user_web_session(user_id)
+        admin_audit.info("action=revoke_all_web_sessions user_id=%s count=%s", user_id, revoked)
+        return {"revoked": revoked}
+
+    @app.post("/api/users/{user_id}/sessions/{session_id}/revoke")
+    def revoke_user_session(user_id: int, session_id: int) -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="управление пользователями требует PostgreSQL")
+        revoked = repo.revoke_user_web_session(user_id, session_id)
+        if not revoked:
+            raise HTTPException(status_code=404, detail="активная сессия не найдена")
+        admin_audit.info("action=revoke_web_session user_id=%s session_id=%s", user_id, session_id)
+        return {"revoked": True}
+
+    @app.post("/api/users/{user_id}/password")
+    def set_user_password(user_id: int, payload: UserPasswordIn) -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="управление пользователями требует PostgreSQL")
+        try:
+            webauth.validate_password(payload.password)
+        except webauth.AuthInputError as exc:
+            raise HTTPException(status_code=422, detail="пароль слишком простой") from exc
+        updated = repo.set_user_password(user_id, webauth.hash_password(payload.password))
+        if not updated:
+            if repo.user_activity_detail(user_id, days=1, search_limit=1) is None:
+                raise HTTPException(status_code=404, detail="пользователь не найден")
+            raise HTTPException(status_code=409, detail="у пользователя нет email или подтверждённого телефона")
+        admin_audit.info("action=admin_set_password user_id=%s sessions_revoked=true", user_id)
+        return {"ok": True, "sessions_revoked": True}
 
     @app.get("/api/listings/{listing_id}")
     def listing_card(listing_id: str) -> dict:

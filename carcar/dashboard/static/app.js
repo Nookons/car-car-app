@@ -2,9 +2,9 @@
 
 const I18N = {
   ru: {
-    title: "сборщик",
-    userAnalytics: "Активность пользователей",
-    userAnalyticsHint: "Сводка активности приложения.",
+    title: "панель управления",
+    userAnalytics: "Пользователи",
+    userAnalyticsHint: "Активность, поиски, сессии и доступ к аккаунту.",
     loadAnalytics: "Обновить",
     logout: "Выйти",
     polls: "Опросов",
@@ -56,7 +56,7 @@ const I18N = {
     mode: "Режим",
     detailsShort: "Карточек",
     footer:
-      "Данные — локально, папка data. Дашборд только для владельца, слушает 127.0.0.1.",
+      "Доступ к управлению ограничен паролем администратора.",
     pause: "Поставить на паузу",
     resume: "Продолжить",
     states: {
@@ -81,9 +81,9 @@ const I18N = {
     noRuns: "Прогонов пока нет",
   },
   en: {
-    title: "collector",
-    userAnalytics: "User activity",
-    userAnalyticsHint: "Application activity summary.",
+    title: "operations dashboard",
+    userAnalytics: "Users",
+    userAnalyticsHint: "Activity, searches, sessions, and account access.",
     loadAnalytics: "Refresh",
     logout: "Log out",
     polls: "Polls",
@@ -134,7 +134,7 @@ const I18N = {
     kb: "KB",
     mode: "Mode",
     detailsShort: "Details",
-    footer: "Data is local, in the data folder. Owner-only dashboard on 127.0.0.1.",
+    footer: "Administrative controls are restricted to dashboard password holders.",
     pause: "Pause",
     resume: "Resume",
     states: {
@@ -160,7 +160,6 @@ const I18N = {
 
 let lang = localStorage.getItem("carcar.lang") || "ru";
 let current = null;
-let busy = false;
 let geo = readGeo();
 let lastMetrics = null;
 let dashboardStarted = false;
@@ -168,6 +167,9 @@ let dashboardIntervals = [];
 let userSearchTimer = null;
 let userAnalyticsRequest = 0;
 let userDetailRequest = 0;
+let activeSupportUserId = null;
+let userOffset = 0;
+const userPageSize = 50;
 
 // Ссылку «рядом со мной» можно открыть с координатами: /?lat=52.23&lon=21.01&radius=50
 (() => {
@@ -199,7 +201,15 @@ function saveGeo(value) {
 function fmtTime(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "—";
   return d.toLocaleTimeString(lang === "ru" ? "ru-RU" : "en-GB", { hour12: false });
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return "—";
+  return date.toLocaleString(lang === "ru" ? "ru-RU" : "en-GB", { hour12: false });
 }
 
 function fmtAgo(seconds) {
@@ -274,7 +284,8 @@ function renderState(status) {
     parts.push(`${t("pausedAt")} ${fmtTime(status.control.updated_at)}`);
     if (status.control.reason) parts.push(`${t("pausedReason")}: ${status.control.reason}`);
   }
-  $("subtitle").textContent = ["otomoto.pl · Польша", ...parts].join(" · ");
+  const platforms = (status.collectors || []).map((collector) => collector.source).filter(Boolean).join(" · ");
+  $("subtitle").textContent = [platforms || "Сервисы и состояние сбора", ...parts].join(" · ");
 
   const banner = $("banner");
   banner.className = "banner hidden";
@@ -292,37 +303,20 @@ function renderState(status) {
 }
 
 function renderKpi(status) {
-  const hb = status.heartbeat || {};
-  const collectorTotals = (status.collectors || []).reduce((sum, collector) => {
-    const stats = collector.stats || {};
-    sum.polls += Number(collector.round || 0);
-    sum.new_ids += Number(stats.new_ids || 0);
-    sum.errors += Number(stats.errors || 0);
-    return sum;
-  }, { polls: 0, new_ids: 0, errors: 0 });
-  const totals = { ...collectorTotals, ...(hb.totals || {}) };
   const storage = status.storage || {};
-  const client = hb.client || {};
-
-  $("kpi-polls").textContent = fmtInt(totals.polls);
-  $("kpi-new").textContent = fmtInt(totals.new_ids);
-  const isDb = storage.mode === "db";
-  $("kpi-details").textContent = fmtInt(
-    isDb ? storage.listings : storage.detail_files,
-  );
+  const collectors = status.collectors || [];
+  $("kpi-total-listings").textContent = fmtInt(storage.listings);
+  $("kpi-active-listings").textContent = fmtInt(storage.active);
+  $("kpi-collectors").textContent = fmtInt(collectors.length);
+  $("kpi-collector-issues").textContent = fmtInt(collectors.filter((collector) =>
+    ["error", "stale"].includes(String(collector.status || "").toLowerCase()),
+  ).length);
   const sweep = status.sweep || {};
   const sweepText =
     sweep.total_pages && sweep.next_page
       ? ` · ${lang === "ru" ? "обход" : "sweep"} ${Math.min(sweep.next_page - 1, sweep.total_pages)}/${sweep.total_pages}`
       : "";
-  $("kpi-details-size").textContent = (isDb ? storage.size : fmtMb(storage.detail_bytes)) + sweepText;
-  const detailsLabel = document.querySelector('[data-i18n="details"]');
-  if (detailsLabel) detailsLabel.textContent = isDb ? t("inDb") : t("details");
-  $("kpi-errors").textContent = fmtInt(totals.errors);
-  $("kpi-errors").closest(".kpi").classList.toggle("negative", (totals.errors || 0) > 0);
-  $("kpi-traffic").textContent = client.wire_bytes
-    ? `${lang === "ru" ? "сеть" : "network"}: ${fmtMb(client.wire_bytes)}`
-    : "—";
+  $("kpi-total-hint").textContent = [storage.size || "", sweepText.replace(/^ · /, "")].filter(Boolean).join(" · ") || "в базе";
 }
 
 function renderChart(polls) {
@@ -385,7 +379,7 @@ function renderPolls(polls) {
   const body = $("polls");
   body.innerHTML = "";
   if (!polls.length) {
-    body.innerHTML = `<tr><td colspan="4" class="muted">${t("noData")}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="3" class="muted">${t("noData")}</td></tr>`;
     return;
   }
   polls
@@ -395,10 +389,9 @@ function renderPolls(polls) {
     .forEach((poll) => {
       const row = document.createElement("tr");
       row.innerHTML = `
-        <td>${fmtTime(poll.ts || poll.at)}</td>
+        <td>${fmtDateTime(poll.ts || poll.at)}</td>
         <td class="num">${fmtInt(poll.new)}</td>
-        <td class="num">${(poll.seconds ?? 0).toFixed(1)}</td>
-        <td class="num">${Math.round((poll.wire_bytes || 0) / 1024)}</td>`;
+        <td class="num">${fmtInt(poll.errors)}</td>`;
       body.appendChild(row);
     });
 }
@@ -411,38 +404,14 @@ function renderRuns(runs) {
     return;
   }
   runs.forEach((run) => {
-    // Старые сводки писались до появления поля mode — угадываем по содержимому.
-    const mode = run.mode || (run.rounds ? "watch" : run.details_saved ? "collect" : "discover");
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${mode}</td>
-      <td>${fmtTime(run.started_at)}</td>
-      <td class="num">${fmtInt(run.new ?? run.new_ids)}</td>
-      <td class="num">${fmtInt(run.details_saved ?? run.items)}</td>`;
+      <td>${esc(run.source || "—")}</td>
+      <td>${fmtDateTime(run.started_at)}</td>
+      <td class="num">${fmtInt(run.new)}</td>
+      <td class="num">${fmtInt(run.errors)}</td>`;
     body.appendChild(row);
   });
-}
-
-function renderControl(status) {
-  const paused = Boolean(status.control?.paused);
-  const button = $("toggle");
-  button.textContent = paused ? t("resume") : t("pause");
-  button.classList.toggle("resume", paused);
-  button.disabled = busy;
-
-  $("reason").disabled = paused;
-
-  const note = $("control-note");
-  if (paused) {
-    const at = fmtTime(status.control.updated_at);
-    note.textContent = `${t("pausedAt")} ${at}${status.control.reason ? ` · ${status.control.reason}` : ""}`;
-  } else {
-    const interval = (status.heartbeat || {}).interval || 15;
-    note.textContent =
-      lang === "ru"
-        ? `Сбор идёт. Проверка паузы — каждые ${interval} с.`
-        : `Collecting. Pause check every ${interval}s.`;
-  }
 }
 
 function esc(value) {
@@ -624,6 +593,10 @@ function renderMetrics() {
   $("kpi-week").textContent = fmtInt(data.totals.week);
   $("kpi-month").textContent = fmtInt(data.totals.month);
   $("kpi-sources").textContent = fmtInt(data.totals.sources);
+  if (current?.storage) {
+    $("kpi-total-listings").textContent = fmtInt(current.storage.listings);
+    $("kpi-active-listings").textContent = fmtInt(data.totals.active);
+  }
 
   const daily = buildSeries(data.daily, "day");
   drawStack($("chart-daily"), daily.labels, daily.series, (d) => `${d.slice(8, 10)}.${d.slice(5, 7)}`);
@@ -750,11 +723,18 @@ function renderUserAnalytics(data, funnel) {
     const link = document.createElement("a");
     link.href = `#user=${encodeURIComponent(user.id)}`;
     link.className = "user-detail-link";
-    link.textContent = "Статистика";
+    link.textContent = "Статистика и доступ";
     cell.appendChild(link);
     tr.appendChild(cell);
   }, 8);
   if (funnel) renderFunnel(funnel);
+  const total = Number(data.total_users || 0);
+  const start = total ? userOffset + 1 : 0;
+  const end = Math.min(userOffset + (data.users || []).length, total);
+  $("ua-users-title").textContent = `Пользователи · ${fmtInt(total)}`;
+  $("ua-user-page").textContent = `${fmtInt(start)}–${fmtInt(end)} из ${fmtInt(total)}`;
+  $("ua-user-prev").disabled = userOffset <= 0;
+  $("ua-user-next").disabled = userOffset + userPageSize >= total;
   $("user-analytics-results").classList.remove("hidden");
   $("user-analytics-error").classList.add("hidden");
   $("user-analytics-status").textContent = lang === "ru" ? "Обновлено сейчас" : "Updated now";
@@ -768,7 +748,7 @@ async function loadUserAnalytics() {
   error.classList.add("hidden");
   $("user-analytics-status").textContent = lang === "ru" ? "Загрузка…" : "Loading…";
   try {
-    const params = new URLSearchParams({ days: "30", limit: "100" });
+    const params = new URLSearchParams({ days: "30", limit: String(userPageSize), offset: String(userOffset) });
     const query = $("ua-user-search").value.trim();
     if (query) params.set("query", query);
     const [response, funnelResponse] = await Promise.all([
@@ -795,8 +775,17 @@ async function loadUserAnalytics() {
 $("refresh-user-analytics").addEventListener("click", loadUserAnalytics);
 
 $("ua-user-search").addEventListener("input", () => {
+  userOffset = 0;
   clearTimeout(userSearchTimer);
   userSearchTimer = setTimeout(loadUserAnalytics, 350);
+});
+$("ua-user-prev").addEventListener("click", () => {
+  userOffset = Math.max(0, userOffset - userPageSize);
+  void loadUserAnalytics();
+});
+$("ua-user-next").addEventListener("click", () => {
+  userOffset += userPageSize;
+  void loadUserAnalytics();
 });
 
 async function loadUserDetail(userId) {
@@ -805,6 +794,7 @@ async function loadUserDetail(userId) {
   const error = $("ua-user-error");
   const content = $("ua-user-content");
   if (!dialog.open) dialog.showModal();
+  activeSupportUserId = String(userId);
   error.classList.add("hidden");
   content.classList.add("hidden");
   $("ua-user-meta").textContent = "Загрузка…";
@@ -818,7 +808,9 @@ async function loadUserDetail(userId) {
     const label = user.username ? `@${user.username}` : [user.first_name, user.last_name].filter(Boolean).join(" ") || `ID ${user.id}`;
     $("ua-user-title").textContent = label;
     const lastSeen = user.last_seen_at ? new Date(user.last_seen_at).toLocaleString("ru-RU") : "—";
-    $("ua-user-meta").textContent = `ID ${user.id} · регистрация ${fmtDateTime(user.created_at)} · последний визит ${lastSeen}`;
+    const identity = [user.email, user.phone, user.tg_id ? `Telegram ${user.tg_id}` : null].filter(Boolean).join(" · ");
+    $("ua-user-meta").textContent = [`ID ${user.id}`, identity, `регистрация ${fmtDateTime(user.created_at)}`, `последний визит ${lastSeen}`].filter(Boolean).join(" · ");
+    $("ua-password-form").classList.toggle("hidden", !user.can_set_password);
     const totals = data.totals || {};
     $("ua-user-sessions").textContent = fmtInt(totals.sessions);
     $("ua-user-searches").textContent = fmtInt(totals.searches);
@@ -843,6 +835,7 @@ async function loadUserDetail(userId) {
     }, 6);
     content.classList.remove("hidden");
     $("ua-user-meta").classList.remove("muted");
+    await loadUserSessions(user.id);
   } catch (cause) {
     if (requestId !== userDetailRequest) return;
     $("ua-user-meta").textContent = "";
@@ -856,6 +849,97 @@ function showUserFromHash() {
   if (match && dashboardStarted) void loadUserDetail(match[1]);
   else if ($("ua-user-dialog").open) $("ua-user-dialog").close();
 }
+
+function showUserActionMessage(kind, message) {
+  const error = $("ua-admin-action-error");
+  const success = $("ua-admin-action-success");
+  error.classList.add("hidden");
+  success.classList.add("hidden");
+  const target = kind === "error" ? error : success;
+  target.textContent = message;
+  target.classList.remove("hidden");
+}
+
+async function loadUserSessions(userId = activeSupportUserId) {
+  if (!userId) return;
+  const status = $("ua-sessions-status");
+  status.textContent = "Загружаю…";
+  try {
+    const response = await fetch(`/api/users/${encodeURIComponent(userId)}/sessions`, { cache: "no-store" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+    const body = $("ua-sessions");
+    body.replaceChildren();
+    const sessions = data.items || [];
+    sessions.forEach((session) => {
+      const row = document.createElement("tr");
+      addAnalyticsCell(row, session.user_agent || "Неизвестное устройство");
+      addAnalyticsCell(row, fmtDateTime(session.last_seen_at));
+      const cell = document.createElement("td");
+      const button = document.createElement("button");
+      button.className = "ghost danger-action";
+      button.type = "button";
+      button.textContent = "Завершить";
+      button.addEventListener("click", () => revokeUserSession(userId, session.id));
+      cell.appendChild(button);
+      row.appendChild(cell);
+      body.appendChild(row);
+    });
+    status.textContent = sessions.length ? `Активных сессий: ${sessions.length}` : "Активных веб-сессий нет";
+  } catch (error) {
+    status.textContent = error instanceof Error ? error.message : "Не удалось загрузить сессии";
+  }
+}
+
+async function revokeUserSession(userId, sessionId = null) {
+  const message = sessionId
+    ? "Завершить эту веб-сессию?"
+    : "Завершить все активные веб-сессии этого пользователя?";
+  if (!window.confirm(message)) return;
+  const endpoint = sessionId
+    ? `/api/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}/revoke`
+    : `/api/users/${encodeURIComponent(userId)}/sessions/revoke`;
+  try {
+    const response = await fetch(endpoint, { method: "POST" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+    await loadUserSessions(userId);
+    showUserActionMessage("success", sessionId ? "Веб-сессия завершена." : `Завершено сессий: ${data.revoked}.`);
+  } catch (error) {
+    showUserActionMessage("error", error instanceof Error ? error.message : "Не удалось завершить сессии");
+  }
+}
+
+$("ua-sessions-refresh").addEventListener("click", () => loadUserSessions());
+$("ua-sessions-revoke-all").addEventListener("click", () => {
+  if (activeSupportUserId) void revokeUserSession(activeSupportUserId);
+});
+$("ua-password-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!activeSupportUserId) return;
+  const password = $("ua-new-password").value;
+  if (password.length < 12) {
+    showUserActionMessage("error", "Пароль должен содержать не менее 12 символов.");
+    return;
+  }
+  if (!window.confirm("Задать новый пароль? Все активные веб-сессии пользователя будут завершены.")) return;
+  const button = event.currentTarget.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/users/${encodeURIComponent(activeSupportUserId)}/password`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+    $("ua-new-password").value = "";
+    await loadUserSessions();
+    showUserActionMessage("success", "Пароль задан. Все активные веб-сессии пользователя завершены.");
+  } catch (error) {
+    showUserActionMessage("error", error instanceof Error ? error.message : "Не удалось задать пароль");
+  } finally {
+    button.disabled = false;
+  }
+});
 
 window.addEventListener("hashchange", showUserFromHash);
 $("ua-user-close").addEventListener("click", () => $("ua-user-dialog").close());
@@ -883,7 +967,7 @@ function renderCollectors(status) {
     tr.innerHTML = `
       <td>${esc(row.source)}</td>
       <td><span class="pill" data-state="${state}"><span class="dot"></span>${t("states")[state] || state}</span></td>
-      <td>${fmtTime(row.last_poll_at)}</td>
+      <td>${fmtDateTime(row.last_poll_at)}</td>
       <td class="num">${fmtInt(stats.new_ids)}</td>
       <td class="num">${fmtInt(stats.errors)}</td>
       <td class="service-state">${notice ? `<span class="service-mode ${notice.mode}">${notice.mode === "maintenance" ? "Ремонт" : "Пауза"}</span><small>${fmtDateTime(notice.starts_at)} — ${fmtDateTime(notice.ends_at)}</small><small>${esc(notice.reason)}</small>` : `<span class="muted">Без ограничений</span>`}</td>
@@ -928,13 +1012,6 @@ async function loadLogs() {
 }
 
 $("refresh-logs").addEventListener("click", loadLogs);
-
-function fmtDateTime(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString(lang === "ru" ? "ru-RU" : "en-GB", {
-    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
-  });
-}
 
 function localInputDate(date) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
@@ -1017,9 +1094,7 @@ function render(status) {
   renderChart(status.polls || []);
   renderPolls(status.polls || []);
   renderRuns(status.runs || []);
-  renderControl(status);
   renderCollectors(status);
-  loadListings();
 }
 
 async function load() {
@@ -1040,30 +1115,6 @@ async function load() {
     banner.textContent = `Дашборд недоступен: ${error.message}`;
   }
 }
-
-async function toggle() {
-  if (busy) return;
-  busy = true;
-  $("toggle").disabled = true;
-  const paused = !current?.control?.paused;
-  try {
-    await fetch("/api/control", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        paused,
-        reason: paused ? $("reason").value.trim() || null : null,
-        by: "dashboard",
-      }),
-    });
-    await load();
-  } finally {
-    busy = false;
-    $("toggle").disabled = false;
-  }
-}
-
-$("toggle").addEventListener("click", toggle);
 
 $("near").addEventListener("click", () => {
   if (geo) {
@@ -1130,7 +1181,8 @@ function showDashboard() {
   loadUserAnalytics();
   showUserFromHash();
   loadLogs();
-  dashboardIntervals = [setInterval(load, 3000), setInterval(loadMetrics, 30000), setInterval(loadLogs, 15000)];
+  loadListings();
+  dashboardIntervals = [setInterval(load, 5000), setInterval(loadMetrics, 30000), setInterval(loadLogs, 15000), setInterval(loadListings, 60000)];
 }
 
 async function checkDashboardSession() {
