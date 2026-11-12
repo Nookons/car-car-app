@@ -89,48 +89,30 @@ class DatabaseRepo:
     def close(self) -> None:
         self.pool.close()
 
-    def ensure_service_notice_schema(self) -> None:
-        """Create the additive, idempotent table needed for scheduled notices."""
-        with self.pool.connection() as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                create table if not exists public.service_notice (
-                    source_id smallint primary key references public.source(id) on delete cascade,
-                    mode text not null check (mode in ('paused', 'maintenance')),
-                    reason text not null check (length(trim(reason)) between 1 and 500),
-                    starts_at timestamptz not null,
-                    ends_at timestamptz not null,
-                    updated_by text not null default 'dashboard',
-                    updated_at timestamptz not null default now(),
-                    check (ends_at > starts_at)
-                )
-                """
-            )
-            cur.execute("alter table public.service_notice enable row level security")
-            cur.execute(
-                "revoke all privileges on table public.service_notice from anon, authenticated"
-            )
-        conn.commit()
-
     def service_notices(self, *, active_only: bool = False) -> list[dict[str, Any]]:
         where = "where n.starts_at <= now() and n.ends_at > now()" if active_only else ""
-        with self.pool.connection() as conn, conn.cursor() as cur:
-            cur.execute(
-                f"""
-                select s.code as source, n.mode, n.reason, n.starts_at, n.ends_at,
-                       n.updated_by, n.updated_at,
-                       (n.starts_at <= now() and n.ends_at > now()) as active
-                from public.service_notice n
-                join public.source s on s.id = n.source_id
-                {where}
-                order by n.starts_at, s.code
-                """
-            )
-            return [
-                {key: _iso(value) if key in {"starts_at", "ends_at", "updated_at"} else value
-                 for key, value in row.items()}
-                for row in cur.fetchall()
-            ]
+        try:
+            with self.pool.connection() as conn, conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    select s.code as source, n.mode, n.reason, n.starts_at, n.ends_at,
+                           n.updated_by, n.updated_at,
+                           (n.starts_at <= now() and n.ends_at > now()) as active
+                    from public.service_notice n
+                    join public.source s on s.id = n.source_id
+                    {where}
+                    order by n.starts_at, s.code
+                    """
+                )
+                return [
+                    {key: _iso(value) if key in {"starts_at", "ends_at", "updated_at"} else value
+                     for key, value in row.items()}
+                    for row in cur.fetchall()
+                ]
+        except Exception as exc:  # noqa: BLE001
+            if getattr(exc, "sqlstate", None) == "42P01":
+                return []
+            raise
 
     def set_service_notice(
         self, source: str, mode: str | None, reason: str | None,
@@ -338,6 +320,38 @@ class DatabaseRepo:
             }
             for r in reversed(rows)
         ]
+
+    def logs(self, limit: int = 100) -> list[dict[str, Any]]:
+        limit = max(1, min(limit, 200))
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select * from (
+                    select r.started_at as at, s.code as source, 'error' as level,
+                           'Прогон завершился с ошибками: ' || r.errors::text as message,
+                           left(coalesce(r.notes, 'crawl_run'), 1000) as details
+                    from crawl_run r join source s on s.id = r.source_id
+                    where r.errors > 0
+                    union all
+                    select j.created_at, coalesce(s.code, 'unknown'), 'reject',
+                           'Объявление отклонено',
+                           left(coalesce(j.external_id || ': ', '') || j.reason, 1000)
+                    from ingest_reject j left join source s on s.id = j.source_id
+                    union all
+                    select c.heartbeat_at, s.code, 'error', 'Последняя ошибка сборщика',
+                           left(c.last_error, 1000)
+                    from collector c join source s on s.id = c.source_id
+                    where c.last_error is not null and c.heartbeat_at is not null
+                ) events
+                order by at desc nulls last
+                limit %s
+                """,
+                (limit,),
+            )
+            return [
+                {**row, "at": _iso(row["at"])}
+                for row in cur.fetchall()
+            ]
 
     def sweep_state(self, source: str = "otomoto") -> dict[str, Any]:
         with self.pool.connection() as conn, conn.cursor() as cur:

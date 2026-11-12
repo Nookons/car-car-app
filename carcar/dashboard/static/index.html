@@ -29,6 +29,7 @@
     </div>
     <div class="topbar-right">
       <a class="ghost dashboard-nav" href="#user-analytics" data-i18n="userAnalytics">Пользователи</a>
+      <a class="ghost dashboard-nav" href="#collectors-section">Сборщики</a>
       <span class="pill" id="state-pill"><span class="dot"></span><span id="state-text">…</span></span>
       <button class="ghost" id="dashboard-logout" type="button" data-i18n="logout">Выйти</button>
       <button class="ghost" id="lang" title="Language">EN</button>
@@ -37,6 +38,37 @@
 
   <main class="hidden" id="dashboard-main">
     <section class="banner hidden" id="banner"></section>
+
+    <section class="card" id="collectors-section">
+      <div class="card-head"><h2 data-i18n="collectors">Коллекторы объявлений</h2></div>
+      <table>
+        <thead>
+          <tr>
+            <th data-i18n="source">Площадка</th>
+            <th data-i18n="status">Статус</th>
+            <th data-i18n="lastPoll">Последний опрос</th>
+            <th class="num" data-i18n="newShort">Новых</th>
+            <th class="num" data-i18n="errorsShort">Ошибок</th>
+            <th>Обслуживание</th>
+            <th data-i18n="actions">Действия</th>
+          </tr>
+        </thead>
+        <tbody id="collectors"></tbody>
+      </table>
+    </section>
+
+    <section class="card" id="logs-section">
+      <div class="card-head">
+        <h2>Ошибки и события сбора</h2>
+        <div class="topbar-right"><span class="muted tiny" id="logs-updated"></span><button class="ghost" type="button" id="refresh-logs">Обновить</button></div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Время</th><th>Площадка</th><th>Тип</th><th>Сообщение</th><th>Детали</th></tr></thead>
+          <tbody id="service-logs"></tbody>
+        </table>
+      </div>
+    </section>
 
     <section class="cards">
       <article class="card kpi">
@@ -138,24 +170,6 @@
         <canvas id="chart-monthly" height="150"></canvas>
         <div class="legend" id="legend-monthly"></div>
       </article>
-    </section>
-
-    <section class="card">
-      <div class="card-head"><h2 data-i18n="collectors">Коллекторы</h2></div>
-      <table>
-        <thead>
-          <tr>
-            <th data-i18n="source">Площадка</th>
-            <th data-i18n="status">Статус</th>
-            <th data-i18n="lastPoll">Последний опрос</th>
-            <th class="num" data-i18n="newShort">Новых</th>
-            <th class="num" data-i18n="errorsShort">Ошибок</th>
-            <th>Обслуживание</th>
-            <th data-i18n="actions">Действия</th>
-          </tr>
-        </thead>
-        <tbody id="collectors"></tbody>
-      </table>
     </section>
 
     <section class="card">

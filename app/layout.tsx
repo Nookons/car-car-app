@@ -6,6 +6,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { Funnel } from "@/components/funnel";
 import { LegalFooter } from "@/components/legal-footer";
 import { AppHeader } from "@/components/app-header";
+import { ServiceNoticeBar } from "@/components/service-notice-bar";
 import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "@/lib/theme";
 
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <I18nProvider>
             <AuthProvider>
               <Funnel />
+              <ServiceNoticeBar />
               <AppHeader />
               <main className="mx-auto min-h-[calc(100dvh-3.5rem)] w-full max-w-6xl px-4 pb-28 pt-4 md:pb-10">
                 {children}

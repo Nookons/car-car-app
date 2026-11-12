@@ -228,7 +228,6 @@ def create_app(
             raise RuntimeError("use_db=True, но DATABASE_URL не задан")
         repo = DatabaseRepo(url)
         db_url = url
-        repo.ensure_service_notice_schema()
 
     app = FastAPI(title="CarCar dashboard", docs_url=None, redoc_url=None)
 
@@ -455,6 +454,12 @@ def create_app(
             return {"available": False, "by_source": [], "daily": [], "monthly": [], "runs": []}
         return {"available": True, **repo.metrics(days=days, months=months)}
 
+    @app.get("/api/logs")
+    def logs(limit: int = Query(default=100, ge=1, le=200)) -> dict:
+        if repo is None:
+            return {"items": []}
+        return {"items": repo.logs(limit=limit)}
+
     @app.get("/api/user-metrics")
     def user_metrics(
         days: int = Query(default=30, ge=1, le=90),
@@ -566,6 +571,8 @@ def create_app(
         ends_at = payload.ends_at
         if starts_at.tzinfo is None or ends_at.tzinfo is None:
             raise HTTPException(status_code=422, detail="укажите даты с часовым поясом")
+        if not payload.reason.strip():
+            raise HTTPException(status_code=422, detail="укажите причину")
         if ends_at <= starts_at:
             raise HTTPException(status_code=422, detail="окончание должно быть позже начала")
         try:
@@ -574,13 +581,28 @@ def create_app(
             )
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001
+            if getattr(exc, "sqlstate", None) == "42P01":
+                raise HTTPException(
+                    status_code=503,
+                    detail="нужно применить db/migrations/20261112_service_notices.sql",
+                ) from exc
+            raise
         return {"ok": True, "source": source}
 
     @app.delete("/api/service-notices/{source}")
     def clear_service_notice(source: str) -> dict:
         if repo is None:
             raise HTTPException(status_code=503, detail="для расписания нужна база данных")
-        repo.set_service_notice(source, None, None, None, None)
+        try:
+            repo.set_service_notice(source, None, None, None, None)
+        except Exception as exc:  # noqa: BLE001
+            if getattr(exc, "sqlstate", None) == "42P01":
+                raise HTTPException(
+                    status_code=503,
+                    detail="нужно применить db/migrations/20261112_service_notices.sql",
+                ) from exc
+            raise
         return {"ok": True, "source": source}
 
     return app

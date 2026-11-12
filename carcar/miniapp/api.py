@@ -350,6 +350,11 @@ def create_app(
     def healthz() -> dict:
         return {"ok": True, "cache": "redis" if cache.enabled else "memory"}
 
+    @app.get("/api/service-status")
+    def service_status() -> dict:
+        """Public, read-only maintenance state for the app's thin notice bar."""
+        return {"notices": repo.service_notices()}
+
     @app.post("/bot/webhook")
     def bot_webhook(
         update: dict[str, Any],

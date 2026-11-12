@@ -633,10 +633,30 @@ class DatabaseSink:
     def is_paused(self, code: str) -> tuple[bool, str | None]:
         source_id = self.source_id(code)
         with self.conn.cursor() as cur:
-            cur.execute(
-                "select paused, paused_reason from collector where source_id = %s",
-                (source_id,),
-            )
+            cur.execute("select to_regclass('public.service_notice')")
+            has_scheduled_notices = cur.fetchone()[0] is not None
+            if has_scheduled_notices:
+                cur.execute(
+                    """
+                    select coalesce(c.paused, false)
+                               or (n.source_id is not null and n.starts_at <= now()
+                                   and n.ends_at > now()) as paused,
+                           case when n.source_id is not null and n.starts_at <= now()
+                                          and n.ends_at > now() then n.reason
+                                else c.paused_reason end as reason
+                    from (select %s::smallint as source_id) requested
+                    left join collector c on c.source_id = requested.source_id
+                    left join service_notice n on n.source_id = requested.source_id
+                    """,
+                    (source_id,),
+                )
+            else:
+                # Keep older deployments functional until the additive SQL
+                # migration is applied by the database owner.
+                cur.execute(
+                    "select paused, paused_reason from collector where source_id = %s",
+                    (source_id,),
+                )
             row = cur.fetchone()
         return (bool(row[0]), row[1]) if row else (False, None)
 

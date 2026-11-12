@@ -290,7 +290,14 @@ function renderState(status) {
 
 function renderKpi(status) {
   const hb = status.heartbeat || {};
-  const totals = hb.totals || {};
+  const collectorTotals = (status.collectors || []).reduce((sum, collector) => {
+    const stats = collector.stats || {};
+    sum.polls += Number(collector.round || 0);
+    sum.new_ids += Number(stats.new_ids || 0);
+    sum.errors += Number(stats.errors || 0);
+    return sum;
+  }, { polls: 0, new_ids: 0, errors: 0 });
+  const totals = { ...collectorTotals, ...(hb.totals || {}) };
   const storage = status.storage || {};
   const client = hb.client || {};
 
@@ -385,7 +392,7 @@ function renderPolls(polls) {
     .forEach((poll) => {
       const row = document.createElement("tr");
       row.innerHTML = `
-        <td>${fmtTime(poll.at)}</td>
+        <td>${fmtTime(poll.ts || poll.at)}</td>
         <td class="num">${fmtInt(poll.new)}</td>
         <td class="num">${(poll.seconds ?? 0).toFixed(1)}</td>
         <td class="num">${Math.round((poll.wire_bytes || 0) / 1024)}</td>`;
@@ -407,8 +414,8 @@ function renderRuns(runs) {
     row.innerHTML = `
       <td>${mode}</td>
       <td>${fmtTime(run.started_at)}</td>
-      <td class="num">${fmtInt(run.new_ids)}</td>
-      <td class="num">${fmtInt(run.details_saved)}</td>`;
+      <td class="num">${fmtInt(run.new ?? run.new_ids)}</td>
+      <td class="num">${fmtInt(run.details_saved ?? run.items)}</td>`;
     body.appendChild(row);
   });
 }
@@ -795,6 +802,41 @@ function renderCollectors(status) {
   });
 }
 
+async function loadLogs() {
+  const body = $("service-logs");
+  if (!body) return;
+  try {
+    const response = await fetch("/api/logs?limit=100", { cache: "no-store" });
+    if (!response.ok) throw new Error(String(response.status));
+    const { items = [] } = await response.json();
+    body.replaceChildren();
+    if (!items.length) {
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 5;
+      cell.className = "muted";
+      cell.textContent = "Ошибок и событий пока нет";
+      row.appendChild(cell);
+      body.appendChild(row);
+    } else {
+      for (const item of items) {
+        const row = document.createElement("tr");
+        for (const value of [fmtDateTime(item.at), item.source, item.level, item.message, item.details]) {
+          const cell = document.createElement("td");
+          cell.textContent = value == null ? "—" : String(value);
+          row.appendChild(cell);
+        }
+        body.appendChild(row);
+      }
+    }
+    $("logs-updated").textContent = `Обновлено ${fmtTime(new Date().toISOString())}`;
+  } catch (error) {
+    $("logs-updated").textContent = `Ошибка загрузки: ${error instanceof Error ? error.message : "API"}`;
+  }
+}
+
+$("refresh-logs").addEventListener("click", loadLogs);
+
 function fmtDateTime(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleString(lang === "ru" ? "ru-RU" : "en-GB", {
@@ -994,7 +1036,8 @@ function showDashboard() {
   load();
   loadMetrics();
   loadUserAnalytics();
-  dashboardIntervals = [setInterval(load, 3000), setInterval(loadMetrics, 30000)];
+  loadLogs();
+  dashboardIntervals = [setInterval(load, 3000), setInterval(loadMetrics, 30000), setInterval(loadLogs, 15000)];
 }
 
 async function checkDashboardSession() {

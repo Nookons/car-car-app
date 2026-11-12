@@ -72,6 +72,25 @@ h2 { font-size: 14px; margin: 0; font-weight: 650; letter-spacing: .01em; }
 .login-card input { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; font: inherit; }
 .login-card button { width: 100%; }
 .analytics-refresh { align-items: center; }
+.service-state { min-width: 240px; }
+.service-state small { display: block; max-width: 300px; margin-top: 3px; color: var(--muted); }
+.service-mode { display: inline-flex; align-items: center; border: 1px solid #fed7aa; border-radius: 999px; padding: 2px 8px; color: #9a3412; background: #fff7ed; font-size: 11px; font-weight: 650; }
+.service-mode.maintenance { border-color: #c4b5fd; color: #5b21b6; background: #f5f3ff; }
+.service-dialog { width: min(520px, calc(100vw - 28px)); max-width: none; padding: 0; border: 1px solid var(--line); border-radius: 14px; color: var(--text); background: var(--card); box-shadow: 0 24px 80px rgba(15, 23, 42, .22); }
+.service-dialog::backdrop { background: rgba(15, 23, 42, .42); backdrop-filter: blur(2px); }
+.service-form { padding: 22px; }
+.service-form .card-head { align-items: flex-start; }
+.service-form .eyebrow { margin: 0 0 4px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .09em; }
+.service-form .field { margin: 12px 0; color: var(--text); font-weight: 550; }
+.service-form input, .service-form select, .service-form textarea { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 9px; padding: 10px 11px; background: var(--card); color: var(--text); font: inherit; font-weight: 400; }
+.service-form textarea { resize: vertical; }
+.service-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.service-actions { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 8px; margin-top: 16px; }
+.service-save { width: auto !important; padding: 9px 16px !important; }
+.table-scroll { overflow-x: auto; }
+#logs-section table { min-width: 700px; }
+#logs-section td:last-child { max-width: 380px; white-space: normal; overflow-wrap: anywhere; }
+#logs-section td:nth-child(4) { min-width: 220px; }
 
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 .dashboard-nav { text-decoration: none; color: var(--text); white-space: nowrap; }
@@ -197,6 +216,13 @@ footer { max-width: 1120px; margin: 0 auto; padding: 0 28px 30px; }
   .grid, .grid.two { grid-template-columns: 1fr; }
   main { padding: 18px 16px 30px; }
   .topbar { padding: 14px 16px; }
+}
+
+@media (max-width: 540px) {
+  .service-dates { grid-template-columns: 1fr; gap: 0; }
+  .service-actions { grid-template-columns: 1fr 1fr; }
+  .service-actions > span { display: none; }
+  .service-actions #service-clear { grid-column: 1 / -1; }
 }
 
 

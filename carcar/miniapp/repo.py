@@ -312,6 +312,27 @@ class MiniAppRepo:
     def close(self) -> None:
         self.pool.close()
 
+    def service_notices(self) -> list[dict[str, Any]]:
+        try:
+            with self.pool.connection() as conn, conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select s.code as source, n.mode, n.reason, n.starts_at, n.ends_at
+                    from public.service_notice n
+                    join public.source s on s.id = n.source_id
+                    where n.starts_at <= now() and n.ends_at > now()
+                    order by n.starts_at, s.code
+                    """
+                )
+                return [
+                    {**row, "starts_at": _iso(row["starts_at"]), "ends_at": _iso(row["ends_at"])}
+                    for row in cur.fetchall()
+                ]
+        except Exception as exc:  # noqa: BLE001
+            if getattr(exc, "sqlstate", None) == "42P01":
+                return []
+            raise
+
     def record_session(self, user_id: int) -> None:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
