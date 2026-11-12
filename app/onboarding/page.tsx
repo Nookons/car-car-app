@@ -193,8 +193,6 @@ export default function OnboardingPage() {
     }
   };
 
-  const hasUserStats = makes.some((make) => (make.users ?? 0) > 0);
-
   if (saved) {
     return (
       <div className="mx-auto w-full max-w-xl space-y-4 py-4">
@@ -265,16 +263,10 @@ export default function OnboardingPage() {
             <h2 className="text-base font-semibold">{t("onboarding.step1")}</h2>
             <div className="space-y-1.5">
               <span className="text-xs text-muted-foreground">{t("filter.make")}</span>
-              <span className="block text-[11px] text-muted-foreground">
-                {hasUserStats
-                  ? t("onboarding.bubbleHint")
-                  : t("onboarding.bubbleHintListings")}
-              </span>
               <BrandBubbles
                 makes={makes}
                 selected={draft.makes ?? []}
                 onToggle={(value) => toggle("makes", value)}
-                onClear={() => patch({ makes: [] })}
               />
             </div>
             <label className="block space-y-1.5">

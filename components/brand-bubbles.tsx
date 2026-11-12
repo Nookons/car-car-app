@@ -29,12 +29,10 @@ export function BrandBubbles({
   makes,
   selected,
   onToggle,
-  onClear,
 }: {
   makes: BubbleMake[];
   selected: string[];
   onToggle: (value: string) => void;
-  onClear: () => void;
 }) {
   const { t } = useI18n();
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -183,27 +181,7 @@ export function BrandBubbles({
   }
 
   return (
-    <div className="w-full space-y-2">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onClear}
-          className={cn(
-            "rounded-full border px-3 py-1.5 text-sm transition",
-            selected.length === 0
-              ? "border-primary bg-primary text-primary-foreground"
-              : "bg-card hover:bg-secondary",
-          )}
-        >
-          {selected.length === 0
-            ? t("onboarding.allMakes")
-            : t("onboarding.resetMakes")}
-        </button>
-        <span className="text-[11px] text-muted-foreground">
-          {t("onboarding.multiHint")}
-        </span>
-      </div>
-
+    <div className="w-full">
       <div
         ref={containerRef}
         className="relative h-[330px] w-full overflow-hidden rounded-2xl border bg-secondary/10"
@@ -211,7 +189,6 @@ export function BrandBubbles({
         {makes.map((make, index) => {
           const isSelected = selected.includes(make.value);
           const label = displayLabel(make.value);
-          const subtitle = hasUserStats && make.users ? make.users : null;
           return (
             <button
               key={make.value}
@@ -220,22 +197,8 @@ export function BrandBubbles({
               }}
               type="button"
               aria-pressed={isSelected}
-              aria-label={`${make.value}${
-                subtitle
-                  ? `, ${t("onboarding.chosenBy").replace("{count}", String(subtitle))}`
-                  : ""
-              }`}
-              title={
-                hasUserStats
-                  ? `${make.value}: ${t("onboarding.chosenBy").replace(
-                      "{count}",
-                      String(make.users ?? 0),
-                    )}`
-                  : `${make.value}: ${t("onboarding.listingsFor").replace(
-                      "{count}",
-                      String(make.count),
-                    )}`
-              }
+              aria-label={make.value}
+              title={make.value}
               onClick={() => onToggle(make.value)}
               className={cn(
                 "absolute left-0 top-0 touch-manipulation select-none outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
@@ -265,9 +228,6 @@ export function BrandBubbles({
                 >
                   {label}
                 </span>
-                {subtitle ? (
-                  <span className="mt-0.5 text-[9px] opacity-60">{subtitle}</span>
-                ) : null}
               </span>
             </button>
           );
