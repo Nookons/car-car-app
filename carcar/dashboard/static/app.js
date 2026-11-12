@@ -811,6 +811,7 @@ async function loadUserDetail(userId) {
     const identity = [user.email, user.phone, user.tg_id ? `Telegram ${user.tg_id}` : null].filter(Boolean).join(" · ");
     $("ua-user-meta").textContent = [`ID ${user.id}`, identity, `регистрация ${fmtDateTime(user.created_at)}`, `последний визит ${lastSeen}`].filter(Boolean).join(" · ");
     $("ua-password-form").classList.toggle("hidden", !user.can_set_password);
+    $("ua-password-unavailable").classList.toggle("hidden", Boolean(user.can_set_password));
     const totals = data.totals || {};
     $("ua-user-sessions").textContent = fmtInt(totals.sessions);
     $("ua-user-searches").textContent = fmtInt(totals.searches);
@@ -904,7 +905,7 @@ async function revokeUserSession(userId, sessionId = null) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
     await loadUserSessions(userId);
-    showUserActionMessage("success", sessionId ? "Сессия завершена." : `Сессии отозваны. Активных записанных сессий: ${data.revoked}.`);
+    showUserActionMessage("success", sessionId ? "Сессия завершена." : `Все сессии и старые токены отозваны. Записанных сессий: ${data.revoked}.`);
   } catch (error) {
     showUserActionMessage("error", error instanceof Error ? error.message : "Не удалось завершить сессии");
   }

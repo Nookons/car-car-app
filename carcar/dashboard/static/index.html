@@ -278,9 +278,11 @@
               <label class="field"><span>Новый пароль · от 12 символов</span><input id="ua-new-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
               <button class="primary" type="submit">Задать пароль и завершить сессии</button>
             </form>
+            <p id="ua-password-unavailable" class="muted small hidden">Сброс недоступен: для входа по паролю у аккаунта должен быть email или подтверждённый телефон.</p>
             <div class="sessions-panel">
               <div class="sessions-heading"><strong>Активные сессии</strong><button class="ghost" id="ua-sessions-revoke-all" type="button">Завершить все</button></div>
               <p class="muted tiny" id="ua-sessions-status">—</p>
+              <p class="muted tiny">Сессии, созданные до включения учёта, могут не отображаться. «Завершить все» также отзывает старые токены приложения.</p>
               <div class="table-scroll"><table><thead><tr><th>Устройство</th><th>Последняя активность</th><th></th></tr></thead><tbody id="ua-sessions"></tbody></table></div>
             </div>
           </div>

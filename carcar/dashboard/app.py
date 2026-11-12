@@ -517,8 +517,8 @@ def create_app(
         if repo is None:
             raise HTTPException(status_code=503, detail="управление пользователями требует PostgreSQL")
         revoked = repo.revoke_user_web_session(user_id)
-        admin_audit.info("action=revoke_all_web_sessions user_id=%s count=%s", user_id, revoked)
-        return {"revoked": revoked}
+        admin_audit.info("action=revoke_all_sessions user_id=%s count=%s", user_id, revoked)
+        return {"revoked": revoked, "tokens_revoked": True}
 
     @app.post("/api/users/{user_id}/sessions/{session_id}/revoke")
     def revoke_user_session(user_id: int, session_id: int) -> dict:
