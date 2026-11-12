@@ -742,7 +742,7 @@ class MiniAppRepo:
         items = [_item(row) for row in rows]
         analyses: dict[int, dict[str, Any]] = {}
         # limit=1 — это запрос счётчика для фильтров; анализ рынка там не нужен.
-        if limit > 1:
+        if limit > 1 and self.list_market:
             try:
                 analyses = self._market_analyses(rows)
             except Exception:
@@ -1728,7 +1728,7 @@ class MiniAppRepo:
             )
             rows = cur.fetchall()
         items = [_item(row) for row in rows]
-        if rows:
+        if rows and self.list_market:
             try:
                 analyses = self._market_analyses(rows)
             except Exception:
