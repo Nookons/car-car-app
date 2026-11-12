@@ -184,7 +184,7 @@ export function BrandBubbles({
     <div className="w-full">
       <div
         ref={containerRef}
-        className="relative h-[330px] w-full overflow-hidden rounded-2xl border bg-secondary/10"
+        className="relative h-[330px] w-full overflow-hidden"
       >
         {makes.map((make, index) => {
           const isSelected = selected.includes(make.value);
