@@ -23,7 +23,7 @@ type FeedItem = Listing & {
 };
 
 export default function FeedPage() {
-  const { token, ready, guest } = useAuth();
+  const { token, authed, ready, guest } = useAuth();
   const router = useRouter();
   const { t } = useI18n();
   const [mode, setMode] = React.useState<"for_you" | "popular">("for_you");
@@ -98,10 +98,10 @@ export default function FeedPage() {
     );
     document.querySelectorAll("[data-listing]").forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, [items, token]);
+  }, [items, token, authed]);
 
   const toggleLike = async (item: FeedItem, on?: boolean) => {
-    if (!token) {
+    if (!authed) {
       if (guest) router.push("/account");
       return;
     }
@@ -132,7 +132,7 @@ export default function FeedPage() {
   };
 
   const share = async (item: FeedItem) => {
-    if (!token) {
+    if (!authed) {
       if (guest) router.push("/account");
       return;
     }

@@ -226,7 +226,7 @@ class Notifier:
                        u.tg_id, u.digest, u.notify_new, u.lang
                 from subscription s
                 join app_user u on u.id = s.user_id
-                where s.active and u.notify_new
+                where s.active and u.notify_new and u.tg_id is not null
                 """
             )
             return cur.fetchall()
@@ -240,7 +240,7 @@ class Notifier:
                 """
                 select u.id as user_id, u.tg_id, u.lang
                 from favorite f join app_user u on u.id = f.user_id
-                where f.listing_id = %s and u.notify_price
+                where f.listing_id = %s and u.notify_price and u.tg_id is not null
                 """,
                 (listing_id,),
             )
@@ -362,7 +362,7 @@ class Notifier:
         lang: str | None = "ru",
         market: dict[str, Any] | None = None,
     ) -> tuple[bool, int | None, str | None]:
-        url = f"{self.public_url}/listing/{item['id']}"
+        url = f"{self.public_url}/listing/{item['id']}?src=alert"
         text = msg(lang)
         caption = grid_caption(item, lang, market)
         keyboard = {
@@ -382,7 +382,7 @@ class Notifier:
         new_price: int,
         lang: str | None = "ru",
     ) -> tuple[bool, int | None, str | None]:
-        url = f"{self.public_url}/listing/{item['id']}"
+        url = f"{self.public_url}/listing/{item['id']}?src=alert"
         text = msg(lang)
         caption = price_drop_caption(item, old_price, new_price, lang)
         keyboard = {
@@ -482,7 +482,7 @@ class Notifier:
                     from notification n
                     join app_user u on u.id = n.user_id
                     join listing l on l.id = n.listing_id
-                    where n.status in ('pending', 'failed')
+                    where n.status in ('pending', 'failed') and u.tg_id is not null
                       and n.next_attempt_at <= now()
                       and (
                         (
@@ -550,7 +550,7 @@ class Notifier:
                     """
                     select u.id, u.tg_id, u.lang, count(*) as total
                     from notification n join app_user u on u.id = n.user_id
-                    where n.status = 'held'
+                    where n.status = 'held' and u.tg_id is not null
                       and n.kind <> 'price_drop'
                       and n.created_at < now() - make_interval(mins => %s)
                     group by u.id, u.tg_id, u.lang

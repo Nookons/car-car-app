@@ -79,6 +79,8 @@ export type Listing = {
   color?: string | null;
   seller_type?: string | null;
   price_analysis?: PriceAnalysis | null;
+  favorite_status?: string;
+  favorite_note?: string | null;
 };
 
 export type PriceEvent = {
@@ -132,10 +134,15 @@ export type ListingCard = Listing & {
 
 export type User = {
   id: number;
-  tg_id: number;
+  tg_id: number | null;
   username: string | null;
   first_name: string | null;
   last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  email_verified: boolean;
+  phone_verified: boolean;
+  has_password: boolean;
   lang: string;
   notify_new: boolean;
   notify_price: boolean;
@@ -178,4 +185,18 @@ export type Filters = {
   radius_km?: number;
   published_days?: number;
   sort?: "new" | "price_asc" | "price_desc" | "distance" | "year_desc" | "mileage_asc";
+};
+
+export type AuthProviders = {
+  password: boolean;
+  dev: boolean;
+  telegram: { bot_username: string; widget: boolean };
+  oauth: Array<{ id: string; label: string }>;
+};
+
+export type Identity = {
+  provider: string;
+  email: string | null;
+  created_at?: string;
+  last_login_at?: string;
 };

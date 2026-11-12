@@ -8,6 +8,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { cacheGet, cacheSet } from "@/lib/cache";
+import { track } from "@/lib/track";
 import { filtersToQuery } from "@/lib/filters";
 import { num } from "@/lib/format";
 import { labelFor, useI18n } from "@/lib/i18n";
@@ -32,7 +33,7 @@ export function FilterPanel({
   onApply: (filters: Filters) => void;
 }) {
   const { t } = useI18n();
-  const { token } = useAuth();
+  const { token, authed } = useAuth();
   const [draft, setDraft] = React.useState<Filters>(initial);
 
   // Если фильтры применили снаружи (URL/сохранённый поиск) — подхватываем их.
@@ -161,7 +162,7 @@ export function FilterPanel({
   };
 
   const saveSearch = async () => {
-    if (!token || !saveName.trim()) return;
+    if (!authed || !saveName.trim()) return;
     setSaving(true);
     try {
       await api("/subscriptions", {
@@ -169,6 +170,7 @@ export function FilterPanel({
         token,
         body: { name: saveName.trim(), criteria: draft },
       });
+      track("saved_search");
       setSaved(true);
       setSaveName("");
       setSaveMode(false);

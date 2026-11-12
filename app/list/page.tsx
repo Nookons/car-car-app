@@ -21,6 +21,7 @@ import { cacheGet, cacheSet } from "@/lib/cache";
 import { activeFilterChips } from "@/lib/filter-chips";
 import { filtersToQuery, loadFilters, saveFilters } from "@/lib/filters";
 import { num, price } from "@/lib/format";
+import { track } from "@/lib/track";
 import { useI18n, type Lang } from "@/lib/i18n";
 import type { Filters, Listing } from "@/lib/types";
 
@@ -179,6 +180,9 @@ export default function ListPage() {
           { token: token ?? undefined, signal: controller.signal },
         );
         if (id !== seq.current) return;
+        if (offset === 0 && !background && Object.keys(next).length > 0) {
+          track("search");
+        }
         setTotal(data.total);
         setApprox(Boolean(data.approx));
         setItems((prev) => (offset === 0 ? data.items : [...prev, ...data.items]));

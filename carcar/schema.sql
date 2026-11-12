@@ -206,6 +206,52 @@ create table if not exists app_user (
 -- снижение цены в избранном — отдельный тумблер (как и notify_new)
 alter table app_user add column if not exists notify_price boolean not null default true;
 
+-- Веб-версия: вход по e-mail/паролю и телефону рядом с Telegram Mini App.
+-- tg_id больше не обязателен, но хотя бы один идентификатор должен быть.
+alter table app_user alter column tg_id drop not null;
+alter table app_user add column if not exists email text;
+alter table app_user add column if not exists email_verified_at timestamptz;
+alter table app_user add column if not exists phone text;
+alter table app_user add column if not exists phone_verified_at timestamptz;
+alter table app_user add column if not exists password_hash text;
+
+create unique index if not exists app_user_email_key
+    on app_user (lower(email)) where email is not null;
+create unique index if not exists app_user_phone_key
+    on app_user (phone) where phone is not null;
+
+do $$
+begin
+    if not exists (
+        select 1 from pg_constraint where conname = 'app_user_identity_check'
+    ) then
+        alter table app_user add constraint app_user_identity_check
+            check (tg_id is not null or email is not null or phone is not null);
+    end if;
+end $$;
+
+-- Способы входа: один человек — один app_user, но несколько identity
+-- (Telegram, Google, Facebook, GitHub). Уникальна пара provider+subject:
+-- один и тот же Google-аккаунт не может быть привязан к двум людям.
+create table if not exists user_identity (
+    id            bigint generated always as identity primary key,
+    user_id       bigint not null references app_user(id) on delete cascade,
+    provider      text not null,
+    subject       text not null,
+    email         text,
+    created_at    timestamptz not null default now(),
+    last_login_at timestamptz not null default now(),
+    unique (provider, subject)
+);
+create index if not exists user_identity_user_idx on user_identity (user_id);
+create index if not exists user_identity_email_idx
+    on user_identity (lower(email)) where email is not null;
+
+-- Уже существующие Telegram-аккаунты сразу становятся identity.
+insert into user_identity (user_id, provider, subject)
+select id, 'telegram', tg_id::text from app_user where tg_id is not null
+on conflict (provider, subject) do nothing;
+
 create table if not exists subscription (
     id         bigint generated always as identity primary key,
     user_id    bigint not null references app_user(id) on delete cascade,
@@ -223,6 +269,40 @@ create table if not exists favorite (
     created_at timestamptz not null default now(),
     primary key (user_id, listing_id)
 );
+
+-- Шортлист — не просто «сердечко»: у машины есть статус и заметка.
+alter table favorite add column if not exists status text not null default 'shortlist';
+alter table favorite add column if not exists note text;
+do $$
+begin
+    if not exists (
+        select 1 from pg_constraint where conname = 'favorite_status_check'
+    ) then
+        alter table favorite add constraint favorite_status_check
+            check (status in ('shortlist', 'contacted', 'viewed', 'rejected', 'bought'));
+    end if;
+end $$;
+
+-- Обезличенная воронка: тип события и случайный visitor_id. Ни IP, ни
+-- поисковых фраз, ни текста заметок здесь нет.
+create table if not exists funnel_event (
+    id         bigint generated always as identity primary key,
+    user_id    bigint references app_user(id) on delete set null,
+    visitor_id uuid not null,
+    kind       text not null check (kind in
+                 ('visit', 'search', 'listing_view', 'favorite_add',
+                  'favorite_update', 'saved_search', 'alert_open', 'share',
+                  'onboarding_start', 'onboarding_step', 'onboarding_done')),
+    listing_id bigint references listing(id) on delete set null,
+    meta       jsonb,
+    created_at timestamptz not null default now()
+);
+create index if not exists funnel_event_kind_idx
+    on funnel_event (kind, created_at desc);
+create index if not exists funnel_event_visitor_idx
+    on funnel_event (visitor_id, created_at desc);
+create index if not exists funnel_event_user_idx
+    on funnel_event (user_id, created_at desc) where user_id is not null;
 
 -- Daily, privacy-preserving product activity aggregates. No raw search text,
 -- IP addresses, or device identifiers are stored here.
@@ -247,6 +327,59 @@ revoke all privileges on table public.user_activity_daily from anon, authenticat
 alter table app_user     enable row level security;
 alter table subscription enable row level security;
 alter table favorite     enable row level security;
+
+-- Одна строка — одна активная cookie-сессия. В базе только SHA-256 токена:
+-- утечка дампа не даёт войти. CSRF-токен привязан к сессии тем же хешем.
+create table if not exists web_session (
+    id           bigint generated always as identity primary key,
+    user_id      bigint not null references app_user(id) on delete cascade,
+    token_hash   text not null unique,
+    csrf_hash    text not null,
+    user_agent   text,
+    created_at   timestamptz not null default now(),
+    last_seen_at timestamptz not null default now(),
+    expires_at   timestamptz not null,
+    revoked_at   timestamptz
+);
+
+create index if not exists web_session_user_idx
+    on web_session (user_id) where revoked_at is null;
+create index if not exists web_session_expires_idx on web_session (expires_at);
+
+-- Одноразовые ссылки и SMS-коды. token_hash — для писем, code_hash — для
+-- телефона; у кода дополнительно хранится число неудачных попыток.
+create table if not exists auth_token (
+    id           bigint generated always as identity primary key,
+    user_id      bigint not null references app_user(id) on delete cascade,
+    kind         text not null check (kind in
+                    ('email_verify', 'email_change', 'password_reset',
+                     'phone_verify', 'phone_login', 'telegram_link')),
+    destination  text not null,
+    token_hash   text,
+    code_hash    text,
+    attempts     integer not null default 0,
+    expires_at   timestamptz not null,
+    consumed_at  timestamptz,
+    created_at   timestamptz not null default now()
+);
+
+create index if not exists auth_token_token_idx
+    on auth_token (kind, token_hash) where token_hash is not null;
+create index if not exists auth_token_destination_idx
+    on auth_token (kind, destination, created_at desc);
+create index if not exists auth_token_expires_idx on auth_token (expires_at);
+
+-- Живая база получила таблицу до появления email_change/telegram_link:
+-- пересобираем ограничение, не теряя данные.
+alter table auth_token drop constraint if exists auth_token_kind_check;
+alter table auth_token add constraint auth_token_kind_check check (kind in
+    ('email_verify', 'email_change', 'password_reset',
+     'phone_verify', 'phone_login', 'telegram_link'));
+
+alter table web_session  enable row level security;
+alter table auth_token   enable row level security;
+alter table user_identity enable row level security;
+alter table funnel_event enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- Состояние коллекторов (на Railway у каждого свой контейнер и нет общего диска)
@@ -301,6 +434,10 @@ begin
 
     delete from listing_event where observed_at < now() - interval '180 days';
     get diagnostics old_events = row_count;
+
+    -- Воронка обезличена, но и ей нужен срок: 400 дней хватает для годовых
+    -- когорт, дальше это уже не метрика, а балласт.
+    delete from funnel_event where created_at < now() - interval '400 days';
 
     return next;
 end;
@@ -511,6 +648,10 @@ revoke all privileges on table
     public.app_user,
     public.subscription,
     public.favorite,
+    public.web_session,
+    public.auth_token,
+    public.user_identity,
+    public.funnel_event,
     public.collector,
     public.sweep_state,
     public.notification,

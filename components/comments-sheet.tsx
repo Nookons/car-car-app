@@ -20,7 +20,7 @@ export function CommentsSheet({
   onClose: () => void;
   onCreated?: () => void;
 }) {
-  const { token } = useAuth();
+  const { token, authed } = useAuth();
   const { t, lang } = useI18n();
   const [items, setItems] = React.useState<Comment[]>([]);
   const [text, setText] = React.useState("");
@@ -36,7 +36,7 @@ export function CommentsSheet({
   if (!open || !listingId) return null;
 
   const send = async () => {
-    if (!token || !text.trim()) return;
+    if (!authed || !text.trim()) return;
     setSending(true);
     try {
       const created = await api<Comment>(`/listings/${listingId}/comments`, {

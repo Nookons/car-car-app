@@ -243,6 +243,43 @@ def _infer_subject_features(row: dict[str, Any]) -> dict[str, Any]:
     return subject
 
 
+# Поля пользователя, которые отдаются наружу. `password_hash` сюда не входит
+# намеренно: хеш читается только отдельным запросом при входе.
+USER_KEYS = (
+    "id",
+    "tg_id",
+    "username",
+    "first_name",
+    "last_name",
+    "email",
+    "phone",
+    "email_verified",
+    "phone_verified",
+    "has_password",
+    "lang",
+    "notify_new",
+    "notify_price",
+    "digest",
+    "created_at",
+)
+
+USER_FIELDS = """
+    id, tg_id, username, first_name, last_name, email, phone,
+    (email_verified_at is not null) as email_verified,
+    (phone_verified_at is not null) as phone_verified,
+    (password_hash is not null) as has_password,
+    lang, notify_new, notify_price, digest, created_at
+"""
+
+SESSION_USER_FIELDS = """
+    u.id, u.tg_id, u.username, u.first_name, u.last_name, u.email, u.phone,
+    (u.email_verified_at is not null) as email_verified,
+    (u.phone_verified_at is not null) as phone_verified,
+    (u.password_hash is not null) as has_password,
+    u.lang, u.notify_new, u.notify_price, u.digest, u.created_at
+"""
+
+
 class MiniAppRepo:
     def __init__(self, url: str) -> None:
         from psycopg.rows import dict_row
@@ -360,11 +397,94 @@ class MiniAppRepo:
             top_listings = cur.fetchall()
         return {"totals": totals, "daily": daily, "users": users, "top_listings": top_listings}
 
+    # -- воронка -----------------------------------------------------------
+    def record_funnel_event(
+        self,
+        *,
+        visitor_id: str,
+        kind: str,
+        user_id: int | None = None,
+        listing_id: int | None = None,
+        meta: dict[str, Any] | None = None,
+    ) -> None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into funnel_event (user_id, visitor_id, kind, listing_id, meta)
+                values (%s, %s, %s, %s, %s::jsonb)
+                """,
+                (
+                    user_id,
+                    visitor_id,
+                    kind,
+                    listing_id,
+                    json.dumps(meta, ensure_ascii=False) if meta else None,
+                ),
+            )
+        conn.commit()
+
+    def funnel_metrics(self, days: int = 30) -> dict[str, Any]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select kind,
+                       count(*) as events,
+                       count(distinct visitor_id) as visitors,
+                       count(distinct user_id) as users
+                from funnel_event
+                where created_at >= now() - make_interval(days => %s)
+                group by kind
+                order by kind
+                """,
+                (days,),
+            )
+            stages = [dict(row) for row in cur.fetchall()]
+
+            cur.execute(
+                """
+                select created_at::date as day, kind, count(*) as events
+                from funnel_event
+                where created_at >= now() - make_interval(days => %s)
+                group by 1, 2
+                order by 1, 2
+                """,
+                (days,),
+            )
+            daily = [dict(row) for row in cur.fetchall()]
+
+            cur.execute(
+                "select count(*) as total from app_user "
+                "where created_at >= now() - make_interval(days => %s)",
+                (days,),
+            )
+            registered = int(cur.fetchone()["total"])
+
+            cur.execute(
+                """
+                select count(distinct e.user_id) as total
+                from funnel_event e
+                join app_user u on u.id = e.user_id
+                where e.kind in ('saved_search', 'favorite_add')
+                  and e.created_at >= u.created_at
+                  and e.created_at <= u.created_at + interval '7 days'
+                  and u.created_at >= now() - make_interval(days => %s)
+                """,
+                (days,),
+            )
+            activated_7d = int(cur.fetchone()["total"])
+        return {
+            "days": days,
+            "registered": registered,
+            "activated_7d": activated_7d,
+            "stages": stages,
+            "daily": daily,
+        }
+
     # -- пользователи ------------------------------------------------------
     def ensure_user(self, tg: dict[str, Any]) -> dict[str, Any]:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
-                """
+                f"""
                 insert into app_user (tg_id, username, first_name, last_name)
                 values (%s, %s, %s, %s)
                 on conflict (tg_id) do update set
@@ -372,8 +492,7 @@ class MiniAppRepo:
                     first_name = excluded.first_name,
                     last_name = excluded.last_name,
                     last_seen_at = now()
-                returning id, tg_id, username, first_name, last_name,
-                          lang, notify_new, notify_price, digest, created_at
+                returning {USER_FIELDS}
                 """,
                 (
                     tg["id"],
@@ -383,21 +502,37 @@ class MiniAppRepo:
                 ),
             )
             row = cur.fetchone()
+            # Telegram-аккаунт сразу получает identity: дальше он находится
+            # одинаково с Google/Facebook, без спецкейса по tg_id.
+            if row:
+                cur.execute(
+                    """
+                    insert into user_identity (user_id, provider, subject)
+                    values (%s, 'telegram', %s)
+                    on conflict (provider, subject) do update set
+                        last_login_at = now()
+                    where user_identity.user_id = excluded.user_id
+                    """,
+                    (row["id"], str(tg["id"])),
+                )
         conn.commit()
         return dict(row)
 
     def get_user(self, user_id: int) -> dict[str, Any] | None:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
-                """
-                select id, tg_id, username, first_name, last_name, lang,
-                       notify_new, notify_price, digest, created_at
-                from app_user where id = %s
-                """,
+                f"select {USER_FIELDS} from app_user where id = %s",
                 (user_id,),
             )
             row = cur.fetchone()
         return dict(row) if row else None
+
+    def delete_user(self, user_id: int) -> bool:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute("delete from app_user where id = %s", (user_id,))
+            deleted = cur.rowcount
+        conn.commit()
+        return bool(deleted)
 
     def update_user(self, user_id: int, **fields: Any) -> dict[str, Any]:
         allowed = {"lang", "notify_new", "notify_price", "digest"}
@@ -413,6 +548,477 @@ class MiniAppRepo:
                 )
             conn.commit()
         return self.get_user(user_id) or {}
+
+    # -- веб-пользователи --------------------------------------------------
+    def create_web_user(
+        self,
+        email: str,
+        password_hash: str,
+        first_name: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Создаёт пользователя по e-mail. None — адрес уже занят."""
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                insert into app_user (email, password_hash, first_name)
+                values (%s, %s, %s)
+                on conflict do nothing
+                returning {USER_FIELDS}
+                """,
+                (email, password_hash, first_name),
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return dict(row) if row else None
+
+    def user_for_login(self, login: str) -> dict[str, Any] | None:
+        """Ищет по e-mail или подтверждённому телефону и отдаёт хеш пароля."""
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            if "@" in login:
+                cur.execute(
+                    f"select {USER_FIELDS}, password_hash from app_user "
+                    "where lower(email) = lower(%s)",
+                    (login,),
+                )
+            else:
+                cur.execute(
+                    f"select {USER_FIELDS}, password_hash from app_user "
+                    "where phone = %s and phone_verified_at is not null",
+                    (login,),
+                )
+            row = cur.fetchone()
+        return dict(row) if row else None
+
+    def get_user_by_email(self, email: str) -> dict[str, Any] | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"select {USER_FIELDS} from app_user where lower(email) = lower(%s)",
+                (email,),
+            )
+            row = cur.fetchone()
+        return dict(row) if row else None
+
+    def get_user_by_phone(self, phone: str) -> dict[str, Any] | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"select {USER_FIELDS} from app_user "
+                "where phone = %s and phone_verified_at is not null",
+                (phone,),
+            )
+            row = cur.fetchone()
+        return dict(row) if row else None
+
+    def set_password(self, user_id: int, password_hash: str) -> None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update app_user set password_hash = %s, last_seen_at = now() where id = %s",
+                (password_hash, user_id),
+            )
+        conn.commit()
+
+    def mark_email_verified(self, user_id: int, email: str) -> dict[str, Any] | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                update app_user set email_verified_at = now()
+                where id = %s and lower(email) = lower(%s)
+                returning {USER_FIELDS}
+                """,
+                (user_id, email),
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return dict(row) if row else None
+
+    def attach_verified_phone(self, user_id: int, phone: str) -> dict[str, Any] | None:
+        """Закрепляет телефон за пользователем.
+
+        Уникальный индекс `app_user_phone_key` не даст двум аккаунтам один
+        номер: гонку двух одновременных подтверждений разрешает база, а не
+        проверка «свободен ли номер» в приложении.
+        """
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                update app_user set phone = %s, phone_verified_at = now()
+                where id = %s
+                returning {USER_FIELDS}
+                """,
+                (phone, user_id),
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return dict(row) if row else None
+
+    # -- cookie-сессии -----------------------------------------------------
+    def create_web_session(
+        self,
+        user_id: int,
+        token_hash: str,
+        csrf_hash: str,
+        *,
+        ttl: int,
+        user_agent: str | None = None,
+    ) -> int:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            # Держим таблицу маленькой: старые сессии не нужны ни для чего.
+            cur.execute(
+                "delete from web_session where expires_at < now() - interval '30 days'"
+            )
+            cur.execute(
+                """
+                insert into web_session
+                    (user_id, token_hash, csrf_hash, user_agent, expires_at)
+                values (%s, %s, %s, %s, now() + make_interval(secs => %s))
+                returning id
+                """,
+                (user_id, token_hash, csrf_hash, (user_agent or "")[:300] or None, float(ttl)),
+            )
+            session_id = int(cur.fetchone()["id"])
+        conn.commit()
+        return session_id
+
+    def get_web_session(self, token_hash: str) -> dict[str, Any] | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                select s.id as session_id, s.csrf_hash, s.expires_at,
+                       {SESSION_USER_FIELDS}
+                from web_session s
+                join app_user u on u.id = s.user_id
+                where s.token_hash = %s
+                  and s.revoked_at is null
+                  and s.expires_at > now()
+                """,
+                (token_hash,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            cur.execute(
+                """
+                update web_session set last_seen_at = now()
+                where id = %s and last_seen_at < now() - interval '5 minutes'
+                """,
+                (row["session_id"],),
+            )
+        conn.commit()
+        data = dict(row)
+        user = {key: data[key] for key in USER_KEYS}
+        return {
+            "session_id": data["session_id"],
+            "csrf_hash": data["csrf_hash"],
+            "expires_at": data["expires_at"],
+            "user": user,
+        }
+
+    def rotate_session_csrf(self, session_id: int, csrf_hash: str) -> None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update web_session set csrf_hash = %s where id = %s",
+                (csrf_hash, session_id),
+            )
+        conn.commit()
+
+    def revoke_web_session(self, session_id: int) -> None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update web_session set revoked_at = now() where id = %s and revoked_at is null",
+                (session_id,),
+            )
+        conn.commit()
+
+    def revoke_user_sessions(self, user_id: int, *, except_id: int | None = None) -> None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update web_session set revoked_at = now() "
+                "where user_id = %s and revoked_at is null and id <> %s",
+                (user_id, except_id or 0),
+            )
+        conn.commit()
+
+    # -- одноразовые ссылки и SMS-коды -------------------------------------
+    def issue_auth_token(
+        self,
+        user_id: int,
+        kind: str,
+        destination: str,
+        *,
+        ttl: int,
+        token_hash: str | None = None,
+        code_hash: str | None = None,
+    ) -> int:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "delete from auth_token where expires_at < now() - interval '7 days'"
+            )
+            # Старые живые токены того же назначения гасим: у человека должна
+            # быть ровно одна действующая ссылка/код.
+            if kind in {"email_change", "telegram_link"}:
+                # У смены почты и привязки Telegram должен жить ровно один
+                # токен: иначе старая ссылка на прежний адрес вернёт его назад.
+                cur.execute(
+                    "update auth_token set consumed_at = now() "
+                    "where user_id = %s and kind = %s and consumed_at is null",
+                    (user_id, kind),
+                )
+            else:
+                cur.execute(
+                    "update auth_token set consumed_at = now() "
+                    "where user_id = %s and kind = %s and destination = %s "
+                    "and consumed_at is null",
+                    (user_id, kind, destination),
+                )
+            cur.execute(
+                """
+                insert into auth_token
+                    (user_id, kind, destination, token_hash, code_hash, expires_at)
+                values (%s, %s, %s, %s, %s, now() + make_interval(secs => %s))
+                returning id
+                """,
+                (user_id, kind, destination, token_hash, code_hash, float(ttl)),
+            )
+            token_id = int(cur.fetchone()["id"])
+        conn.commit()
+        return token_id
+
+    def consume_auth_token(self, kind: str, token_hash: str) -> dict[str, Any] | None:
+        """Атомарно гасит ссылку: два параллельных перехода не сработают оба."""
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                update auth_token set consumed_at = now()
+                where kind = %s and token_hash = %s
+                  and consumed_at is null and expires_at > now()
+                returning user_id, destination
+                """,
+                (kind, token_hash),
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return dict(row) if row else None
+
+    def latest_phone_code(self, kind: str, destination: str) -> dict[str, Any] | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select id, code_hash, attempts
+                from auth_token
+                where kind = %s and destination = %s
+                  and consumed_at is null and expires_at > now()
+                order by created_at desc limit 1
+                """,
+                (kind, destination),
+            )
+            row = cur.fetchone()
+        return dict(row) if row else None
+
+    def bump_auth_attempts(self, token_id: int) -> None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update auth_token set attempts = attempts + 1 where id = %s",
+                (token_id,),
+            )
+        conn.commit()
+
+    def consume_auth_token_id(self, token_id: int) -> None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update auth_token set consumed_at = now() "
+                "where id = %s and consumed_at is null",
+                (token_id,),
+            )
+        conn.commit()
+
+    def count_recent_tokens(self, kind: str, destination: str, seconds: int) -> int:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "select count(*) as total from auth_token "
+                "where kind = %s and destination = %s "
+                "and created_at > now() - make_interval(secs => %s)",
+                (kind, destination, float(seconds)),
+            )
+            row = cur.fetchone()
+        return int(row["total"])
+
+    # -- связанные входы ---------------------------------------------------
+    def get_identity(self, provider: str, subject: str) -> dict[str, Any] | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                select i.user_id, i.email as identity_email, {SESSION_USER_FIELDS}
+                from user_identity i
+                join app_user u on u.id = i.user_id
+                where i.provider = %s and i.subject = %s
+                """,
+                (provider, subject),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            cur.execute(
+                "update user_identity set last_login_at = now() "
+                "where provider = %s and subject = %s",
+                (provider, subject),
+            )
+        conn.commit()
+        data = dict(row)
+        user = {key: data[key] for key in USER_KEYS}
+        return {
+            "provider": provider,
+            "subject": subject,
+            "email": data["identity_email"],
+            "user": user,
+        }
+
+    def list_identities(self, user_id: int) -> list[dict[str, Any]]:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select provider, email, created_at, last_login_at
+                from user_identity where user_id = %s
+                order by created_at
+                """,
+                (user_id,),
+            )
+            rows = cur.fetchall()
+        return [dict(row) for row in rows]
+
+    def attach_identity(
+        self,
+        user_id: int,
+        provider: str,
+        subject: str,
+        email: str | None = None,
+    ) -> bool:
+        """Привязывает identity. False — она уже принадлежит другому человеку."""
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into user_identity (user_id, provider, subject, email)
+                values (%s, %s, %s, %s)
+                on conflict (provider, subject) do update set
+                    last_login_at = now(),
+                    email = coalesce(excluded.email, user_identity.email)
+                where user_identity.user_id = excluded.user_id
+                returning user_id
+                """,
+                (user_id, provider, subject, email),
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return bool(row)
+
+    def get_user_by_tg(self, tg_id: int) -> dict[str, Any] | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"select {USER_FIELDS} from app_user where tg_id = %s",
+                (tg_id,),
+            )
+            row = cur.fetchone()
+        return dict(row) if row else None
+
+    def link_telegram(self, user_id: int, tg: dict[str, Any]) -> dict[str, Any] | None:
+        """Привязывает Telegram к уже существующему веб-аккаунту.
+
+        None — этот Telegram (или у аккаунта уже есть другой Telegram) занят.
+        """
+        tg_id = int(tg["id"])
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "select tg_id from app_user where id = %s for update",
+                (user_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            if row["tg_id"] is not None and int(row["tg_id"]) != tg_id:
+                return None
+
+            cur.execute(
+                "select id from app_user where tg_id = %s and id <> %s",
+                (tg_id, user_id),
+            )
+            if cur.fetchone():
+                return None
+
+            cur.execute(
+                "select user_id from user_identity "
+                "where provider = 'telegram' and subject = %s",
+                (str(tg_id),),
+            )
+            existing = cur.fetchone()
+            if existing and int(existing["user_id"]) != user_id:
+                return None
+
+            cur.execute(
+                f"""
+                update app_user set
+                    tg_id = %s,
+                    username = coalesce(username, %s),
+                    first_name = coalesce(first_name, %s),
+                    last_name = coalesce(last_name, %s),
+                    last_seen_at = now()
+                where id = %s
+                returning {USER_FIELDS}
+                """,
+                (
+                    tg_id,
+                    tg.get("username"),
+                    tg.get("first_name"),
+                    tg.get("last_name"),
+                    user_id,
+                ),
+            )
+            updated = cur.fetchone()
+            cur.execute(
+                """
+                insert into user_identity (user_id, provider, subject)
+                values (%s, 'telegram', %s)
+                on conflict (provider, subject) do update set
+                    last_login_at = now()
+                """,
+                (user_id, str(tg_id)),
+            )
+        conn.commit()
+        return dict(updated) if updated else None
+
+    def create_social_user(
+        self,
+        email: str,
+        first_name: str | None = None,
+        *,
+        email_verified: bool,
+    ) -> dict[str, Any] | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                insert into app_user (email, first_name, email_verified_at)
+                values (%s, %s, case when %s then now() else null end)
+                on conflict do nothing
+                returning {USER_FIELDS}
+                """,
+                (email, first_name, email_verified),
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return dict(row) if row else None
+
+    def set_email_verified(self, user_id: int, email: str) -> dict[str, Any] | None:
+        """Меняет почту и сразу помечает её подтверждённой (ссылка из письма)."""
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                update app_user
+                set email = %s, email_verified_at = now(), last_seen_at = now()
+                where id = %s
+                returning {USER_FIELDS}
+                """,
+                (email, user_id),
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return dict(row) if row else None
 
     # -- объявления ----------------------------------------------------------
     def _market_analyses(self, rows: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
@@ -1702,6 +2308,45 @@ class MiniAppRepo:
             return None
         return next((s for s in self.subscriptions(user_id) if s["id"] == sub_id), None)
 
+    def get_subscription(self, user_id: int, sub_id: int) -> dict[str, Any] | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                select id, name, criteria, active, created_at
+                from subscription where id = %s and user_id = %s
+                """,
+                (sub_id, user_id),
+            )
+            row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "id": row["id"],
+            "name": row["name"],
+            "criteria": row["criteria"],
+            "active": row["active"],
+            "created_at": _iso(row["created_at"]),
+        }
+
+    def find_listing_for_criteria(self, criteria: dict[str, Any]) -> dict[str, Any] | None:
+        """Одна машина под фильтр — для демо-алерта и превью онбординга."""
+        allowed = {
+            "q", "make", "model", "price_min", "price_max", "year_min", "year_max",
+            "mileage_min", "mileage_max", "fuel", "gearbox", "body", "drive",
+            "condition", "seller_type", "color", "doors", "seats", "power_min",
+            "power_max", "engine_min", "engine_max", "source", "published_days",
+            "lat", "lon", "radius_km", "sort",
+        }
+        kwargs = {
+            key: value
+            for key, value in (criteria or {}).items()
+            if key in allowed and value not in (None, "")
+        }
+        if "sort" not in kwargs:
+            kwargs["sort"] = "new"
+        items, _, _ = self.search(limit=1, offset=0, **kwargs)
+        return items[0] if items else None
+
     def delete_subscription(self, user_id: int, sub_id: int) -> bool:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
@@ -1717,7 +2362,8 @@ class MiniAppRepo:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
                 f"""
-                select {FIELDS}, s.code as source_code, null::float8 as distance_km
+                select {FIELDS}, s.code as source_code, null::float8 as distance_km,
+                       f.status as favorite_status, f.note as favorite_note
                 from favorite f
                 join listing l on l.id = f.listing_id
                 join source s on s.id = l.source_id
@@ -1728,6 +2374,9 @@ class MiniAppRepo:
             )
             rows = cur.fetchall()
         items = [_item(row) for row in rows]
+        for row, item in zip(rows, items, strict=True):
+            item["favorite_status"] = row.get("favorite_status") or "shortlist"
+            item["favorite_note"] = row.get("favorite_note")
         if rows and self.list_market:
             try:
                 analyses = self._market_analyses(rows)
@@ -1738,6 +2387,43 @@ class MiniAppRepo:
                 if analysis:
                     item["price_analysis"] = analysis
         return items
+
+    def get_favorite(self, user_id: int, listing_id: int) -> dict[str, Any] | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "select status, note from favorite where user_id = %s and listing_id = %s",
+                (user_id, listing_id),
+            )
+            row = cur.fetchone()
+        return dict(row) if row else None
+
+    def update_favorite(
+        self,
+        user_id: int,
+        listing_id: int,
+        *,
+        status: str | None = None,
+        note: str | None = None,
+    ) -> dict[str, Any] | None:
+        sets, params = [], {"user_id": user_id, "listing_id": listing_id}
+        if status is not None:
+            sets.append("status = %(status)s")
+            params["status"] = status
+        if note is not None:
+            sets.append("note = %(note)s")
+            params["note"] = note.strip()[:500] or None
+        if not sets:
+            return None
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"update favorite set {', '.join(sets)} "
+                "where user_id = %(user_id)s and listing_id = %(listing_id)s "
+                "returning status, note",
+                params,
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return dict(row) if row else None
 
     def add_favorite(self, user_id: int, listing_id: int) -> bool:
         with self.pool.connection() as conn, conn.cursor() as cur:

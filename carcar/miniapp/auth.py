@@ -22,6 +22,7 @@ from urllib.parse import parse_qsl
 TOKEN_TTL = 30 * 24 * 3600
 INIT_DATA_TTL = 5 * 60
 MAX_FUTURE_AUTH_SKEW = 30
+LOGIN_WIDGET_TTL = 5 * 60
 
 
 class AuthError(ValueError):
@@ -77,6 +78,54 @@ def validate_init_data(init_data: str, bot_token: str, *, max_age: int = INIT_DA
         raise AuthError("в user нет id")
 
     return {"user": user, "auth_date": auth_date, "raw": pairs}
+
+
+def validate_telegram_login(
+    payload: dict, bot_token: str, *, max_age: int = LOGIN_WIDGET_TTL
+) -> dict:
+    """Проверяет данные Telegram Login Widget для обычного браузера.
+
+    Это другой алгоритм, чем у Mini App: секрет — `SHA256(bot_token)`, а не
+    `HMAC("WebAppData", bot_token)`. Поля приходят как есть из `data-onauth`,
+    поэтому не полагаемся на их типы.
+    """
+    data = {key: str(value) for key, value in payload.items() if value is not None}
+    received_hash = data.pop("hash", "")
+    if not received_hash:
+        raise AuthError("нет подписи")
+    if not bot_token:
+        raise AuthError("бот не настроен")
+
+    check_string = "\n".join(f"{key}={value}" for key, value in sorted(data.items()))
+    secret = hashlib.sha256(bot_token.encode()).digest()
+    expected = hmac.new(secret, check_string.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, received_hash):
+        raise AuthError("подпись не совпадает")
+
+    try:
+        auth_date = int(data.get("auth_date", "0") or 0)
+        user_id = int(data.get("id", "0") or 0)
+    except (TypeError, ValueError) as exc:
+        raise AuthError("неверные поля Telegram") from exc
+    if auth_date <= 0 or user_id <= 0:
+        raise AuthError("неверные поля Telegram")
+    age = time.time() - auth_date
+    if age < -MAX_FUTURE_AUTH_SKEW:
+        raise AuthError("auth_date из будущего")
+    if max_age and age > max_age:
+        raise AuthError("вход просрочен")
+
+    return {
+        "user": {
+            "id": user_id,
+            "first_name": data.get("first_name"),
+            "last_name": data.get("last_name"),
+            "username": data.get("username"),
+            "photo_url": data.get("photo_url"),
+            "language_code": data.get("language_code"),
+        },
+        "auth_date": auth_date,
+    }
 
 
 def issue_token(user_id: int, secret: str, *, ttl: int = TOKEN_TTL) -> str:

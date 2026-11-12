@@ -3,11 +3,19 @@ import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
 import { BottomNav } from "@/components/bottom-nav";
+import { Funnel } from "@/components/funnel";
+import { LegalFooter } from "@/components/legal-footer";
 import { AppHeader } from "@/components/app-header";
 import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "@/lib/theme";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ??
+      (process.env.NODE_ENV === "production"
+        ? "https://car-car-app.vercel.app"
+        : "http://localhost:3006"),
+  ),
   title: "CarCar — машины из Польши",
   description: "Агрегатор объявлений о продаже авто в Польше",
 };
@@ -41,11 +49,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <I18nProvider>
             <AuthProvider>
+              <Funnel />
               <AppHeader />
               <main className="mx-auto min-h-[calc(100dvh-3.5rem)] w-full max-w-6xl px-4 pb-28 pt-4 md:pb-10">
                 {children}
               </main>
               <BottomNav />
+              <LegalFooter />
             </AuthProvider>
           </I18nProvider>
         </ThemeProvider>

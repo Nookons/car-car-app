@@ -9,12 +9,13 @@ export function AppHeader() {
   const { t } = useI18n();
   const pathname = usePathname();
   const isListing = pathname.startsWith("/listing/");
+  const isShare = pathname.startsWith("/share/");
 
   return (
     <header
       className={cn(
         "app-header sticky top-0 z-30 border-b bg-background/95 backdrop-blur",
-        isListing && "max-md:hidden",
+        (isListing || isShare) && "hidden",
       )}
     >
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">

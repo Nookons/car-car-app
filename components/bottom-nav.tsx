@@ -17,12 +17,13 @@ export function BottomNav() {
   const pathname = usePathname();
   const { t } = useI18n();
   const isListing = pathname.startsWith("/listing/");
+  const isShare = pathname.startsWith("/share/");
 
   return (
     <nav
       className={cn(
         "fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 backdrop-blur safe-bottom md:hidden",
-        isListing && "hidden",
+        (isListing || isShare) && "hidden",
       )}
     >
       <div className="mx-auto grid max-w-md grid-cols-4">

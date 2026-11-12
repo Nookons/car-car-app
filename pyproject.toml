@@ -43,6 +43,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.ruff.lint.per-file-ignores]
 # FastAPI: Depends() в аргументах — стандартный паттерн
 "carcar/miniapp/api.py" = ["B008"]
+"carcar/miniapp/webauth_routes.py" = ["B008"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

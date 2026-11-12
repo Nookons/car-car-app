@@ -5,6 +5,7 @@ import { Crosshair } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
+import { track } from "@/lib/track";
 import { useAuth } from "@/components/auth-provider";
 import { num } from "@/lib/format";
 import { labelFor, useI18n } from "@/lib/i18n";
@@ -47,7 +48,7 @@ export function FilterDialog({
   onApply: (filters: Filters) => void;
 }) {
   const { t } = useI18n();
-  const { token } = useAuth();
+  const { token, authed } = useAuth();
   const [draft, setDraft] = React.useState<Filters>(initial);
   const [makes, setMakes] = React.useState<Option[]>([]);
   const [models, setModels] = React.useState<Option[]>([]);
@@ -169,12 +170,13 @@ export function FilterDialog({
               <Button
                 disabled={!saveName.trim()}
                 onClick={async () => {
-                  if (!token) return;
+                  if (!authed) return;
                   await api("/subscriptions", {
                     method: "POST",
                     token,
                     body: { name: saveName.trim(), criteria: draft },
                   });
+                  track("saved_search");
                   setSaveMode(false);
                   setSaveName("");
                   setSaved(true);

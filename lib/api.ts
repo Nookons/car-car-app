@@ -1,8 +1,7 @@
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  (process.env.NODE_ENV === "production"
-    ? "https://api-production-5bee.up.railway.app"
-    : "http://127.0.0.1:8080");
+// Фронт ходит на свой же `/api`, а Next проксирует запрос в FastAPI
+// (см. `rewrites` в next.config.mjs). Это не оптимизация: cookie сессии
+// становится first-party, и браузер не режет её как стороннюю.
+const BASE = "/api";
 
 export class ApiError extends Error {
   status: number;
@@ -10,6 +9,16 @@ export class ApiError extends Error {
     super(message);
     this.status = status;
   }
+}
+
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const prefix = `${name}=`;
+  for (const part of document.cookie.split(";")) {
+    const value = part.trim();
+    if (value.startsWith(prefix)) return decodeURIComponent(value.slice(prefix.length));
+  }
+  return null;
 }
 
 // Coalesce identical in-flight GETs (for example when multiple components
@@ -33,12 +42,21 @@ export async function api<T>(
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
 
   const method = options.method ?? "GET";
-  const url = `${API_URL}/api${path}`;
+  // Cookie-сессия уходит автоматически, поэтому изменяющий запрос обязан
+  // предъявить CSRF-токен из читаемой cookie. Для Bearer он не нужен.
+  if (method !== "GET" && method !== "HEAD" && !options.token) {
+    const csrf = readCookie("carcar_csrf");
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+  }
+
+  const url = `${BASE}${path}`;
   const request = async (): Promise<T> => {
     const response = await fetch(url, {
       method,
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      // Cookie сессии — единственный носитель входа в веб-версии.
+      credentials: "include",
       // API cache is authoritative; avoid persisting potentially stale listings in the browser.
       cache: "no-store",
       signal: options.signal,
@@ -48,6 +66,7 @@ export async function api<T>(
       const detail = await response.json().catch(() => ({}));
       throw new ApiError(response.status, detail.detail ?? `HTTP ${response.status}`);
     }
+    if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
   };
 

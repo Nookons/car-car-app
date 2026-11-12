@@ -1,4 +1,11 @@
 /** @type {import('next').NextConfig} */
+const apiTarget = (
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === "production"
+    ? "https://api-production-5bee.up.railway.app"
+    : "http://127.0.0.1:8080")
+).replace(/\/$/, "");
+
 const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
   // Next production server compresses dynamic responses; keep this explicit so
@@ -42,6 +49,11 @@ const nextConfig = {
       { source: "/en/car", destination: "/", permanent: false },
       { source: "/en/car/:id", destination: "/listing/:id", permanent: false },
     ];
+  },
+  async rewrites() {
+    // Один origin для фронта и API: cookie сессии остаётся first-party и
+    // переживает блокировку сторонних cookie в Safari/Chrome.
+    return [{ source: "/api/:path*", destination: `${apiTarget}/api/:path*` }];
   },
   images: {
     // Оптимизатор Vercel считается в квоте (5 000 исходников/мес на бесплатном

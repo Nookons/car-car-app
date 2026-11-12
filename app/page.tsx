@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, MagnifyingGlass } from "@phosphor-icons/react";
+import { ArrowRight, MagnifyingGlass, Sparkle } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
 import { ListingRow } from "@/components/listing-row";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,7 @@ type Make = { value: string; count: number };
 const HOME_MAKES = 8;
 
 export default function HomePage() {
-  const { token, user, ready, error } = useAuth();
+  const { token, authed, user, ready, error } = useAuth();
   const router = useRouter();
   const { t } = useI18n();
   const [query, setQuery] = React.useState("");
@@ -57,11 +57,11 @@ export default function HomePage() {
   }, []);
 
   React.useEffect(() => {
-    if (!token) return;
+    if (!authed) return;
     api<{ items: Listing[] }>("/recommendations?limit=3", { token })
       .then((data) => setRecs(data.items))
       .catch(() => setRecs([]));
-  }, [token]);
+  }, [token, authed]);
 
   if (!ready) return <HomeSkeleton />;
   if (error) return <p className="py-10 text-center text-sm text-muted-foreground">{error}</p>;
@@ -106,6 +106,20 @@ export default function HomePage() {
           <ArrowRight size={16} />
         </button>
       </form>
+
+      <Link
+        href="/onboarding"
+        className="mx-auto flex w-full max-w-2xl items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 transition hover:bg-primary/10"
+      >
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+          <Sparkle size={20} weight="fill" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">{t("onboarding.title")}</span>
+          <span className="block text-xs text-muted-foreground">{t("onboarding.subtitle")}</span>
+        </span>
+        <ArrowRight size={18} className="shrink-0 text-muted-foreground" />
+      </Link>
 
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
         {QUICK.map((quick) => (

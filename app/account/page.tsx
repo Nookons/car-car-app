@@ -1,10 +1,25 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, BellSlash, Trash, Eye, TelegramLogo, TrendDown } from "@phosphor-icons/react";
+import {
+  Bell,
+  BellSlash,
+  CheckCircle,
+  DownloadSimple,
+  EnvelopeSimple,
+  Eye,
+  SignOut,
+  TelegramLogo,
+  Trash,
+  TrendDown,
+  WarningCircle,
+} from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
 import { ListingRow } from "@/components/listing-row";
+import { ShortlistDialog } from "@/components/shortlist-dialog";
+import { SignInMethods } from "@/components/sign-in-methods";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
@@ -13,51 +28,70 @@ import { ThemeSwitch } from "@/components/theme-switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { loadFilters, saveFilters } from "@/lib/filters";
+import { shortlistKey } from "@/lib/shortlist";
+import { track } from "@/lib/track";
 import { LANGS, labelFor, useI18n, type Key } from "@/lib/i18n";
 import { filtersSummary } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Filters, Listing, Subscription, User } from "@/lib/types";
 
 export default function AccountPage() {
-  const { token, ready, favorites } = useAuth();
+  const { token, user, authed, mode, ready, favorites, logout, refreshUser } = useAuth();
   const router = useRouter();
   const { t, lang, setLang } = useI18n();
   const [subs, setSubs] = React.useState<Subscription[]>([]);
-  const [me, setMe] = React.useState<User | null>(null);
+  const [me, setMe] = React.useState<User | null>(user);
   const [favItems, setFavItems] = React.useState<Listing[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [nameOpen, setNameOpen] = React.useState(false);
   const [name, setName] = React.useState("");
+  const [resend, setResend] = React.useState<"idle" | "sending" | "sent">("idle");
+  const [shortlistItem, setShortlistItem] = React.useState<Listing | null>(null);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteWord, setDeleteWord] = React.useState("");
+  const [deleting, setDeleting] = React.useState(false);
+  const [dataError, setDataError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (user) setMe(user);
+  }, [user]);
 
   const load = React.useCallback(async () => {
-    if (!token) return;
+    if (!authed) return;
     setLoading(true);
+    const auth = token ? { token } : {};
     try {
       const [subsData, favData, meData] = await Promise.all([
-        api<{ items: Subscription[] }>("/subscriptions", { token }),
-        api<{ items: Listing[] }>("/favorites", { token }),
-        api<User>("/me", { token }),
+        api<{ items: Subscription[] }>("/subscriptions", auth),
+        api<{ items: Listing[] }>("/favorites", auth),
+        api<User>("/me", auth),
       ]);
       setSubs(subsData.items);
       setMe(meData);
       setFavItems(favData.items);
+    } catch {
+      // сессия могла истечь — гостевой экран покажет вход
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [authed, token]);
 
   React.useEffect(() => {
-    if (ready && token) void load();
-  }, [ready, token, load]);
+    if (ready && authed) void load();
+  }, [ready, authed, load]);
 
   const patchUser = async (patch: Partial<User>) => {
-    if (!token || !me) return;
+    if (!authed || !me) return;
     const previous = me;
     // Мгновенно показываем новое состояние, запрос — фоном.
     setMe({ ...me, ...patch } as User);
     try {
-      const fresh = await api<User>("/me", { method: "PATCH", token, body: patch });
+      const fresh = await api<User>("/me", {
+        method: "PATCH",
+        token: token ?? undefined,
+        body: patch,
+      });
       setMe(fresh);
     } catch {
       setMe(previous);
@@ -65,7 +99,7 @@ export default function AccountPage() {
   };
 
   const saveFilter = () => {
-    if (!token || !name.trim()) return;
+    if (!authed || !name.trim()) return;
     const criteria: Filters = loadFilters();
     const draft: Subscription = {
       id: -Date.now(),
@@ -76,17 +110,66 @@ export default function AccountPage() {
     };
     // Сразу показываем новый фильтр, сохранение уходит фоном.
     setSubs((prev) => [draft, ...prev]);
+    track("saved_search");
     setName("");
     setNameOpen(false);
     api<Subscription>("/subscriptions", {
       method: "POST",
-      token,
+      token: token ?? undefined,
       body: { name: draft.name, criteria },
     })
       .then((created) =>
         setSubs((prev) => prev.map((item) => (item.id === draft.id ? created : item))),
       )
       .catch(() => setSubs((prev) => prev.filter((item) => item.id !== draft.id)));
+  };
+
+  const resendEmail = async () => {
+    if (resend === "sending") return;
+    setResend("sending");
+    try {
+      await api("/auth/email/resend", { method: "POST", token: token ?? undefined });
+      setResend("sent");
+    } catch {
+      setResend("idle");
+    }
+  };
+
+  const doLogout = async () => {
+    await logout();
+    router.replace("/");
+  };
+
+  const exportData = async () => {
+    setDataError(null);
+    try {
+      const data = await api<unknown>("/account/export", token ? { token } : {});
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `carcar-export-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (exc) {
+      setDataError(exc instanceof Error ? exc.message : "error");
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (deleteWord !== t("account.deleteWord")) return;
+    setDeleting(true);
+    setDataError(null);
+    try {
+      await api("/account", { method: "DELETE", token: token ?? undefined });
+      await logout();
+      router.replace("/");
+    } catch (exc) {
+      setDataError(exc instanceof Error ? exc.message : "error");
+      setDeleting(false);
+    }
   };
 
   if (!ready) {
@@ -98,18 +181,27 @@ export default function AccountPage() {
     );
   }
 
-  if (!token) {
+  if (!authed) {
     return (
-      <div className="space-y-4">
+      <div className="mx-auto w-full max-w-md space-y-4 py-4">
         <h1 className="text-lg font-semibold">{t("nav.account")}</h1>
-        <Card className="space-y-4 p-6 text-center">
+        <Card className="space-y-3 p-6 text-center">
           <ThemeSwitch />
           <p className="text-sm text-muted-foreground">{t("account.guestHint")}</p>
+          <Link href="/login" className={cn(buttonVariants(), "w-full")}>
+            {t("auth.login")}
+          </Link>
+          <Link
+            href="/register"
+            className={cn(buttonVariants({ variant: "outline" }), "w-full")}
+          >
+            {t("auth.register")}
+          </Link>
           <a
             href={`https://t.me/${(process.env.NEXT_PUBLIC_TELEGRAM_BOT || "CarCarFinderBot").replace(/^@/, "")}?startapp`}
             target="_blank"
             rel="noopener noreferrer"
-            className={cn(buttonVariants(), "w-full")}
+            className={cn(buttonVariants({ variant: "ghost" }), "w-full")}
           >
             <TelegramLogo size={18} />
             {t("account.openTelegram")}
@@ -119,7 +211,7 @@ export default function AccountPage() {
     );
   }
 
-  if (loading) {
+  if (loading && !me) {
     return (
       <div className="space-y-3">
         <Skeleton className="h-24" />
@@ -128,23 +220,63 @@ export default function AccountPage() {
     );
   }
 
-  const initials = (me?.first_name?.[0] ?? "?") + (me?.last_name?.[0] ?? "");
+  const isWeb = mode === "web";
+  const displayName =
+    [me?.first_name, me?.last_name].filter(Boolean).join(" ") ||
+    me?.email ||
+    (me?.tg_id ? `${t("account.telegramId")} ${me.tg_id}` : t("account.user"));
+  const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-      <Card className="flex items-center gap-3 p-4 lg:col-span-2">
+    <div className="grid min-w-0 gap-4 lg:grid-cols-2 lg:items-start [&>*]:min-w-0">
+      <Card className="flex flex-wrap items-center gap-3 p-4 lg:col-span-2">
         <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-base font-bold text-primary-foreground">
-          {initials}
+          {initials || "?"}
         </div>
-        <div>
-          <p className="font-semibold">
-            {[me?.first_name, me?.last_name].filter(Boolean).join(" ") || t("account.user")}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {me?.username ? `@${me.username}` : `${t("account.telegramId")} ${me?.tg_id}`}
-          </p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold">{displayName}</p>
+          {isWeb ? (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <EnvelopeSimple size={14} />
+              <span className="truncate">{me?.email}</span>
+              {me?.email_verified ? (
+                <CheckCircle size={14} weight="fill" className="text-emerald-500" />
+              ) : (
+                <WarningCircle size={14} className="text-amber-500" />
+              )}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {me?.username ? `@${me.username}` : `${t("account.telegramId")} ${me?.tg_id}`}
+            </p>
+          )}
         </div>
+        {isWeb ? (
+          <Button variant="outline" size="sm" onClick={doLogout}>
+            <SignOut size={16} />
+            {t("auth.logout")}
+          </Button>
+        ) : null}
       </Card>
+
+      {isWeb && me && !me.email_verified ? (
+        <Card className="flex flex-wrap items-center justify-between gap-3 border-amber-300 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40 lg:col-span-2">
+          <p className="flex items-center gap-2 text-sm">
+            <WarningCircle size={18} className="text-amber-600 dark:text-amber-400" />
+            {t("account.verifyEmailBanner")}
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={resend === "sending" || resend === "sent"}
+            onClick={resendEmail}
+          >
+            {resend === "sent" ? t("auth.emailSent") : t("auth.resendEmail")}
+          </Button>
+        </Card>
+      ) : null}
+
+      <SignInMethods />
 
       <Card className="space-y-3 p-4">
         <h2 className="text-base font-semibold">{t("account.settings")}</h2>
@@ -200,6 +332,10 @@ export default function AccountPage() {
           <p className="text-xs text-muted-foreground">{t("account.notifyPriceHint")}</p>
         </div>
 
+        {isWeb ? (
+          <p className="text-xs text-muted-foreground">{t("account.alertsTelegramOnly")}</p>
+        ) : null}
+
         <div className="flex items-center justify-between gap-3 py-1">
           <span className="text-sm">{t("account.digest")}</span>
           <Button
@@ -220,9 +356,7 @@ export default function AccountPage() {
         <p className="text-xs text-muted-foreground">{t("account.hintFilters")}</p>
 
         {subs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {t("account.noFilters")}
-          </p>
+          <p className="text-sm text-muted-foreground">{t("account.noFilters")}</p>
         ) : (
           <ul className="space-y-3">
             {subs.map((sub) => (
@@ -248,11 +382,13 @@ export default function AccountPage() {
                     onClick={() => {
                       const nextActive = !sub.active;
                       setSubs((prev) =>
-                        prev.map((item) => (item.id === sub.id ? { ...item, active: nextActive } : item)),
+                        prev.map((item) =>
+                          item.id === sub.id ? { ...item, active: nextActive } : item,
+                        ),
                       );
                       api(`/subscriptions/${sub.id}`, {
                         method: "PATCH",
-                        token,
+                        token: token ?? undefined,
                         body: { active: nextActive },
                       }).catch(() =>
                         setSubs((prev) =>
@@ -270,7 +406,10 @@ export default function AccountPage() {
                     size="sm"
                     onClick={() => {
                       setSubs((prev) => prev.filter((item) => item.id !== sub.id));
-                      api(`/subscriptions/${sub.id}`, { method: "DELETE", token }).catch(() => load());
+                      api(`/subscriptions/${sub.id}`, {
+                        method: "DELETE",
+                        token: token ?? undefined,
+                      }).catch(() => load());
                     }}
                   >
                     <Trash size={16} />
@@ -296,12 +435,103 @@ export default function AccountPage() {
         ) : (
           <div className="-mx-4 space-y-3 md:mx-auto md:w-full md:max-w-2xl">
             {favItems.slice(0, 6).map((item, index) => (
-              <ListingRow key={item.id} item={item} priority={index < 2} />
+              <div key={item.id} className="space-y-1">
+                <ListingRow item={item} priority={index < 2} />
+                <div className="flex items-center justify-between gap-2 px-2 text-xs">
+                  <span className="min-w-0 truncate text-muted-foreground">
+                    {t(shortlistKey(item.favorite_status))}
+                    {item.favorite_note ? ` · ${item.favorite_note}` : ""}
+                  </span>
+                  <button
+                    type="button"
+                    className="shrink-0 text-muted-foreground underline-offset-4 hover:underline"
+                    onClick={() => setShortlistItem(item)}
+                  >
+                    {t("shortlist.open")}
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         )}
       </section>
 
+      <section className="lg:col-span-2">
+        <Card className="space-y-3 p-4">
+          <h2 className="text-base font-semibold">{t("account.dataTitle")}</h2>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={exportData}>
+              <DownloadSimple size={16} />
+              {t("account.export")}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash size={16} />
+              {t("account.delete")}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">{t("account.exportHint")}</p>
+          {dataError ? (
+            <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+              {dataError}
+            </p>
+          ) : null}
+        </Card>
+      </section>
+
+      {shortlistItem ? (
+        <ShortlistDialog
+          open
+          onClose={() => setShortlistItem(null)}
+          listingId={shortlistItem.id}
+          initialStatus={shortlistItem.favorite_status}
+          initialNote={shortlistItem.favorite_note}
+          onSaved={(status, note) =>
+            setFavItems((prev) =>
+              prev.map((item) =>
+                item.id === shortlistItem.id
+                  ? { ...item, favorite_status: status, favorite_note: note || null }
+                  : item,
+              ),
+            )
+          }
+        />
+      ) : null}
+
+      <Dialog
+        open={deleteOpen}
+        onClose={() => {
+          setDeleteOpen(false);
+          setDeleteWord("");
+          setDataError(null);
+        }}
+        title={t("account.delete")}
+        footer={
+          <Button
+            variant="destructive"
+            className="w-full"
+            disabled={deleting || deleteWord !== t("account.deleteWord")}
+            onClick={deleteAccount}
+          >
+            {deleting ? t("onboarding.saving") : t("account.deleteAction")}
+          </Button>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">{t("account.deleteHint")}</p>
+          <p className="text-sm font-medium">{t("account.deleteConfirm")}</p>
+          <Input
+            value={deleteWord}
+            onChange={(event) => setDeleteWord(event.target.value)}
+            autoComplete="off"
+            placeholder={t("account.deleteWord")}
+          />
+        </div>
+      </Dialog>
 
       <Dialog
         open={nameOpen}
@@ -321,6 +551,7 @@ export default function AccountPage() {
           maxLength={120}
         />
       </Dialog>
+
     </div>
   );
 }

@@ -33,10 +33,30 @@ export function telegram(): TelegramWebApp | undefined {
   return typeof window !== "undefined" ? window.Telegram?.WebApp : undefined;
 }
 
+/**
+ * Открыто ли приложение внутри Telegram.
+ *
+ * Признак — непустой `initData`: его подписывает Telegram, и подделать его
+ * без токена бота нельзя. В обычном браузере (в том числе при заходе по
+ * прямой ссылке из мессенджера) `initData` пустой — это веб-режим.
+ */
+export function isTelegram(): boolean {
+  return Boolean(telegram()?.initData);
+}
+
 export function getInitData(): string {
   const tg = telegram();
   if (tg?.initData) return tg.initData;
-  return process.env.NEXT_PUBLIC_ALLOW_DEV === "1" ? "dev" : "";
+  // Ручная эмуляция Mini App в браузере: только явный флаг, чтобы обычный
+  // локальный веб-вход не превращался в Telegram-вход.
+  if (
+    process.env.NEXT_PUBLIC_ALLOW_DEV === "1" &&
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("tg_dev")
+  ) {
+    return "dev";
+  }
+  return "";
 }
 
 export type Coords = { lat: number; lon: number };

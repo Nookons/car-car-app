@@ -13,6 +13,7 @@ import {
   MapPin,
   ShareNetwork,
   Star,
+  Tag,
   TrendDown,
   User,
   WarningCircle,
@@ -21,6 +22,7 @@ import { useAuth } from "@/components/auth-provider";
 import { PhotoGallery } from "@/components/photo-gallery";
 import { PriceHistory } from "@/components/price-history";
 import { PriceMarket } from "@/components/price-market";
+import { ShortlistDialog } from "@/components/shortlist-dialog";
 import { SimilarListings } from "@/components/similar-listings";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -39,6 +41,8 @@ import {
   price,
 } from "@/lib/format";
 import { labelFor, useI18n } from "@/lib/i18n";
+import { shortlistKey } from "@/lib/shortlist";
+import { track } from "@/lib/track";
 import { sourceName } from "@/lib/source";
 import { cn } from "@/lib/utils";
 import type { Listing, ListingCard as ListingDetail } from "@/lib/types";
@@ -49,7 +53,7 @@ const controlClass =
 export default function ListingPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { token, favorites, toggleFavorite } = useAuth();
+  const { token, authed, favorites, toggleFavorite } = useAuth();
   const { t, lang } = useI18n();
   const [item, setItem] = React.useState<ListingDetail | null>(null);
   const [similar, setSimilar] = React.useState<Listing[]>([]);
@@ -58,6 +62,7 @@ export default function ListingPage() {
   const [allEquipment, setAllEquipment] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+  const [shortlistOpen, setShortlistOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!params?.id) return;
@@ -82,9 +87,17 @@ export default function ListingPage() {
   }, [params?.id]);
 
   React.useEffect(() => {
-    if (!token || !params?.id) return;
+    if (!authed || !params?.id) return;
     void api(`/listings/${params.id}/view`, { method: "POST", token }).catch(() => {});
-  }, [params?.id, token]);
+  }, [params?.id, token, authed]);
+
+  React.useEffect(() => {
+    if (!item?.id) return;
+    track("listing_view", { listingId: item.id });
+    if (new URLSearchParams(window.location.search).get("src") === "alert") {
+      track("alert_open", { listingId: item.id });
+    }
+  }, [item?.id]);
 
   if (error) {
     return (
@@ -198,8 +211,9 @@ export default function ListingPage() {
   const mapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
 
   const share = async () => {
-    const url = window.location.href;
+    const url = `${window.location.origin}/share/${item.id}`;
     const text = `${title} — ${price(item.price, item.currency)}`;
+    track("share", { listingId: item.id });
     if (navigator.share) {
       try {
         await navigator.share({ title, text, url });
@@ -216,7 +230,7 @@ export default function ListingPage() {
   };
 
   const copyLink = async () => {
-    const url = window.location.href;
+    const url = `${window.location.origin}/share/${item.id}`;
     try {
       await navigator.clipboard.writeText(url);
     } catch {
@@ -239,7 +253,7 @@ export default function ListingPage() {
   };
 
   const favorite = () => {
-    if (!token) {
+    if (!authed) {
       router.push("/account");
       return;
     }
@@ -382,6 +396,22 @@ export default function ListingPage() {
               </p>
             ) : null}
           </div>
+
+          {isFav ? (
+            <button
+              type="button"
+              onClick={() => setShortlistOpen(true)}
+              className="flex w-full items-center justify-between gap-2 rounded-xl border bg-card px-3 py-2.5 text-sm"
+            >
+              <span className="flex items-center gap-2">
+                <Tag size={16} />
+                {t("shortlist.title")}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {t(shortlistKey(item.favorite_status))}
+              </span>
+            </button>
+          ) : null}
 
           {item.status === "removed" ? (
             <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
@@ -544,6 +574,24 @@ export default function ListingPage() {
           <SimilarListings items={similar} allHref={similarHref} />
         </div>
       </div>
+
+      {shortlistOpen ? (
+        <ShortlistDialog
+          open
+          onClose={() => setShortlistOpen(false)}
+          listingId={item.id}
+          initialStatus={item.favorite_status}
+          initialNote={item.favorite_note}
+          onSaved={(status, note) =>
+            setItem((prev) =>
+              prev
+                ? { ...prev, favorite_status: status, favorite_note: note || null }
+                : prev,
+            )
+          }
+        />
+      ) : null}
+
     </div>
   );
 }

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import contextlib
+import html
 import logging
 import re
 import time
@@ -45,7 +46,10 @@ class Bot:
         return self.call("getMe")
 
     def set_webhook(self, url: str, secret: str | None = None) -> dict:
-        params: dict = {"url": url, "allowed_updates": ["message"]}
+        params: dict = {
+            "url": url,
+            "allowed_updates": ["message", "callback_query", "inline_query"],
+        }
         if secret:
             params["secret_token"] = secret
         return self.call("setWebhook", **params)
@@ -154,6 +158,106 @@ class Bot:
             f"<blockquote expandable><pre>{table}</pre></blockquote>"
         )
 
+    def inline_results(self, query: str, limit: int = 5) -> list[dict]:
+        """Результаты для @bot <запрос>: статья с ценой и ссылкой на share-карточку."""
+        query = (query or "").strip()[:80]
+        if not query:
+            return []
+        terms = [part for part in query.split() if part][:5]
+        if not terms:
+            return []
+        conds, params = [], []
+        for part in terms:
+            term = part.replace("!", "!!").replace("%", "!%").replace("_", "!_")
+            pattern = f"%{term}%"
+            conds.append(
+                "(title ilike %s escape '!' or make ilike %s escape '!' "
+                "or model ilike %s escape '!')"
+            )
+            params.extend([pattern, pattern, pattern])
+        where = " and ".join(conds)
+        try:
+            from .db import database_url
+
+            url = database_url()
+            if not url:
+                return []
+            import psycopg
+            from psycopg.rows import dict_row
+
+            with psycopg.connect(
+                url,
+                connect_timeout=10,
+                prepare_threshold=None,
+                row_factory=dict_row,
+            ) as conn:
+                rows = conn.execute(
+                    f"""
+                    select id, title, price, currency, year, mileage_km, city,
+                           thumb_url, url
+                    from listing
+                    where status = 'active' and {where}
+                    order by published_at desc nulls last
+                    limit %s
+                    """,
+                    (*params, max(1, min(limit, 10))),
+                ).fetchall()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("inline-поиск не удался: %s", exc)
+            return []
+
+        results = []
+        for row in rows:
+            title = html.escape(str(row["title"]))
+            price_label = f"{int(row['price']):,}".replace(",", " ") if row["price"] else ""
+            description = " · ".join(
+                str(part)
+                for part in (
+                    f"{price_label} zł" if price_label else None,
+                    row["year"],
+                    f"{int(row['mileage_km']):,}".replace(",", " ") + " km"
+                    if row["mileage_km"]
+                    else None,
+                    html.escape(str(row["city"])) if row["city"] else None,
+                )
+                if part
+            )
+            card_url = (
+                f"{self.public_url}/share/{row['id']}"
+                if self.public_url
+                else str(row["url"])
+            )
+            caption = f"<b>{title}</b>\n{description or price_label}"
+            result = {
+                "type": "article",
+                "id": str(row["id"]),
+                "title": f"{title} — {price_label} zł" if price_label else title,
+                "description": description,
+                "input_message_content": {
+                    "message_text": f"{caption}\n{card_url}",
+                    "parse_mode": "HTML",
+                },
+            }
+            thumb = str(row["thumb_url"] or "").split("?")[0].lower()
+            if row["thumb_url"] and thumb.endswith((".jpg", ".jpeg", ".png")):
+                result["thumb_url"] = row["thumb_url"]
+            if self.public_url:
+                result["reply_markup"] = {
+                    "inline_keyboard": [[{"text": "Открыть в CarCar", "url": card_url}]]
+                }
+            results.append(result)
+        return results
+
+    def answer_inline(self, inline_query_id: str, query: str) -> None:
+        results = self.inline_results(query)
+        self.call(
+            "answerInlineQuery",
+            inline_query_id=inline_query_id,
+            results=results,
+            cache_time=30,
+            is_personal=False,
+        )
+
     def send_specs(self, chat_id: int, listing_id: int) -> None:
         lang = self.lang_for(chat_id)
         text = self.specs_text(listing_id, lang)
@@ -207,15 +311,21 @@ class Bot:
         text = msg(self.lang_for(chat_id))
         if self.public_url:
             keyboard = {
-                "inline_keyboard": [[
-                    {"text": text["start_button"], "web_app": {"url": self.public_url}}
-                ]]
+                "inline_keyboard": [
+                    [{"text": text["start_button"], "web_app": {"url": self.public_url}}],
+                    [{"text": "Найти в чате", "switch_inline_query": ""}],
+                ]
             }
             self.call("sendMessage", chat_id=chat_id, text=text["start"], reply_markup=keyboard)
         else:
             self.call("sendMessage", chat_id=chat_id, text=text["no_url"])
 
     def handle_update(self, update: dict) -> None:
+        inline = update.get("inline_query")
+        if inline:
+            with contextlib.suppress(Exception):
+                self.answer_inline(inline.get("id", ""), inline.get("query", ""))
+            return
         message = update.get("message") or update.get("edited_message")
         if not message:
             return
@@ -232,7 +342,10 @@ class Bot:
         while True:
             try:
                 updates = self.call(
-                    "getUpdates", offset=self.offset, timeout=30, allowed_updates=["message"]
+                    "getUpdates",
+                    offset=self.offset,
+                    timeout=30,
+                    allowed_updates=["message", "callback_query", "inline_query"],
                 )
             except Exception as exc:  # noqa: BLE001
                 log.warning("getUpdates: %s", exc)

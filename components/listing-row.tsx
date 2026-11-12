@@ -27,7 +27,7 @@ const lower = (value: string) => (value ? value[0].toLowerCase() + value.slice(1
  * заголовок и цена сверху, фотолента, ниже — характеристики, город и дата.
  */
 export function ListingRow({ item, priority = false }: { item: Listing; priority?: boolean }) {
-  const { favorites, toggleFavorite, token } = useAuth();
+  const { favorites, toggleFavorite, authed } = useAuth();
   const { t, lang } = useI18n();
   const router = useRouter();
   const favorite = favorites.has(item.id);
@@ -70,7 +70,7 @@ export function ListingRow({ item, priority = false }: { item: Listing; priority
   const location = [distance, item.city, item.region].filter(Boolean).join(", ");
 
   const onFavorite = () => {
-    if (!token) {
+    if (!authed) {
       router.push("/account");
       return;
     }

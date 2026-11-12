@@ -7,24 +7,43 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import logging
 import os
 from contextlib import asynccontextmanager
+from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import httpx
-from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from psycopg import errors as pg_errors
 from pydantic import BaseModel, Field
 
+from .. import webauth
 from ..cache import Cache
 from ..db import database_url
 from .auth import AuthError, issue_token, validate_init_data, verify_token
 from .repo import MiniAppRepo
+from .webauth_routes import WebAuthSettings, build_webauth_router, csrf_ok
 
 STATIC = __import__("pathlib").Path(__file__).parent / "static"
+log = logging.getLogger("carcar.miniapp")
+EVENT_LIMITER = webauth.RateLimiter()
+DEMO_LIMITER = webauth.RateLimiter()
 
 
 class AuthIn(BaseModel):
@@ -56,6 +75,23 @@ class SubscriptionPatch(BaseModel):
     name: str | None = Field(default=None, max_length=120)
     criteria: dict[str, Any] | None = None
     active: bool | None = None
+
+
+class EventIn(BaseModel):
+    kind: str = Field(
+        pattern="^(visit|search|listing_view|favorite_add|favorite_update|"
+        "saved_search|alert_open|share|onboarding_start|onboarding_step|onboarding_done)$"
+    )
+    visitor_id: str = Field(min_length=36, max_length=36)
+    listing_id: int | None = None
+    meta: dict[str, Any] | None = None
+
+
+class FavoritePatch(BaseModel):
+    status: str | None = Field(
+        default=None, pattern="^(shortlist|contacted|viewed|rejected|bought)$"
+    )
+    note: str | None = Field(default=None, max_length=500)
 
 
 def create_app(
@@ -173,32 +209,59 @@ def create_app(
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[origin.strip() for origin in origins if origin.strip()],
-        allow_credentials=False,
+        allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-Analytics-Admin-Token"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-CSRF-Token",
+            "X-Analytics-Admin-Token",
+        ],
     )
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
-    def current_user(authorization: str | None = Header(default=None)) -> dict[str, Any]:
-        if not authorization or not authorization.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="нет токена")
-        try:
-            user_id = verify_token(authorization[7:], jwt_secret)
-        except AuthError as exc:
-            raise HTTPException(status_code=401, detail=str(exc)) from exc
-        user = repo.get_user(user_id)
+    def _resolve_user(
+        request: Request, authorization: str | None
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+        """Два равноправных входа: Bearer-JWT (Telegram) и cookie (браузер)."""
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                return repo.get_user(verify_token(authorization[7:], jwt_secret)), None
+            except AuthError:
+                return None, None
+
+        raw = request.cookies.get(webauth.SESSION_COOKIE)
+        if not raw:
+            return None, None
+        session = repo.get_web_session(webauth.token_hash(raw))
+        if not session:
+            return None, None
+        # Нужен роутам веб-авторизации: отдать CSRF и отозвать сессию.
+        request.state.web_session = session
+        return session["user"], session
+
+    def current_user(
+        request: Request, authorization: str | None = Header(default=None)
+    ) -> dict[str, Any]:
+        user, session = _resolve_user(request, authorization)
         if not user:
-            raise HTTPException(status_code=401, detail="пользователь не найден")
+            raise HTTPException(status_code=401, detail="нет токена")
+        # Cookie уходит автоматически, поэтому изменяющий запрос обязан
+        # подтвердить CSRF-токеном. Для Bearer (Telegram) проверка не нужна.
+        if (
+            session
+            and request.method not in ("GET", "HEAD", "OPTIONS")
+            and not csrf_ok(request, session)
+        ):
+            raise HTTPException(status_code=403, detail="csrf_failed")
         return user
 
-    def optional_user(authorization: str | None = Header(default=None)) -> dict | None:
-        if not authorization or not authorization.startswith("Bearer "):
-            return None
-        try:
-            return repo.get_user(verify_token(authorization[7:], jwt_secret))
-        except AuthError:
-            return None
+    def optional_user(
+        request: Request, authorization: str | None = Header(default=None)
+    ) -> dict | None:
+        user, _ = _resolve_user(request, authorization)
+        return user
 
     def analytics_admin(
         token: str | None = Header(default=None, alias="X-Analytics-Admin-Token"),
@@ -207,6 +270,22 @@ def create_app(
             raise HTTPException(status_code=503, detail="аналитика администратора не настроена")
         if not hmac.compare_digest(token or "", analytics_admin_token):
             raise HTTPException(status_code=401, detail="нужен токен администратора")
+
+    # В dev JWT-секрет может быть сгенерирован внутри create_app: он же
+    # подписывает SMS-коды, поэтому передаём фактическое значение, а не env.
+    web_settings = WebAuthSettings.from_env()
+    if not web_settings.jwt_secret:
+        web_settings = replace(web_settings, jwt_secret=jwt_secret)
+    if not web_settings.bot_token:
+        web_settings = replace(web_settings, bot_token=bot_token)
+    app.include_router(
+        build_webauth_router(
+            repo=repo,
+            settings=web_settings,
+            require_user=current_user,
+            optional_user=optional_user,
+        )
+    )
 
     @app.get("/")
     def index() -> FileResponse:
@@ -280,6 +359,17 @@ def create_app(
             raise HTTPException(status_code=503, detail="webhook не настроен")
         if not hmac.compare_digest(secret or "", webhook_secret):
             raise HTTPException(status_code=403, detail="плохой секрет")
+        inline = update.get("inline_query")
+        if inline:
+            from ..bot import Bot
+
+            try:
+                Bot(bot_token, public_url).answer_inline(
+                    inline.get("id", ""), inline.get("query", "")
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning("inline-ответ не отправлен: %s", exc)
+            return {"ok": True}
         callback = update.get("callback_query")
         if callback:
             from ..bot import Bot
@@ -303,7 +393,40 @@ def create_app(
         if chat_id and text.startswith("/start"):
             from ..bot import Bot
 
-            Bot(bot_token, public_url).reply_start(chat_id)
+            bot = Bot(bot_token, public_url)
+            parts = text.split(maxsplit=1)
+            argument = parts[1].strip() if len(parts) > 1 else ""
+            if argument.startswith("link_"):
+                token = argument[len("link_"):].strip()
+                row = repo.consume_auth_token(
+                    "telegram_link", webauth.token_hash(token)
+                )
+                sender = message.get("from") or {}
+                if not row:
+                    reply = (
+                        "This link is invalid or has expired. "
+                        "Create a new one in your CarCar account."
+                    )
+                elif not sender.get("id"):
+                    reply = "Could not read your Telegram account."
+                else:
+                    try:
+                        linked = repo.link_telegram(int(row["user_id"]), sender)
+                    except Exception as exc:  # noqa: BLE001
+                        log.warning("не удалось привязать Telegram: %s", exc)
+                        linked = None
+                    reply = (
+                        "Telegram is now linked to your CarCar account. "
+                        "Return to the website — Telegram sign-in is ready."
+                        if linked
+                        else "This Telegram is already linked to another CarCar account."
+                    )
+                try:
+                    bot.call("sendMessage", chat_id=chat_id, text=reply)
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("не удалось ответить в Telegram: %s", exc)
+                return {"ok": True}
+            bot.reply_start(chat_id)
         return {"ok": True}
 
     # -- авторизация -------------------------------------------------------
@@ -333,6 +456,34 @@ def create_app(
     ) -> dict:
         return repo.user_activity_metrics(days, limit, offset)
 
+    @app.get("/api/admin/funnel")
+    def admin_funnel(
+        _: None = Depends(analytics_admin),
+        days: int = Query(default=30, ge=1, le=365),
+    ) -> dict:
+        data = repo.funnel_metrics(days)
+        by_kind = {row["kind"]: row for row in data["stages"]}
+        ordered = ["visit", "search", "saved_search", "alert_open"]
+        stages = []
+        previous = None
+        for kind in ordered:
+            row = by_kind.get(kind, {"events": 0, "visitors": 0, "users": 0})
+            visitors = int(row["visitors"] or 0)
+            stages.append(
+                {
+                    "kind": kind,
+                    "events": int(row["events"] or 0),
+                    "visitors": visitors,
+                    "users": int(row["users"] or 0),
+                    "conversion": (
+                        round(visitors / previous, 4) if previous else None
+                    ),
+                }
+            )
+            previous = visitors
+        data["stages"] = stages
+        return data
+
     # -- профиль -----------------------------------------------------------
     @app.get("/api/me")
     def me(user: dict = Depends(current_user)) -> dict:
@@ -347,6 +498,74 @@ def create_app(
             notify_price=payload.notify_price,
             digest=payload.digest,
         )
+
+    @app.get("/api/account/export")
+    def export_account(user: dict = Depends(current_user)) -> dict:
+        """Экспорт данных пользователя по RODO: без пароля и токенов."""
+        return {
+            "exported_at": datetime.now(UTC).isoformat(),
+            "user": user,
+            "subscriptions": repo.subscriptions(user["id"]),
+            "favorites": repo.favorites(user["id"]),
+            "identities": repo.list_identities(user["id"]),
+        }
+
+    @app.delete("/api/account")
+    def delete_account(
+        response: Response, user: dict = Depends(current_user)
+    ) -> dict:
+        repo.delete_user(user["id"])
+        response.delete_cookie(webauth.SESSION_COOKIE, path="/")
+        response.delete_cookie(webauth.CSRF_COOKIE, path="/")
+        return {"ok": True}
+
+    # -- события воронки ---------------------------------------------------
+    @app.post("/api/events")
+    def record_event(
+        payload: EventIn,
+        request: Request,
+        user: dict | None = Depends(optional_user),
+    ) -> dict:
+        try:
+            visitor = str(UUID(payload.visitor_id))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="invalid_visitor") from exc
+        if not visitor:
+            raise HTTPException(status_code=400, detail="invalid_visitor")
+
+        ip = request.client.host if request.client else "unknown"
+        for key in (f"event-ip:{ip}", f"event-visitor:{visitor}"):
+            retry = EVENT_LIMITER.retry_after(key, limit=180, window=60)
+            if retry is not None:
+                raise HTTPException(
+                    status_code=429,
+                    detail="rate_limited",
+                    headers={"Retry-After": str(retry)},
+                )
+
+        # В meta кладём только короткие служебные поля. Никаких поисковых
+        # фраз, заметок и текстов — иначе «обезличенная» воронка перестаёт
+        # быть обезличенной.
+        meta_in = payload.meta or {}
+        meta: dict[str, Any] = {}
+        if isinstance(meta_in.get("step"), int) and 1 <= meta_in["step"] <= 6:
+            meta["step"] = meta_in["step"]
+        for key in ("source", "status"):
+            value = meta_in.get(key)
+            if isinstance(value, str) and value:
+                meta[key] = value[:32]
+
+        try:
+            repo.record_funnel_event(
+                visitor_id=visitor,
+                kind=payload.kind,
+                user_id=user["id"] if user else None,
+                listing_id=payload.listing_id,
+                meta=meta or None,
+            )
+        except pg_errors.ForeignKeyViolation as exc:
+            raise HTTPException(status_code=400, detail="invalid_listing") from exc
+        return {"ok": True}
 
     # -- объявления ---------------------------------------------------------
     @app.get("/api/listings")
@@ -605,6 +824,36 @@ def create_app(
     def create_subscription(payload: SubscriptionIn, user: dict = Depends(current_user)) -> dict:
         return repo.create_subscription(user["id"], payload.name, payload.criteria)
 
+    @app.post("/api/subscriptions/{sub_id}/demo")
+    def demo_subscription(
+        sub_id: int, user: dict = Depends(current_user)
+    ) -> dict:
+        sub = repo.get_subscription(user["id"], sub_id)
+        if not sub:
+            raise HTTPException(status_code=404, detail="подписка не найдена")
+        retry = DEMO_LIMITER.retry_after(f"demo:{user['id']}", limit=3, window=60)
+        if retry is not None:
+            raise HTTPException(
+                status_code=429,
+                detail="rate_limited",
+                headers={"Retry-After": str(retry)},
+            )
+        item = repo.find_listing_for_criteria(sub["criteria"] or {})
+        if not item:
+            return {"sent": False, "listing": None}
+        sent = False
+        if user.get("tg_id") and bot_token and public_url:
+            from ..bot import Bot
+
+            try:
+                ok, _, _ = Bot(bot_token, public_url).send(
+                    int(user["tg_id"]), item, user.get("lang"), None
+                )
+                sent = bool(ok)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("демо-алерт не отправлен: %s", exc)
+        return {"sent": sent, "listing": item}
+
     @app.patch("/api/subscriptions/{sub_id}")
     def patch_subscription(
         sub_id: int, payload: SubscriptionPatch, user: dict = Depends(current_user)
@@ -628,6 +877,28 @@ def create_app(
     @app.post("/api/favorites/{listing_id}")
     def add_favorite(listing_id: int, user: dict = Depends(current_user)) -> dict:
         return {"ok": repo.add_favorite(user["id"], listing_id)}
+
+    @app.get("/api/favorites/{listing_id}")
+    def get_favorite(listing_id: int, user: dict = Depends(current_user)) -> dict:
+        item = repo.get_favorite(user["id"], listing_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="избранное не найдено")
+        return item
+
+    @app.patch("/api/favorites/{listing_id}")
+    def patch_favorite(
+        listing_id: int,
+        payload: FavoritePatch,
+        user: dict = Depends(current_user),
+    ) -> dict:
+        if payload.status is None and payload.note is None:
+            raise HTTPException(status_code=400, detail="nothing_to_update")
+        updated = repo.update_favorite(
+            user["id"], listing_id, status=payload.status, note=payload.note
+        )
+        if not updated:
+            raise HTTPException(status_code=404, detail="избранное не найдено")
+        return {"ok": True, **updated}
 
     @app.delete("/api/favorites/{listing_id}")
     def remove_favorite(listing_id: int, user: dict = Depends(current_user)) -> dict:
