@@ -102,6 +102,7 @@
           <article class="card kpi"><span class="label">WAU</span><strong id="ua-wau">—</strong></article>
           <article class="card kpi"><span class="label">MAU</span><strong id="ua-mau">—</strong></article>
         </div>
+        <div class="cards analytics-kpis" id="ua-funnel"></div>
         <div class="grid two analytics-tables">
           <article class="card analytics-scroll">
             <h2>Активность по дням · 30 дней</h2>
@@ -149,6 +150,7 @@
             <th data-i18n="lastPoll">Последний опрос</th>
             <th class="num" data-i18n="newShort">Новых</th>
             <th class="num" data-i18n="errorsShort">Ошибок</th>
+            <th>Обслуживание</th>
             <th data-i18n="actions">Действия</th>
           </tr>
         </thead>
@@ -241,6 +243,37 @@
       </article>
     </section>
   </main>
+
+  <dialog class="service-dialog" id="service-dialog">
+    <form id="service-form" class="service-form">
+      <div class="card-head">
+        <div><p class="eyebrow">УПРАВЛЕНИЕ ПЛОЩАДКОЙ</p><h2 id="service-dialog-title">Сервис</h2></div>
+        <button class="ghost" type="button" id="service-close" aria-label="Закрыть">✕</button>
+      </div>
+      <input type="hidden" id="service-source">
+      <label class="field">Режим
+        <select id="service-mode" required>
+          <option value="paused">Пауза</option>
+          <option value="maintenance">Ремонт / обслуживание</option>
+        </select>
+      </label>
+      <label class="field">Причина для пользователей
+        <textarea id="service-reason" maxlength="500" rows="3" required placeholder="Например: обновление источника объявлений"></textarea>
+      </label>
+      <div class="service-dates">
+        <label class="field">Начало<input id="service-start" type="datetime-local" required></label>
+        <label class="field">Окончание<input id="service-end" type="datetime-local" required></label>
+      </div>
+      <p class="muted tiny">Период учитывается автоматически. В приложении плашка видна только во время обслуживания.</p>
+      <div class="service-actions">
+        <button class="ghost hidden" type="button" id="service-clear">Снять объявление</button>
+        <span></span>
+        <button class="ghost" type="button" id="service-cancel">Отмена</button>
+        <button class="primary service-save" type="submit" id="service-save">Сохранить</button>
+      </div>
+      <p class="banner bad hidden" id="service-error" role="alert"></p>
+    </form>
+  </dialog>
 
   <footer class="muted tiny hidden" id="dashboard-footer">
     <span data-i18n="footer">Данные — локально, папка data. Дашборд только для владельца, слушает 127.0.0.1.</span>

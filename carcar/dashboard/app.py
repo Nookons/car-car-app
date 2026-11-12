@@ -10,16 +10,16 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
 import hmac
+import json
 import os
 import re
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request, Response
@@ -47,6 +47,13 @@ class ControlIn(BaseModel):
     source: str = Field(default="otomoto", max_length=40)
     reason: str | None = Field(default=None, max_length=200)
     by: str = Field(default="dashboard", max_length=40)
+
+
+class ServiceNoticeIn(BaseModel):
+    mode: Literal["paused", "maintenance"]
+    reason: str = Field(min_length=1, max_length=500)
+    starts_at: datetime
+    ends_at: datetime
 
 
 class DashboardLoginIn(BaseModel):
@@ -221,6 +228,7 @@ def create_app(
             raise RuntimeError("use_db=True, но DATABASE_URL не задан")
         repo = DatabaseRepo(url)
         db_url = url
+        repo.ensure_service_notice_schema()
 
     app = FastAPI(title="CarCar dashboard", docs_url=None, redoc_url=None)
 
@@ -273,7 +281,9 @@ def create_app(
 
     @app.post("/api/session/logout")
     def logout(response: Response) -> dict:
-        response.delete_cookie(session_cookie, path="/", secure=True, httponly=True, samesite="strict")
+        response.delete_cookie(
+            session_cookie, path="/", secure=True, httponly=True, samesite="strict"
+        )
         return {"ok": True}
 
     @app.get("/listing/{listing_id}")
@@ -332,6 +342,11 @@ def create_app(
             collectors = []
             errors.append(f"collectors: {exc}")
 
+        notices = _safe(
+            lambda: repo.service_notices() if repo is not None else [],
+            [], errors, "service notices",
+        )
+
         # На Railway heartbeat-файла нет: состояние берём из записи коллектора.
         if not heartbeat and collectors:
             active = next((c for c in collectors if c.get("last_poll_at")), None)
@@ -347,6 +362,7 @@ def create_app(
             "now": now.isoformat(),
             "state": state,
             "collectors": collectors,
+            "service_notices": notices,
             "sweep": sweep,
             "age_seconds": round(age, 1) if age is not None else None,
             "stale_after": stale_after,
@@ -412,6 +428,26 @@ def create_app(
                 ]
             items.sort(key=lambda i: i.get("distance_km", 1e9))
         return {"items": items[:limit], "total": len(items), "filtered": nearby}
+
+    @app.get("/api/funnel-metrics")
+    def funnel_metrics(days: int = Query(default=30, ge=1, le=365)) -> dict:
+        """Проксирует воронку визит → поиск → сохранённый поиск → алерт."""
+        if not analytics_admin_token:
+            raise HTTPException(status_code=503, detail="аналитика не настроена")
+        try:
+            response = httpx.get(
+                f"{api_base_url}/api/admin/funnel",
+                params={"days": days},
+                headers={"X-Analytics-Admin-Token": analytics_admin_token},
+                timeout=10.0,
+            )
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail="API аналитики недоступно") from exc
+        if response.status_code == 401:
+            raise HTTPException(status_code=401, detail="неверный токен аналитики")
+        if response.status_code != 200:
+            raise HTTPException(status_code=502, detail="ошибка API аналитики")
+        return response.json()
 
     @app.get("/api/metrics")
     def metrics(days: int = 30, months: int = 12) -> dict:
@@ -521,5 +557,30 @@ def create_app(
             by=payload.by,
         )
         return {"ok": True, "control": state.as_dict()}
+
+    @app.put("/api/service-notices/{source}")
+    def save_service_notice(source: str, payload: ServiceNoticeIn) -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="для расписания нужна база данных")
+        starts_at = payload.starts_at
+        ends_at = payload.ends_at
+        if starts_at.tzinfo is None or ends_at.tzinfo is None:
+            raise HTTPException(status_code=422, detail="укажите даты с часовым поясом")
+        if ends_at <= starts_at:
+            raise HTTPException(status_code=422, detail="окончание должно быть позже начала")
+        try:
+            repo.set_service_notice(
+                source, payload.mode, payload.reason.strip(), starts_at, ends_at
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return {"ok": True, "source": source}
+
+    @app.delete("/api/service-notices/{source}")
+    def clear_service_notice(source: str) -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="для расписания нужна база данных")
+        repo.set_service_notice(source, None, None, None, None)
+        return {"ok": True, "source": source}
 
     return app

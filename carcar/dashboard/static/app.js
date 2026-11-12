@@ -690,7 +690,19 @@ function fillAnalyticsTable(id, rows, renderRow, emptyColumns) {
   });
 }
 
-function renderUserAnalytics(data) {
+function renderFunnel(funnel) {
+  const box = $("ua-funnel");
+  if (!box || !funnel?.stages) return;
+  const labels = lang === "ru"
+    ? { visit: "Визиты", search: "Поиски", saved_search: "Сохранённые", alert_open: "Алерты" }
+    : { visit: "Visits", search: "Searches", saved_search: "Saved searches", alert_open: "Alerts" };
+  box.innerHTML = funnel.stages.map((stage) => {
+    const conv = stage.conversion == null ? "" : ` · ${Math.round(stage.conversion * 100)}%`;
+    return `<article class="card kpi"><span class="label">${labels[stage.kind] ?? stage.kind}</span><strong>${fmtInt(stage.visitors)}</strong><span class="tiny muted">${fmtInt(stage.events)} ${lang === "ru" ? "событий" : "events"}${conv}</span></article>`;
+  }).join("");
+}
+
+function renderUserAnalytics(data, funnel) {
   $("ua-registered").textContent = fmtInt(data.totals.registered_users);
   $("ua-dau").textContent = fmtInt(data.totals.dau);
   $("ua-wau").textContent = fmtInt(data.totals.wau);
@@ -718,6 +730,7 @@ function renderUserAnalytics(data) {
     addAnalyticsCell(tr, fmtInt(user.favorites_added));
     addAnalyticsCell(tr, fmtInt(user.subscriptions_created));
   }, 7);
+  if (funnel) renderFunnel(funnel);
   $("user-analytics-results").classList.remove("hidden");
   $("user-analytics-error").classList.add("hidden");
   $("user-analytics-status").textContent = lang === "ru" ? "Обновлено сейчас" : "Updated now";
@@ -730,12 +743,14 @@ async function loadUserAnalytics() {
   error.classList.add("hidden");
   $("user-analytics-status").textContent = lang === "ru" ? "Загрузка…" : "Loading…";
   try {
-    const response = await fetch("/api/user-metrics?days=30&limit=100", {
-      cache: "no-store",
-    });
+    const [response, funnelResponse] = await Promise.all([
+      fetch("/api/user-metrics?days=30&limit=100", { cache: "no-store" }),
+      fetch("/api/funnel-metrics?days=30", { cache: "no-store" }),
+    ]);
     const data = await response.json().catch(() => ({}));
+    const funnel = funnelResponse.ok ? await funnelResponse.json().catch(() => null) : null;
     if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
-    renderUserAnalytics(data);
+    renderUserAnalytics(data, funnel);
   } catch (exc) {
     $("user-analytics-results").classList.add("hidden");
     error.textContent = exc instanceof Error ? exc.message : "Не удалось загрузить метрики";
@@ -753,14 +768,17 @@ function renderCollectors(status) {
   const tbody = $("collectors");
   if (!tbody) return;
   const rows = status.collectors || [];
+  const notices = new Map((status.service_notices || []).map((notice) => [notice.source, notice]));
   tbody.innerHTML = "";
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="6" class="muted">${t("noData")}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="muted">${t("noData")}</td></tr>`;
     return;
   }
   rows.forEach((row) => {
     const stats = row.stats || {};
-    const paused = Boolean(row.paused);
+    const notice = notices.get(row.source);
+    const inWindow = notice && new Date(notice.starts_at) <= new Date() && new Date(notice.ends_at) > new Date();
+    const paused = Boolean(row.paused || inWindow);
     const state = paused ? "paused" : (row.status || "never");
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -769,29 +787,94 @@ function renderCollectors(status) {
       <td>${fmtTime(row.last_poll_at)}</td>
       <td class="num">${fmtInt(stats.new_ids)}</td>
       <td class="num">${fmtInt(stats.errors)}</td>
-      <td></td>`;
+      <td class="service-state">${notice ? `<span class="service-mode ${notice.mode}">${notice.mode === "maintenance" ? "Ремонт" : "Пауза"}</span><small>${fmtDateTime(notice.starts_at)} — ${fmtDateTime(notice.ends_at)}</small><small>${esc(notice.reason)}</small>` : `<span class="muted">Без ограничений</span>`}</td>
+      <td><button class="ghost service-configure" type="button">Настроить</button></td>`;
     const cell = tr.lastElementChild;
-    const button = document.createElement("button");
-    button.className = "ghost";
-    button.textContent = paused ? t("resumeBtn") : t("pauseBtn");
-    button.addEventListener("click", async () => {
-      button.disabled = true;
-      await fetch("/api/control", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: row.source,
-          paused: !paused,
-          reason: !paused ? "пауза из дашборда" : null,
-          by: "dashboard",
-        }),
-      });
-      await load();
-    });
-    cell.appendChild(button);
+    cell.querySelector(".service-configure").addEventListener("click", () => openServiceDialog(row.source, notice));
     tbody.appendChild(tr);
   });
 }
+
+function fmtDateTime(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString(lang === "ru" ? "ru-RU" : "en-GB", {
+    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function localInputDate(date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function openServiceDialog(source, notice) {
+  const dialog = $("service-dialog");
+  $("service-source").value = source;
+  $("service-dialog-title").textContent = source;
+  $("service-mode").value = notice?.mode || "paused";
+  $("service-reason").value = notice?.reason || "";
+  const now = new Date();
+  now.setSeconds(0, 0);
+  $("service-start").value = notice ? localInputDate(new Date(notice.starts_at)) : localInputDate(now);
+  const end = notice ? new Date(notice.ends_at) : new Date(now.getTime() + 4 * 60 * 60 * 1000);
+  $("service-end").value = localInputDate(end);
+  $("service-clear").classList.toggle("hidden", !notice);
+  $("service-error").classList.add("hidden");
+  dialog.showModal();
+}
+
+$("service-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("service-save");
+  const error = $("service-error");
+  button.disabled = true;
+  error.classList.add("hidden");
+  try {
+    const source = $("service-source").value;
+    const response = await fetch(`/api/service-notices/${encodeURIComponent(source)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: $("service-mode").value,
+        reason: $("service-reason").value.trim(),
+        starts_at: new Date($("service-start").value).toISOString(),
+        ends_at: new Date($("service-end").value).toISOString(),
+      }),
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.detail || `HTTP ${response.status}`);
+    }
+    $("service-dialog").close();
+    await load();
+  } catch (cause) {
+    error.textContent = cause instanceof Error ? cause.message : "Не удалось сохранить";
+    error.classList.remove("hidden");
+  } finally {
+    button.disabled = false;
+  }
+});
+
+async function clearServiceNotice() {
+  const source = $("service-source").value;
+  const button = $("service-clear");
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/service-notices/${encodeURIComponent(source)}`, { method: "DELETE" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    $("service-dialog").close();
+    await load();
+  } catch (error) {
+    $("service-error").textContent = error instanceof Error ? error.message : "Не удалось удалить";
+    $("service-error").classList.remove("hidden");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$("service-clear").addEventListener("click", clearServiceNotice);
+$("service-close").addEventListener("click", () => $("service-dialog").close());
+$("service-cancel").addEventListener("click", () => $("service-dialog").close());
 
 function render(status) {
   current = status;
