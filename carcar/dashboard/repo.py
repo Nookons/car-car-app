@@ -592,7 +592,7 @@ class DatabaseRepo:
             )
             by_kind = {row["kind"]: row for row in cur.fetchall()}
             cur.execute(
-                """select created_at::date day, kind, count(*)::int events
+                """select created_at::date as "day", kind, count(*)::int events
                    from funnel_event where created_at >= now() - make_interval(days => %s)
                    group by 1, 2 order by 1, 2""", (days,)
             )
