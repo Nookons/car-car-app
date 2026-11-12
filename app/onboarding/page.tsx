@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, Sparkle } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
+import { BrandBubbles } from "@/components/brand-bubbles";
 import { ListingRow } from "@/components/listing-row";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -193,9 +194,6 @@ export default function OnboardingPage() {
   };
 
   const hasUserStats = makes.some((make) => (make.users ?? 0) > 0);
-  const makeWeight = (make: Make) =>
-    hasUserStats ? make.users ?? 0 : make.count;
-  const maxMake = Math.max(1, ...makes.map(makeWeight));
 
   if (saved) {
     return (
@@ -272,38 +270,12 @@ export default function OnboardingPage() {
                   ? t("onboarding.bubbleHint")
                   : t("onboarding.bubbleHintListings")}
               </span>
-              <div className="flex flex-wrap items-center gap-2">
-                <Chip
-                  active={!draft.makes?.length}
-                  onClick={() => patch({ makes: [] })}
-                >
-                  {t("onboarding.any")}
-                </Chip>
-                {makes.map((make) => {
-                  const weight = makeWeight(make);
-                  const scale = hasUserStats
-                    ? 0.75 + 0.5 * (weight / maxMake)
-                    : 0.85 + 0.3 * (weight / maxMake);
-                  return (
-                    <Chip
-                      key={make.value}
-                      active={Boolean(draft.makes?.includes(make.value))}
-                      onClick={() => toggle("makes", make.value)}
-                      title={
-                        hasUserStats
-                          ? t("onboarding.chosenBy").replace("{count}", String(make.users ?? 0))
-                          : t("onboarding.listingsFor").replace("{count}", String(make.count))
-                      }
-                      style={{ fontSize: `${scale}rem` }}
-                    >
-                      {make.value}
-                      {hasUserStats && make.users ? (
-                        <span className="ml-1 text-[10px] opacity-60">{make.users}</span>
-                      ) : null}
-                    </Chip>
-                  );
-                })}
-              </div>
+              <BrandBubbles
+                makes={makes}
+                selected={draft.makes ?? []}
+                onToggle={(value) => toggle("makes", value)}
+                onClear={() => patch({ makes: [] })}
+              />
             </div>
             <label className="block space-y-1.5">
               <span className="text-xs text-muted-foreground">{t("onboarding.budget")}</span>
