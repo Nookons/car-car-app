@@ -31,9 +31,12 @@ case "$MODE" in
         done
         ;;
     sweep)
-        exec python -m carcar sweep \
+        python -m carcar sweep \
             --rps "${CARCAR_RPS:-0.7}" \
-            --minutes 0
+            --minutes 0 \
+            --min-interval "${CARCAR_SWEEP_MIN_INTERVAL:-1440}"
+        # Полный проход завершён: не гоняем Railway по кругу, ждём интервал.
+        sleep $(( ${CARCAR_SWEEP_MIN_INTERVAL:-1440} * 60 ))
         ;;
     worker)
         exec python -m carcar worker --consumer "${CARCAR_CONSUMER:-worker-1}"

@@ -9,11 +9,23 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from typing import Any
 
 from .control import load_control, save_control
 from .db import DatabaseSink
 from .store import Store
+
+SWEEP_DEFAULTS: dict[str, Any] = {
+    "next_page": 1,
+    "total_pages": None,
+    "inserted": 0,
+    "updated": 0,
+    "pass_started_at": None,
+    "completed_at": None,
+    "last_pages": None,
+    "last_errors": None,
+}
 
 
 class CollectorState:
@@ -42,16 +54,26 @@ class CollectorState:
         save_control(self.store.control_path, paused=paused, reason=reason, by=by)
 
     # -- прогресс обхода ---------------------------------------------------
+    def _local_load(self) -> dict[str, Any]:
+        path = self.store.state_dir / "sweep.json"
+        if not path.exists():
+            return dict(SWEEP_DEFAULTS)
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return dict(SWEEP_DEFAULTS)
+        return {**SWEEP_DEFAULTS, **data} if isinstance(data, dict) else dict(SWEEP_DEFAULTS)
+
+    def _local_save(self, payload: dict[str, Any]) -> None:
+        self.store._atomic_write(
+            self.store.state_dir / "sweep.json",
+            json.dumps(payload, ensure_ascii=False),
+        )
+
     def sweep_load(self) -> dict[str, Any]:
         if self.sink is not None:
             return self.sink.sweep_state(self.source)
-        path = self.store.state_dir / "sweep.json"
-        if not path.exists():
-            return {"next_page": 1, "total_pages": None, "inserted": 0, "updated": 0}
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            return {"next_page": 1, "total_pages": None, "inserted": 0, "updated": 0}
+        return self._local_load()
 
     def sweep_save(
         self, *, next_page: int, total_pages: int | None, inserted: int, updated: int
@@ -64,13 +86,54 @@ class CollectorState:
                 inserted=inserted,
                 updated=updated,
             )
-        payload = {
+            return
+        payload = self._local_load() | {
             "next_page": next_page,
             "total_pages": total_pages,
             "inserted": inserted,
             "updated": updated,
         }
-        self.store._atomic_write(
-            self.store.state_dir / "sweep.json",
-            json.dumps(payload, ensure_ascii=False),
+        self._local_save(payload)
+
+    def begin_sweep_pass(self) -> datetime:
+        """Начинает новый полный проход и возвращает его точку отсчёта."""
+        if self.sink is not None:
+            return self.sink.begin_sweep_pass(self.source)
+        now = datetime.now(UTC)
+        self._local_save(
+            {
+                **SWEEP_DEFAULTS,
+                "pass_started_at": now.isoformat(),
+            }
         )
+        return now
+
+    def complete_sweep_pass(
+        self,
+        *,
+        pages: int,
+        total_pages: int,
+        errors: int,
+        inserted: int,
+        updated: int,
+    ) -> None:
+        """Фиксирует завершённый проход, не сбрасывая его точку отсчёта."""
+        if self.sink is not None:
+            self.sink.complete_sweep_pass(
+                self.source,
+                pages=pages,
+                total_pages=total_pages,
+                errors=errors,
+                inserted=inserted,
+                updated=updated,
+            )
+            return
+        payload = self._local_load() | {
+            "completed_at": datetime.now(UTC).isoformat(),
+            "last_pages": pages,
+            "last_errors": errors,
+            "next_page": total_pages + 1,
+            "inserted": inserted,
+            "updated": updated,
+        }
+        self._local_save(payload)

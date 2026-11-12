@@ -32,6 +32,7 @@ if [ "${CARCAR_WITH_SWEEP:-1}" = "1" ]; then
     (
         while true; do
             .venv/bin/python -m carcar sweep --rps "${CARCAR_RPS:-0.25}" --minutes 240 \
+                --min-interval "${CARCAR_SWEEP_MIN_INTERVAL:-1440}" \
                 >> logs/sweep.log 2>&1
             sleep 30
         done

@@ -21,6 +21,7 @@ from .client import Client, FetchError, GoneError
 from .config import Settings
 from .db import DatabaseSink
 from .geo import get_geo
+from .lifecycle import pass_completed
 from .parse import Listing, ParseError, parse_offer, parse_search, to_int
 from .state import CollectorState
 from .store import Store
@@ -248,37 +249,113 @@ def fetch_detail(
     )
 
 
+def _state_dt(value: Any) -> datetime | None:
+    """Дата из БД или JSON-состояния — всегда aware UTC."""
+    if isinstance(value, datetime):
+        return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+    if isinstance(value, str) and value:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+    return None
+
+
 def sweep(
     client: Client,
     store: Store,
     settings: Settings,
     *,
     sink: DatabaseSink,
-    from_page: int = 1,
+    from_page: int = 0,
     max_pages: int = 0,
     minutes: float = 0.0,
+    min_interval_minutes: float = 0.0,
 ) -> dict[str, Any]:
     """Полный обход рынка постранично, с сохранением прогресса.
 
     Нужен один раз для истории и потом раз в сутки для проверки «снятых»:
     инкрементальный опрос видит только новые объявления.
+
+    Завершённый проход подтверждает снятия: объявление, которого не было
+    в двух полных проходах подряд, помечается `removed` и уходит в
+    `listing_lifecycle`. Если проход прерван лимитом или в нём слишком много
+    ошибок, счётчики не трогаем — следующий чистый проход всё исправит.
     """
     state = CollectorState(store, settings.source, sink)
     saved = state.sweep_load()
+    next_page = int(saved.get("next_page") or 1)
+    total_pages: int | None = saved.get("total_pages")
+    pass_started_at = _state_dt(saved.get("pass_started_at"))
+    completed_at = _state_dt(saved.get("completed_at"))
+    can_reconcile = True
 
-    page = from_page if from_page > 1 else int(saved.get("next_page", 1))
+    def start_pass() -> datetime:
+        """Новый проход: сбрасываем накопленные счётчики прошлого."""
+        nonlocal next_page, total_pages, saved
+        stamp = state.begin_sweep_pass()
+        next_page = 1
+        total_pages = None
+        saved = {"inserted": 0, "updated": 0, "next_page": 1, "total_pages": None}
+        return stamp
+
+    if from_page == 1:
+        # Явный старт нового прохода: не ждём min_interval.
+        pass_started_at = start_pass()
+        page = 1
+    elif from_page > 1:
+        page = from_page
+        if completed_at is not None or pass_started_at is None:
+            # Продолжение с середины без сохранённой точки отсчёта: этот
+            # проход неполный, снятия по нему не подтверждаем.
+            pass_started_at = start_pass()
+            can_reconcile = False
+    elif pass_started_at is None:
+        # Старое состояние или первый запуск: начинаем с первой страницы.
+        pass_started_at = start_pass()
+        page = 1
+    elif completed_at is not None:
+        if (
+            min_interval_minutes > 0
+            and (utcnow() - completed_at).total_seconds() < min_interval_minutes * 60
+        ):
+            log.info("sweep: прошлый обход завершён %s — пропускаю", completed_at)
+            return {
+                "pages": 0,
+                "inserted": 0,
+                "updated": 0,
+                "rejected": 0,
+                "errors": 0,
+                "next_page": next_page,
+                "total_pages": total_pages,
+                "completed": False,
+                "removed": 0,
+                "skipped": "interval",
+            }
+        pass_started_at = start_pass()
+        page = 1
+    elif total_pages and next_page > total_pages:
+        # Старое состояние без completed_at: проход уже дошёл до конца.
+        pass_started_at = start_pass()
+        page = 1
+    else:
+        page = next_page
+
     started = time.monotonic()
     deadline = started + minutes * 60 if minutes else None
     totals = {"pages": 0, "inserted": 0, "updated": 0, "rejected": 0, "errors": 0}
     consecutive = 0
-    total_pages: int | None = saved.get("total_pages")
+    stopped_early = False
 
     while True:
         if total_pages and page > total_pages:
             break
         if max_pages and totals["pages"] >= max_pages:
+            stopped_early = True
             break
         if deadline and time.monotonic() >= deadline:
+            stopped_early = True
             break
         try:
             response = client.get(settings.search_url(page))
@@ -296,6 +373,7 @@ def sweep(
                     f"авто-пауза: sweep, {totals['errors']} ошибок",
                     by="collector",
                 )
+                stopped_early = True
                 break
             continue
 
@@ -335,7 +413,46 @@ def sweep(
 
         page += 1
 
-    return {**totals, "next_page": page, "total_pages": total_pages}
+    completed = pass_completed(
+        page=page,
+        total_pages=total_pages,
+        pages=totals["pages"],
+        errors=totals["errors"],
+        stopped_early=stopped_early,
+    )
+    removed = 0
+    if completed:
+        assert total_pages is not None
+        try:
+            state.complete_sweep_pass(
+                pages=totals["pages"],
+                total_pages=total_pages,
+                errors=totals["errors"],
+                inserted=totals["inserted"],
+                updated=totals["updated"],
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.exception("sweep: не удалось сохранить завершение прохода: %s", exc)
+        if can_reconcile and pass_started_at is not None:
+            try:
+                stats = sink.reconcile_removed(
+                    settings.source,
+                    pass_started_at,
+                    errors=totals["errors"],
+                    pages=totals["pages"],
+                )
+                removed = int(stats.get("removed") or 0)
+            except Exception as exc:  # noqa: BLE001
+                log.exception("sweep: не удалось подтвердить снятые: %s", exc)
+
+    return {
+        **totals,
+        "next_page": page,
+        "total_pages": total_pages,
+        "completed": completed,
+        "removed": removed,
+        "skipped": None,
+    }
 
 
 def enrich(

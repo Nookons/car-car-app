@@ -78,6 +78,10 @@ create table if not exists listing (
     first_seen_at timestamptz not null default now(),
     last_seen_at  timestamptz not null default now(),
     status        text not null default 'active' check (status in ('active', 'removed')),
+    -- когда объявление подтверждённо ушло из выдачи; null — ещё не снимали
+    removed_at    timestamptz,
+    -- сколько полных обходов подряд объявление не встречалось: 2 → removed
+    missed_sweeps smallint not null default 0,
 
     -- хэш канонических полей: по нему понимаем, менялось ли что-то
     content_hash  text not null,
@@ -88,6 +92,8 @@ create table if not exists listing (
 
 -- Догоняющие колонки для уже существующих баз
 alter table listing add column if not exists details_fetched_at timestamptz;
+alter table listing add column if not exists removed_at timestamptz;
+alter table listing add column if not exists missed_sweeps smallint not null default 0;
 
 -- Индексы только под реальные запросы (лента, фильтры, гео).
 create index if not exists listing_active_published_idx
@@ -104,6 +110,14 @@ create index if not exists listing_geo_idx
 
 create index if not exists listing_last_seen_idx
     on listing (last_seen_at) where status = 'active';
+
+-- Подтверждение снятий: «активные, которых не видели в этом проходе»
+create index if not exists listing_active_source_last_seen_idx
+    on listing (source_id, last_seen_at) where status = 'active';
+
+-- Снятые: кто давно не подтверждался и сколько проходов пропустил
+create index if not exists listing_active_missed_idx
+    on listing (source_id, missed_sweeps) where status = 'active';
 
 -- Для графиков «сколько собрано за день/месяц»
 create index if not exists listing_first_seen_idx
@@ -152,6 +166,66 @@ create table if not exists listing_event (
 
 create index if not exists listing_event_listing_idx
     on listing_event (listing_id, observed_at desc);
+
+-- ---------------------------------------------------------------------------
+-- «Индекс ушедших»: лёгкий снимок снятого объявления.
+--
+-- Переживает carcar_purge(): полная строка listing с фото удаляется, а
+-- характеристики, цены и dom_days остаются. listing_id — без FK: архив
+-- должен жить дольше объявления. Пишем только подтверждённые снятия
+-- (removed_at is not null), чтобы админское «скрыть» не попало в статистику.
+-- ---------------------------------------------------------------------------
+
+create table if not exists listing_lifecycle (
+    listing_id        bigint primary key,
+    source_id         smallint not null,
+    external_id       text not null,
+
+    make              text,
+    model             text,
+    year              smallint,
+    mileage_km        integer,
+    fuel              text,
+    gearbox           text,
+    body              text,
+    power_hp          smallint,
+    engine_cm3        integer,
+    drive             text,
+    generation        text,
+    color             text,
+    city              text,
+    region            text,
+    seller_type       text,
+
+    first_price       numeric(12, 0),
+    last_price        numeric(12, 0),
+    currency          char(3) not null default 'PLN',
+    price_changes     integer not null default 0,
+    -- signed: минус — подешевело до снятия
+    price_change_pct  numeric(6, 2),
+
+    published_at      timestamptz,
+    first_seen_at     timestamptz not null,
+    last_seen_at      timestamptz not null,
+    removed_at        timestamptz not null,
+
+    -- нижняя оценка срока на рынке: до последнего наблюдения, а не до
+    -- конца sweep; точность ограничена интервалом полного обхода
+    dom_days          numeric(8, 2) not null,
+    dom_basis         text not null check (dom_basis in ('published_at', 'first_seen_at')),
+    removal_kind      text not null check (removal_kind in
+                          ('disappeared', 'gone_404', 'legacy')),
+
+    details_fetched_at timestamptz,
+    created_at        timestamptz not null default now()
+);
+
+create index if not exists listing_lifecycle_vehicle_idx
+    on listing_lifecycle (make, model, year);
+create index if not exists listing_lifecycle_removed_idx
+    on listing_lifecycle (removed_at desc);
+create index if not exists listing_lifecycle_source_idx
+    on listing_lifecycle (source_id, removed_at desc);
 
 -- ---------------------------------------------------------------------------
 -- Наблюдаемость и отбракованные записи
@@ -408,8 +482,19 @@ create table if not exists sweep_state (
     total_pages integer,
     inserted    integer not null default 0,
     updated     integer not null default 0,
+    -- граница «видели в этом проходе»; по ней считается missed_sweeps
+    pass_started_at timestamptz,
+    completed_at    timestamptz,
+    last_pages      integer,
+    last_errors     integer,
     updated_at  timestamptz not null default now()
 );
+
+-- Догоняющие колонки для уже существующих баз
+alter table sweep_state add column if not exists pass_started_at timestamptz;
+alter table sweep_state add column if not exists completed_at timestamptz;
+alter table sweep_state add column if not exists last_pages integer;
+alter table sweep_state add column if not exists last_errors integer;
 
 alter table collector    enable row level security;
 alter table sweep_state  enable row level security;
@@ -423,6 +508,58 @@ returns table (removed_listings bigint, old_runs bigint, old_rejects bigint, old
 language plpgsql
 as $$
 begin
+    -- Перед удалением полной строки сохраняем «Индекс ушедших»: характеристики,
+    -- первую/последнюю цену и срок на рынке. listing_lifecycle не имеет FK,
+    -- поэтому переживает удаление объявления.
+    with expired as (
+        select l.id, l.source_id, l.external_id, l.make, l.model, l.year,
+               l.mileage_km, l.fuel, l.gearbox, l.body, l.power_hp, l.engine_cm3,
+               l.drive, l.generation, l.color, l.city, l.region, l.seller_type,
+               l.price as last_price, l.currency, l.published_at, l.first_seen_at,
+               l.last_seen_at, l.removed_at, l.details_fetched_at,
+               coalesce((
+                   select e.old_price from listing_event e
+                   where e.listing_id = l.id and e.kind in ('price_drop', 'price_up')
+                   order by e.observed_at asc limit 1
+               ), l.price) as first_price,
+               (select count(*)::int from listing_event e
+                where e.listing_id = l.id and e.kind in ('price_drop', 'price_up')) as price_changes
+        from listing l
+        where l.status = 'removed'
+          and l.removed_at is not null
+          and l.last_seen_at < now() - make_interval(days => retention_days)
+          and not exists (select 1 from listing_lifecycle x where x.listing_id = l.id)
+    )
+    insert into listing_lifecycle (
+        listing_id, source_id, external_id, make, model, year, mileage_km,
+        fuel, gearbox, body, power_hp, engine_cm3, drive, generation, color,
+        city, region, seller_type, first_price, last_price, currency,
+        price_changes, price_change_pct, published_at, first_seen_at,
+        last_seen_at, removed_at, dom_days, dom_basis, removal_kind,
+        details_fetched_at
+    )
+    select
+        id, source_id, external_id, make, model, year, mileage_km,
+        fuel, gearbox, body, power_hp, engine_cm3, drive, generation, color,
+        city, region, seller_type, first_price, last_price, currency,
+        price_changes,
+        case when first_price > 0
+             then round((last_price - first_price)::numeric / first_price * 100, 2)
+        end,
+        published_at, first_seen_at, last_seen_at, removed_at,
+        round(greatest(0, extract(epoch from (
+            last_seen_at - case
+                when published_at is not null and published_at <= first_seen_at
+                then published_at else first_seen_at
+            end
+        )) / 86400)::numeric, 2),
+        case when published_at is not null and published_at <= first_seen_at
+             then 'published_at' else 'first_seen_at' end,
+        'legacy',
+        details_fetched_at
+    from expired
+    on conflict (listing_id) do nothing;
+
     -- Снятые объявления живут ещё месяц (могут понадобиться для истории цены).
     delete from listing
     where status = 'removed' and last_seen_at < now() - make_interval(days => retention_days);
@@ -436,6 +573,10 @@ begin
 
     delete from listing_event where observed_at < now() - interval '180 days';
     get diagnostics old_events = row_count;
+
+    -- «Индекс ушедших» — двухлетняя история; дальше это уже не метрика,
+    -- а балласт. Снимок лёгкий: без фото, описаний и JSON.
+    delete from listing_lifecycle where removed_at < now() - interval '730 days';
 
     -- Воронка обезличена, но и ей нужен срок: 400 дней хватает для годовых
     -- когорт, дальше это уже не метрика, а балласт.
@@ -452,6 +593,7 @@ $$;
 alter table source        enable row level security;
 alter table listing       enable row level security;
 alter table listing_event enable row level security;
+alter table listing_lifecycle enable row level security;
 alter table crawl_run     enable row level security;
 alter table ingest_reject enable row level security;
 

@@ -44,6 +44,7 @@ Railway                          Supabase (Postgres)
 | `CARCAR_INTERVAL` | нет | секунды между опросами, по умолчанию 60 |
 | `CARCAR_DETAILS` | нет | сколько карточек за опрос, по умолчанию 3 |
 | `CARCAR_RPS` | нет | темп обхода для `sweep`, по умолчанию 0.7 |
+| `CARCAR_SWEEP_MIN_INTERVAL` | нет | минуты между полными проходами, по умолчанию 1440 |
 | `CARCAR_ENRICH_LIMIT` | нет | сколько карточек за прогон обогащения |
 | `PORT` | для dashboard | Railway подставляет сам |
 
@@ -68,6 +69,9 @@ Railway                          Supabase (Postgres)
 5. **Sweep**: `CARCAR_MODE=sweep`. Можно держать постоянно — после завершения
    он выходит, а Railway перезапускает; прогресс в `sweep_state`, так что
    повторный запуск продолжит с места. Но лучше — Railway Cron раз в сутки.
+   Завершённый проход сам подтверждает снятия (`reconcile_removed`) и пишет
+   `listing_lifecycle`; повторный проход не начнётся раньше
+   `CARCAR_SWEEP_MIN_INTERVAL` минут (по умолчанию 1440).
 
 6. **Дашборд**: `CARCAR_MODE=dashboard`, `DATABASE_URL`. Публичный домен
    Railway даёт сам; порт берётся из `$PORT`.

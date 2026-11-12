@@ -22,6 +22,12 @@ from typing import Any
 import psycopg
 
 from .canonical import Prepared, prepare
+from .lifecycle import (
+    MAX_SWEEP_ERROR_RATIO,
+    MISSES_TO_REMOVE,
+    dom_days,
+    price_change_pct,
+)
 
 log = logging.getLogger("carcar")
 
@@ -54,7 +60,7 @@ update listing set
     thumb_url = %s, photos = %s, photos_count = %s,
     published_at = coalesce(%s, published_at),
     content_hash = %s, updated_at = now(), last_seen_at = now(),
-    status = 'active'
+    status = 'active', removed_at = null, missed_sweeps = 0
 where source_id = %s and external_id = %s
 """
 
@@ -239,7 +245,7 @@ class DatabaseSink:
                 if unchanged:
                     cur.execute(
                         """
-                        update listing set last_seen_at = now()
+                        update listing set last_seen_at = now(), missed_sweeps = 0
                         where source_id = %s and external_id = any(%s)
                         """,
                         (source_id, unchanged),
@@ -432,13 +438,232 @@ class DatabaseSink:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                update listing set status = 'removed', details_fetched_at = now(),
-                                    updated_at = now()
+                update listing
+                set status = 'removed',
+                    removed_at = coalesce(removed_at, now()),
+                    missed_sweeps = 0,
+                    details_fetched_at = now(),
+                    updated_at = now()
                 where source_id = %s and external_id = %s
+                returning id
                 """,
                 (source_id, external_id),
             )
+            row = cur.fetchone()
+            if row:
+                cur.execute(
+                    """
+                    insert into listing_event (listing_id, kind, old_price, new_price)
+                    select id, 'removed', price, null
+                    from listing
+                    where id = %s
+                      and not exists (
+                          select 1 from listing_event
+                          where listing_id = %s and kind = 'removed'
+                      )
+                    """,
+                    (row[0], row[0]),
+                )
+                self._archive_lifecycle(cur, [row[0]], "gone_404")
         self.conn.commit()
+
+    def _archive_lifecycle(
+        self, cur: Any, listing_ids: list[int], removal_kind: str
+    ) -> int:
+        """Снимает лёгкий снимок объявления в `listing_lifecycle`.
+
+        Таблица переживает `carcar_purge()`: полная строка `listing` с фото
+        удаляется, а характеристики, цены и `dom_days` остаются для «Индекса
+        ушедших». Пишем только подтверждённые снятия (`removed_at is not null`),
+        чтобы админское «скрыть» не попало в статистику продаж.
+        """
+        if not listing_ids:
+            return 0
+        from psycopg.rows import dict_row
+
+        with self.conn.cursor(row_factory=dict_row) as rows:
+            rows.execute(
+                """
+                select l.id, l.source_id, l.external_id, l.make, l.model, l.year,
+                       l.mileage_km, l.fuel, l.gearbox, l.body, l.power_hp,
+                       l.engine_cm3, l.drive, l.generation, l.color, l.city,
+                       l.region, l.seller_type, l.price as last_price, l.currency,
+                       l.published_at, l.first_seen_at, l.last_seen_at, l.removed_at,
+                       l.details_fetched_at,
+                       coalesce((
+                           select e.old_price from listing_event e
+                           where e.listing_id = l.id
+                             and e.kind in ('price_drop', 'price_up')
+                           order by e.observed_at asc
+                           limit 1
+                       ), l.price) as first_price,
+                       (select count(*)::int from listing_event e
+                        where e.listing_id = l.id
+                          and e.kind in ('price_drop', 'price_up')) as price_changes
+                from listing l
+                where l.id = any(%s) and l.removed_at is not null
+                """,
+                (listing_ids,),
+            )
+            source_rows = rows.fetchall()
+
+        values = []
+        for row in source_rows:
+            days, basis = dom_days(
+                row["published_at"], row["first_seen_at"], row["last_seen_at"]
+            )
+            values.append(
+                (
+                    row["id"], row["source_id"], row["external_id"], row["make"],
+                    row["model"], row["year"], row["mileage_km"], row["fuel"],
+                    row["gearbox"], row["body"], row["power_hp"], row["engine_cm3"],
+                    row["drive"], row["generation"], row["color"], row["city"],
+                    row["region"], row["seller_type"], row["first_price"],
+                    row["last_price"], row["currency"], row["price_changes"],
+                    price_change_pct(row["first_price"], row["last_price"]),
+                    row["published_at"], row["first_seen_at"], row["last_seen_at"],
+                    row["removed_at"], days, basis, removal_kind,
+                    row["details_fetched_at"],
+                )
+            )
+        if not values:
+            return 0
+        cur.executemany(
+            """
+            insert into listing_lifecycle (
+                listing_id, source_id, external_id, make, model, year, mileage_km,
+                fuel, gearbox, body, power_hp, engine_cm3, drive, generation, color,
+                city, region, seller_type, first_price, last_price, currency,
+                price_changes, price_change_pct, published_at, first_seen_at,
+                last_seen_at, removed_at, dom_days, dom_basis, removal_kind,
+                details_fetched_at
+            ) values (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            )
+            on conflict (listing_id) do update set
+                first_price = excluded.first_price,
+                last_price = excluded.last_price,
+                price_changes = excluded.price_changes,
+                price_change_pct = excluded.price_change_pct,
+                removed_at = excluded.removed_at,
+                last_seen_at = excluded.last_seen_at,
+                dom_days = excluded.dom_days,
+                dom_basis = excluded.dom_basis,
+                removal_kind = excluded.removal_kind,
+                details_fetched_at = excluded.details_fetched_at
+            """,
+            values,
+        )
+        return len(values)
+
+    @resilient
+    def reconcile_removed(
+        self,
+        code: str,
+        pass_started_at: datetime,
+        *,
+        errors: int = 0,
+        pages: int = 0,
+        min_misses: int = MISSES_TO_REMOVE,
+        max_error_ratio: float = MAX_SWEEP_ERROR_RATIO,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Подтверждает снятые после полного обхода.
+
+        Логика в три шага, все в одной транзакции:
+          1. кого видели в этом проходе — `missed_sweeps = 0`;
+          2. кого не видели — `missed_sweeps += 1`;
+          3. кто пропущен `min_misses` полных проходов подряд — `removed`.
+
+        Два пропуска защищают от ложного снятия, если одна страница выдачи
+        не открылась. Если ошибок в проходе слишком много, не трогаем счётчики
+        вообще: лучше подождать чистый проход, чем испортить историю.
+        """
+        allowed = max(1, int(pages * max(0.0, max_error_ratio)))
+        if errors > allowed:
+            log.warning(
+                "снятия не подтверждаю: ошибок %s при %s страницах (лимит %s)",
+                errors,
+                pages,
+                allowed,
+            )
+            return {
+                "skipped": "errors",
+                "seen": 0,
+                "missing": 0,
+                "removed": 0,
+                "archived": 0,
+            }
+
+        source_id = self.source_id(code)
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                update listing set missed_sweeps = 0
+                where source_id = %s and status = 'active' and last_seen_at >= %s
+                """,
+                (source_id, pass_started_at),
+            )
+            seen = cur.rowcount
+            cur.execute(
+                """
+                update listing set missed_sweeps = missed_sweeps + 1
+                where source_id = %s and status = 'active' and last_seen_at < %s
+                """,
+                (source_id, pass_started_at),
+            )
+            missing = cur.rowcount
+            cur.execute(
+                """
+                select id from listing
+                where source_id = %s and status = 'active' and missed_sweeps >= %s
+                """,
+                (source_id, max(1, min_misses)),
+            )
+            candidates = [row[0] for row in cur.fetchall()]
+
+            if dry_run:
+                self.conn.rollback()
+                return {
+                    "seen": seen,
+                    "missing": missing,
+                    "removed": 0,
+                    "archived": 0,
+                    "candidates": len(candidates),
+                    "dry_run": True,
+                }
+
+            removed: list[int] = []
+            if candidates:
+                cur.execute(
+                    """
+                    update listing
+                    set status = 'removed', removed_at = now(), updated_at = now()
+                    where id = any(%s) and status = 'active'
+                    returning id
+                    """,
+                    (candidates,),
+                )
+                removed = [row[0] for row in cur.fetchall()]
+                if removed:
+                    cur.execute(
+                        """
+                        insert into listing_event (listing_id, kind, old_price, new_price)
+                        select id, 'removed', price, null
+                        from listing where id = any(%s)
+                        """,
+                        (removed,),
+                    )
+            archived = self._archive_lifecycle(cur, removed, "disappeared")
+        self.conn.commit()
+        return {
+            "seen": seen,
+            "missing": missing,
+            "removed": len(removed),
+            "archived": archived,
+            "candidates": len(candidates),
+        }
 
     @resilient
     def pending_details(
@@ -640,7 +865,8 @@ class DatabaseSink:
                            and (c.stats #>> '{service_notice,ends_at}')::timestamptz > now(),
                            false) as paused,
                        case when (c.stats #>> '{service_notice,starts_at}')::timestamptz <= now()
-                                      and (c.stats #>> '{service_notice,ends_at}')::timestamptz > now()
+                                      and (c.stats #>> '{service_notice,ends_at}')::timestamptz
+                                          > now()
                             then c.stats #>> '{service_notice,reason}'
                             else c.paused_reason end as reason
                 from (select %s::smallint as source_id) requested
@@ -656,19 +882,111 @@ class DatabaseSink:
         source_id = self.source_id(code)
         with self.conn.cursor() as cur:
             cur.execute(
-                "select next_page, total_pages, inserted, updated from sweep_state "
-                "where source_id = %s",
+                """
+                select next_page, total_pages, inserted, updated,
+                       pass_started_at, completed_at, last_pages, last_errors
+                from sweep_state
+                where source_id = %s
+                """,
                 (source_id,),
             )
             row = cur.fetchone()
         if not row:
-            return {"next_page": 1, "total_pages": None, "inserted": 0, "updated": 0}
+            return {
+                "next_page": 1,
+                "total_pages": None,
+                "inserted": 0,
+                "updated": 0,
+                "pass_started_at": None,
+                "completed_at": None,
+                "last_pages": None,
+                "last_errors": None,
+            }
         return {
             "next_page": row[0],
             "total_pages": row[1],
             "inserted": row[2],
             "updated": row[3],
+            "pass_started_at": row[4],
+            "completed_at": row[5],
+            "last_pages": row[6],
+            "last_errors": row[7],
         }
+
+    @resilient
+    def begin_sweep_pass(self, code: str) -> datetime:
+        """Начинает новый полный проход и возвращает его точку отсчёта.
+
+        `pass_started_at` — граница «видели в этом проходе»: всё, что имеет
+        `last_seen_at` меньше неё, в этом проходе не встретилось.
+        """
+        source_id = self.source_id(code)
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into sweep_state (
+                    source_id, next_page, total_pages, inserted, updated,
+                    pass_started_at, completed_at, last_pages, last_errors, updated_at
+                )
+                values (%s, 1, null, 0, 0, now(), null, 0, 0, now())
+                on conflict (source_id) do update set
+                    next_page = 1,
+                    total_pages = null,
+                    inserted = 0,
+                    updated = 0,
+                    pass_started_at = now(),
+                    completed_at = null,
+                    last_pages = 0,
+                    last_errors = 0,
+                    updated_at = now()
+                returning pass_started_at
+                """,
+                (source_id,),
+            )
+            row = cur.fetchone()
+        self.conn.commit()
+        return row[0]
+
+    @resilient
+    def complete_sweep_pass(
+        self,
+        code: str,
+        *,
+        pages: int,
+        total_pages: int,
+        errors: int,
+        inserted: int,
+        updated: int,
+    ) -> None:
+        """Фиксирует завершённый полный проход, не сбрасывая его точку отсчёта."""
+        source_id = self.source_id(code)
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                update sweep_state
+                set completed_at = now(),
+                    last_pages = %s,
+                    last_errors = %s,
+                    inserted = %s,
+                    updated = %s,
+                    next_page = %s,
+                    updated_at = now()
+                where source_id = %s
+                """,
+                (pages, errors, inserted, updated, total_pages + 1, source_id),
+            )
+            if cur.rowcount == 0:
+                cur.execute(
+                    """
+                    insert into sweep_state (
+                        source_id, next_page, total_pages, inserted, updated,
+                        pass_started_at, completed_at, last_pages, last_errors, updated_at
+                    )
+                    values (%s, %s, %s, %s, %s, now(), now(), %s, %s, now())
+                    """,
+                    (source_id, total_pages + 1, total_pages, inserted, updated, pages, errors),
+                )
+        self.conn.commit()
 
     @resilient
     def set_sweep_state(
@@ -734,11 +1052,22 @@ class DatabaseSink:
             total = cur.fetchone()[0]
             cur.execute("select count(*) from listing where status = 'active'")
             active = cur.fetchone()[0]
+            cur.execute("select count(*) from listing where status = 'removed'")
+            removed = cur.fetchone()[0]
+            cur.execute("select count(*) from listing_lifecycle")
+            lifecycle = cur.fetchone()[0]
             cur.execute("select count(*) from listing_event")
             events = cur.fetchone()[0]
             cur.execute("select pg_size_pretty(pg_total_relation_size('listing'))")
             size = cur.fetchone()[0]
-        return {"total": total, "active": active, "events": events, "listing_size": size}
+        return {
+            "total": total,
+            "active": active,
+            "removed": removed,
+            "lifecycle": lifecycle,
+            "events": events,
+            "listing_size": size,
+        }
 
     def close(self) -> None:
         self.conn.close()

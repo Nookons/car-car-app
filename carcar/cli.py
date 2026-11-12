@@ -121,6 +121,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_sweep.add_argument("--from-page", type=int, default=0, help="продолжить с сохранённого места")
     p_sweep.add_argument("--max-pages", type=int, default=0, help="0 — до конца")
     p_sweep.add_argument("--minutes", type=float, default=0.0, help="0 — без ограничения")
+    p_sweep.add_argument(
+        "--min-interval",
+        type=float,
+        default=0.0,
+        help="не начинать новый проход раньше N минут после завершения",
+    )
 
     p_enrich = sub.add_parser("enrich", help="догрузить карточки без фото")
     _add_common(p_enrich)
@@ -378,12 +384,18 @@ def main(argv: list[str] | None = None) -> int:
                     from_page=args.from_page,
                     max_pages=args.max_pages,
                     minutes=args.minutes,
+                    min_interval_minutes=args.min_interval,
                 )
-                print(
-                    f"обход: страниц {summary['pages']}, новых {summary['inserted']}, "
-                    f"обновлено {summary['updated']}, ошибок {summary['errors']}, "
-                    f"следующая страница {summary['next_page']}"
-                )
+                if summary.get("skipped"):
+                    print(f"обход пропущен: {summary['skipped']}")
+                else:
+                    print(
+                        f"обход: страниц {summary['pages']}, новых {summary['inserted']}, "
+                        f"обновлено {summary['updated']}, ошибок {summary['errors']}, "
+                        f"снято {summary['removed']}, "
+                        f"завершён {summary['completed']}, "
+                        f"следующая страница {summary['next_page']}"
+                    )
 
             elif args.command == "enrich":
                 if sink is None:
