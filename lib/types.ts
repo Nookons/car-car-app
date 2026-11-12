@@ -160,6 +160,7 @@ export type Subscription = {
 export type Filters = {
   q?: string;
   make?: string;
+  makes?: string[];
   model?: string;
   price_min?: number;
   price_max?: number;
@@ -168,8 +169,11 @@ export type Filters = {
   mileage_min?: number;
   mileage_max?: number;
   fuel?: string;
+  fuels?: string[];
   gearbox?: string;
+  gearboxes?: string[];
   body?: string;
+  bodies?: string[];
   drive?: string;
   condition?: string;
   seller_type?: string;

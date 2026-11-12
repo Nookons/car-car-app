@@ -21,7 +21,7 @@ const BODIES = ["sedan", "suv", "wagon", "hatchback", "coupe", "van"] as const;
 const FUELS = ["petrol", "diesel", "hybrid", "electric", "lpg"] as const;
 const GEARBOXES = ["automatic", "manual"] as const;
 
-type Make = { value: string; count: number };
+type Make = { value: string; count: number; users?: number };
 
 function readDraft(): Filters {
   if (typeof window === "undefined") return {};
@@ -36,15 +36,21 @@ function Chip({
   active,
   children,
   onClick,
+  title,
+  style,
 }: {
   active: boolean;
   children: React.ReactNode;
   onClick: () => void;
+  title?: string;
+  style?: React.CSSProperties;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={title}
+      style={style}
       className={cn(
         "rounded-full border px-3 py-1.5 text-sm transition",
         active
@@ -64,6 +70,7 @@ export default function OnboardingPage() {
   const [step, setStep] = React.useState(0);
   const [makes, setMakes] = React.useState<Make[]>([]);
   const [total, setTotal] = React.useState<number | null>(null);
+  const [approx, setApprox] = React.useState(false);
   const [preview, setPreview] = React.useState<Listing[]>([]);
   const [saving, setSaving] = React.useState(false);
   const [saved, setSaved] = React.useState<Subscription | null>(null);
@@ -94,11 +101,14 @@ export default function OnboardingPage() {
   React.useEffect(() => {
     if (step !== 2) return;
     let cancelled = false;
-    api<{ items: Listing[]; total: number }>(`/listings?${filtersToQuery(draft, 0, 3)}`)
+    api<{ items: Listing[]; total: number; approx?: boolean }>(
+      `/listings?${filtersToQuery(draft, 0, 3)}`,
+    )
       .then((data) => {
         if (cancelled) return;
         setPreview(data.items);
         setTotal(data.total);
+        setApprox(Boolean(data.approx));
       })
       .catch(() => {
         if (!cancelled) setTotal(null);
@@ -117,6 +127,21 @@ export default function OnboardingPage() {
     setDraft((prev) => ({ ...prev, ...next }));
   };
 
+  const toggle = (
+    key: "makes" | "bodies" | "fuels" | "gearboxes",
+    value: string,
+  ) => {
+    setDraft((prev) => {
+      const current = prev[key] ?? [];
+      return {
+        ...prev,
+        [key]: current.includes(value)
+          ? current.filter((item) => item !== value)
+          : [...current, value],
+      };
+    });
+  };
+
   const save = async () => {
     if (!ready) return;
     if (!authed) {
@@ -127,8 +152,8 @@ export default function OnboardingPage() {
     setError(null);
     try {
       const bits = [
-        draft.make,
-        draft.body ? labelFor(t, "body", draft.body) : null,
+        draft.makes?.join(", "),
+        draft.bodies?.map((value) => labelFor(t, "body", value)).join(", "),
         draft.price_max ? `≤ ${num(draft.price_max)} zł` : null,
       ].filter(Boolean);
       const name = bits.join(" · ") || t("onboarding.start");
@@ -157,6 +182,11 @@ export default function OnboardingPage() {
       setSaving(false);
     }
   };
+
+  const hasUserStats = makes.some((make) => (make.users ?? 0) > 0);
+  const makeWeight = (make: Make) =>
+    hasUserStats ? make.users ?? 0 : make.count;
+  const maxMake = Math.max(1, ...makes.map(makeWeight));
 
   if (saved) {
     return (
@@ -228,19 +258,40 @@ export default function OnboardingPage() {
             <h2 className="text-base font-semibold">{t("onboarding.step1")}</h2>
             <div className="space-y-1.5">
               <span className="text-xs text-muted-foreground">{t("filter.make")}</span>
-              <div className="flex flex-wrap gap-2">
-                <Chip active={!draft.make} onClick={() => patch({ make: undefined })}>
+              <span className="block text-[11px] text-muted-foreground">
+                {hasUserStats
+                  ? t("onboarding.bubbleHint")
+                  : t("onboarding.bubbleHintListings")}
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Chip
+                  active={!draft.makes?.length}
+                  onClick={() => patch({ makes: [] })}
+                >
                   {t("onboarding.any")}
                 </Chip>
-                {makes.map((make) => (
-                  <Chip
-                    key={make.value}
-                    active={draft.make === make.value}
-                    onClick={() => patch({ make: make.value })}
-                  >
-                    {make.value}
-                  </Chip>
-                ))}
+                {makes.map((make) => {
+                  const weight = makeWeight(make);
+                  const scale = 0.8 + 0.25 * (weight / maxMake);
+                  return (
+                    <Chip
+                      key={make.value}
+                      active={Boolean(draft.makes?.includes(make.value))}
+                      onClick={() => toggle("makes", make.value)}
+                      title={
+                        hasUserStats
+                          ? t("onboarding.chosenBy").replace("{count}", String(make.users ?? 0))
+                          : t("onboarding.listingsFor").replace("{count}", String(make.count))
+                      }
+                      style={{ fontSize: `${scale}rem` }}
+                    >
+                      {make.value}
+                      {hasUserStats && make.users ? (
+                        <span className="ml-1 text-[10px] opacity-60">{make.users}</span>
+                      ) : null}
+                    </Chip>
+                  );
+                })}
               </div>
             </div>
             <label className="block space-y-1.5">
@@ -268,11 +319,14 @@ export default function OnboardingPage() {
             <div className="space-y-1.5">
               <span className="text-xs text-muted-foreground">{t("filter.body")}</span>
               <div className="flex flex-wrap gap-2">
+                <Chip active={!draft.bodies?.length} onClick={() => patch({ bodies: [] })}>
+                  {t("onboarding.any")}
+                </Chip>
                 {BODIES.map((body) => (
                   <Chip
                     key={body}
-                    active={draft.body === body}
-                    onClick={() => patch({ body: draft.body === body ? undefined : body })}
+                    active={Boolean(draft.bodies?.includes(body))}
+                    onClick={() => toggle("bodies", body)}
                   >
                     {labelFor(t, "body", body)}
                   </Chip>
@@ -282,11 +336,14 @@ export default function OnboardingPage() {
             <div className="space-y-1.5">
               <span className="text-xs text-muted-foreground">{t("filter.fuel")}</span>
               <div className="flex flex-wrap gap-2">
+                <Chip active={!draft.fuels?.length} onClick={() => patch({ fuels: [] })}>
+                  {t("onboarding.any")}
+                </Chip>
                 {FUELS.map((fuel) => (
                   <Chip
                     key={fuel}
-                    active={draft.fuel === fuel}
-                    onClick={() => patch({ fuel: draft.fuel === fuel ? undefined : fuel })}
+                    active={Boolean(draft.fuels?.includes(fuel))}
+                    onClick={() => toggle("fuels", fuel)}
                   >
                     {labelFor(t, "fuel", fuel)}
                   </Chip>
@@ -296,13 +353,14 @@ export default function OnboardingPage() {
             <div className="space-y-1.5">
               <span className="text-xs text-muted-foreground">{t("filter.gearbox")}</span>
               <div className="flex flex-wrap gap-2">
+                <Chip active={!draft.gearboxes?.length} onClick={() => patch({ gearboxes: [] })}>
+                  {t("onboarding.any")}
+                </Chip>
                 {GEARBOXES.map((gearbox) => (
                   <Chip
                     key={gearbox}
-                    active={draft.gearbox === gearbox}
-                    onClick={() =>
-                      patch({ gearbox: draft.gearbox === gearbox ? undefined : gearbox })
-                    }
+                    active={Boolean(draft.gearboxes?.includes(gearbox))}
+                    onClick={() => toggle("gearboxes", gearbox)}
                   >
                     {labelFor(t, "gearbox", gearbox)}
                   </Chip>
@@ -347,10 +405,10 @@ export default function OnboardingPage() {
             <h2 className="text-base font-semibold">{t("onboarding.step3")}</h2>
             <div className="flex flex-wrap gap-2 text-xs">
               {[
-                draft.make,
-                draft.body ? labelFor(t, "body", draft.body) : null,
-                draft.fuel ? labelFor(t, "fuel", draft.fuel) : null,
-                draft.gearbox ? labelFor(t, "gearbox", draft.gearbox) : null,
+                draft.makes?.join(", "),
+                draft.bodies?.map((value) => labelFor(t, "body", value)).join(", "),
+                draft.fuels?.map((value) => labelFor(t, "fuel", value)).join(", "),
+                draft.gearboxes?.map((value) => labelFor(t, "gearbox", value)).join(", "),
                 draft.price_max ? `${t("filter.priceTo")}: ${num(draft.price_max)} zł` : null,
                 draft.year_min ? `${t("filter.yearFrom")} ${draft.year_min}` : null,
                 draft.mileage_max ? `${t("filter.mileage")} ${num(draft.mileage_max)} km` : null,
@@ -365,13 +423,25 @@ export default function OnboardingPage() {
             <p className="text-sm text-muted-foreground">
               {total == null
                 ? t("list.loading")
-                : t("onboarding.found").replace("{count}", num(total))}
+                : t("onboarding.found").replace(
+                    "{count}",
+                    `${num(total)}${approx ? "+" : ""}`,
+                  )}
             </p>
             {preview.length ? (
               <div className="space-y-2">
-                {preview.slice(0, 1).map((item) => (
+                {preview.slice(0, 3).map((item) => (
                   <ListingRow key={item.id} item={item} />
                 ))}
+                {total != null && total > preview.length ? (
+                  <Link
+                    href={`/list?${filtersToQuery(draft)}`}
+                    className="block pt-1 text-center text-sm text-primary underline-offset-4 hover:underline"
+                  >
+                    {t("onboarding.openList")} · {num(total)}
+                    {approx ? "+" : ""}
+                  </Link>
+                ) : null}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">{t("onboarding.noMatch")}</p>

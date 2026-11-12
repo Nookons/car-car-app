@@ -36,7 +36,7 @@ from pydantic import BaseModel, Field
 from .. import webauth
 from ..cache import Cache
 from ..db import database_url
-from .auth import AuthError, TOKEN_TTL, issue_token, validate_init_data, verify_token_claims
+from .auth import TOKEN_TTL, AuthError, issue_token, validate_init_data, verify_token_claims
 from .repo import MiniAppRepo
 from .webauth_routes import WebAuthSettings, build_webauth_router, csrf_ok
 

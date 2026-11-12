@@ -47,6 +47,8 @@ const TEXT_KEYS = new Set([
   "sort",
 ]);
 
+const ARRAY_KEYS = new Set(["makes", "bodies", "fuels", "gearboxes"]);
+
 const NUMBER_KEYS = new Set([
   "price_min",
   "price_max",
@@ -77,9 +79,14 @@ type CachedList = {
 function readFiltersFromUrl(): Filters | null {
   if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.search);
-  const out: Record<string, string | number> = {};
+  const out: Record<string, string | number | string[]> = {};
   params.forEach((value, key) => {
     if (!value) return;
+    if (ARRAY_KEYS.has(key)) {
+      const current = Array.isArray(out[key]) ? (out[key] as string[]) : [];
+      out[key] = [...current, value];
+      return;
+    }
     if (key === "sort") {
       if (["new", "price_asc", "price_desc", "distance"].includes(value)) out.sort = value;
       return;
@@ -103,6 +110,10 @@ function listUrl(filters: Filters): string {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
     if (value === undefined || value === null || value === "") return;
+    if (Array.isArray(value)) {
+      value.forEach((item) => params.append(key, String(item)));
+      return;
+    }
     params.set(key, String(value));
   });
   const query = params.toString();

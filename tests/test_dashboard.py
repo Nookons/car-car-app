@@ -13,13 +13,21 @@ from carcar.store import Store
 
 
 @pytest.fixture()
-def app(tmp_path):
+def app(tmp_path, monkeypatch):
+    monkeypatch.setenv("CARCAR_DASHBOARD_PASSWORD", "test-dashboard-password")
     return create_app(root=tmp_path)
 
 
 @pytest.fixture()
 def client(app):
-    return TestClient(app)
+    with TestClient(app, base_url="https://testserver") as test_client:
+        assert (
+            test_client.post(
+                "/api/session", json={"password": "test-dashboard-password"}
+            ).status_code
+            == 200
+        )
+        yield test_client
 
 
 def test_index_page(client):

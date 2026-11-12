@@ -40,8 +40,13 @@ export function activeFilterChips(filters: Filters, t: (key: Key) => string): Fi
 
   add(
     "make",
-    [filters.make, filters.model].filter(Boolean).join(" "),
-    ["make", "model"],
+    [
+      filters.make ?? filters.makes?.join(", "),
+      filters.model,
+    ]
+      .filter(Boolean)
+      .join(" "),
+    ["make", "model", "makes"],
   );
 
   add(
@@ -104,9 +109,23 @@ export function activeFilterChips(filters: Filters, t: (key: Key) => string): Fi
     add("fresh", label, ["published_days"]);
   }
 
-  add("fuel", labelFor(t, "fuel", filters.fuel), ["fuel"]);
-  add("gearbox", labelFor(t, "gearbox", filters.gearbox), ["gearbox"]);
-  add("body", labelFor(t, "body", filters.body), ["body"]);
+  add(
+    "fuel",
+    filters.fuel ?? filters.fuels?.map((value) => labelFor(t, "fuel", value)).join(", ") ?? "",
+    ["fuel", "fuels"],
+  );
+  add(
+    "gearbox",
+    filters.gearbox ??
+      filters.gearboxes?.map((value) => labelFor(t, "gearbox", value)).join(", ") ??
+      "",
+    ["gearbox", "gearboxes"],
+  );
+  add(
+    "body",
+    filters.body ?? filters.bodies?.map((value) => labelFor(t, "body", value)).join(", ") ?? "",
+    ["body", "bodies"],
+  );
   add("drive", labelFor(t, "drive", filters.drive), ["drive"]);
   add("condition", labelFor(t, "condition", filters.condition), ["condition"]);
   add("color", filters.color ?? "", ["color"]);

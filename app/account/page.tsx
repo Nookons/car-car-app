@@ -558,11 +558,14 @@ export default function AccountPage() {
 
 function summary(filters: Filters, t: (key: Key) => string): string {
   const parts = [
-    filters.make,
+    filters.makes?.join(", ") ?? filters.make,
+    filters.bodies?.map((value) => labelFor(t, "body", value)).join(", ") ??
+      (filters.body ? labelFor(t, "body", filters.body) : null),
     filters.price_max ? `≤ ${filters.price_max} zł` : null,
     filters.year_min ? `≥ ${filters.year_min}` : null,
     filters.mileage_max ? `≤ ${filters.mileage_max} km` : null,
-    filters.gearbox ? labelFor(t, "gearbox", filters.gearbox) : null,
+    filters.gearboxes?.map((value) => labelFor(t, "gearbox", value)).join(", ") ??
+      (filters.gearbox ? labelFor(t, "gearbox", filters.gearbox) : null),
     filters.radius_km ? `${filters.radius_km} km` : null,
   ].filter(Boolean);
   return parts.join(" · ");

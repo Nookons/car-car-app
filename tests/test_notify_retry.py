@@ -18,3 +18,13 @@ def test_backoff_first_attempt_is_minute():
 
 def test_max_attempts_limit():
     assert MAX_ATTEMPTS == 6
+
+
+def test_matches_multi_select_criteria():
+    from carcar.notify import matches
+
+    row = {"make": "Audi", "body": "sedan", "fuel": "petrol", "gearbox": "automatic"}
+    assert matches({"makes": ["BMW", "Audi"], "bodies": ["sedan", "wagon"]}, row)
+    assert matches({"makes": ["BMW", "Audi"], "bodies": ["suv"]}, row) is False
+    assert matches({"fuels": ["diesel"]}, row) is False
+    assert matches({"gearboxes": ["automatic"]}, row)

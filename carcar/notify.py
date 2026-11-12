@@ -67,7 +67,15 @@ def matches(criteria: dict[str, Any], row: dict[str, Any]) -> bool:
         current = (row.get(field) or "").lower()
         return current == value.lower()
 
-    if criteria.get("make") and not text_equal("make", criteria["make"]):
+    def text_in(field: str, values: list[str]) -> bool:
+        current = (row.get(field) or "").lower()
+        return current in {str(value).lower() for value in values}
+
+    makes = criteria.get("makes")
+    if isinstance(makes, list) and makes:
+        if not text_in("make", makes):
+            return False
+    elif criteria.get("make") and not text_equal("make", criteria["make"]):
         return False
     if criteria.get("model") and not text_equal("model", criteria["model"]):
         return False
@@ -100,7 +108,18 @@ def matches(criteria: dict[str, Any], row: dict[str, Any]) -> bool:
     ):
         return False
 
-    for field in ("fuel", "gearbox", "body", "drive", "condition", "color", "seller_type"):
+    for field, multi in (
+        ("fuel", "fuels"),
+        ("gearbox", "gearboxes"),
+        ("body", "bodies"),
+    ):
+        values = criteria.get(multi)
+        if isinstance(values, list) and values:
+            if not text_in(field, values):
+                return False
+        elif criteria.get(field) and not text_equal(field, criteria[field]):
+            return False
+    for field in ("drive", "condition", "color", "seller_type"):
         if criteria.get(field) and not text_equal(field, criteria[field]):
             return False
     if criteria.get("source") and (row.get("source_code") or "").lower() != str(

@@ -41,8 +41,12 @@ def store(tmp_path) -> Store:
 
 
 @pytest.fixture()
-def client(store) -> TestClient:
-    return TestClient(create_app(root=store.root))
+def client(store, monkeypatch) -> TestClient:
+    password = "test-dashboard-password"
+    monkeypatch.setenv("CARCAR_DASHBOARD_PASSWORD", password)
+    with TestClient(create_app(root=store.root), base_url="https://testserver") as test_client:
+        assert test_client.post("/api/session", json={"password": password}).status_code == 200
+        yield test_client
 
 
 def test_listings_empty(client):
@@ -93,7 +97,8 @@ def test_card_with_saved_detail(client, store, offer_html):
     assert card["details"]["make"]
 
 
-def test_fetch_endpoint_downloads_card(store, offer_html):
+def test_fetch_endpoint_downloads_card(store, offer_html, monkeypatch):
+    monkeypatch.setenv("CARCAR_DASHBOARD_PASSWORD", "test-dashboard-password")
     offer = parse_offer(offer_html)
     store.append_discovered([make_row(id=offer.id, url=offer.url)])
 
@@ -103,16 +108,24 @@ def test_fetch_endpoint_downloads_card(store, offer_html):
             transport=httpx.MockTransport(lambda request: httpx.Response(200, text=offer_html)),
         )
 
-    client = TestClient(create_app(root=store.root, client_factory=factory))
-    response = client.post(f"/api/listings/{offer.id}/fetch")
+    with TestClient(
+        create_app(root=store.root, client_factory=factory), base_url="https://testserver"
+    ) as client:
+        assert (
+            client.post(
+                "/api/session", json={"password": "test-dashboard-password"}
+            ).status_code
+            == 200
+        )
+        response = client.post(f"/api/listings/{offer.id}/fetch")
 
-    assert response.status_code == 200
-    assert response.json()["saved"] is True
-    assert store.find_detail_file(offer.id) is not None
+        assert response.status_code == 200
+        assert response.json()["saved"] is True
+        assert store.find_detail_file(offer.id) is not None
 
-    # повторный вызов не ходит на площадку
-    again = client.post(f"/api/listings/{offer.id}/fetch").json()
-    assert again["already"] is True
+        # повторный вызов не ходит на площадку
+        again = client.post(f"/api/listings/{offer.id}/fetch").json()
+        assert again["already"] is True
 
 
 def test_fetch_unknown_listing_404(client):
