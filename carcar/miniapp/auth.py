@@ -16,6 +16,7 @@ import binascii
 import hashlib
 import hmac
 import json
+import secrets
 import time
 from urllib.parse import parse_qsl
 
@@ -128,17 +129,22 @@ def validate_telegram_login(
     }
 
 
-def issue_token(user_id: int, secret: str, *, ttl: int = TOKEN_TTL) -> str:
+def issue_token(
+    user_id: int, secret: str, *, ttl: int = TOKEN_TTL, auth_version: int = 0
+) -> str:
     now = int(time.time())
     header = _b64(json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode())
-    body = {"sub": str(user_id), "iat": now, "exp": now + ttl}
+    body = {
+        "sub": str(user_id), "iat": now, "exp": now + ttl,
+        "ver": max(0, int(auth_version)), "sid": secrets.token_urlsafe(18),
+    }
     payload = _b64(json.dumps(body, separators=(",", ":")).encode())
     signature = hmac.new(secret.encode(), f"{header}.{payload}".encode(), hashlib.sha256).digest()
     return f"{header}.{payload}.{_b64(signature)}"
 
 
-def verify_token(token: str, secret: str) -> int:
-    """Возвращает user_id из подписанного токена."""
+def verify_token_claims(token: str, secret: str) -> dict:
+    """Возвращает проверенные идентификатор и маркеры сессии из JWT."""
     try:
         header, payload, signature = token.split(".")
     except ValueError as exc:
@@ -162,7 +168,11 @@ def verify_token(token: str, secret: str) -> int:
         user_id = int(data["sub"])
         if user_id <= 0:
             raise AuthError("неверный пользователь в токене")
-        return user_id
+        return {
+            "user_id": user_id,
+            "auth_version": max(0, int(data.get("ver", 0))),
+            "session_id": str(data["sid"]) if data.get("sid") else None,
+        }
     except AuthError:
         raise
     except (
@@ -174,3 +184,8 @@ def verify_token(token: str, secret: str) -> int:
         binascii.Error,
     ) as exc:
         raise AuthError("битый токен") from exc
+
+
+def verify_token(token: str, secret: str) -> int:
+    """Обратносуместимая проверка JWT, возвращающая user_id."""
+    return verify_token_claims(token, secret)["user_id"]

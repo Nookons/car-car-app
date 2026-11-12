@@ -885,7 +885,7 @@ async function loadUserSessions(userId = activeSupportUserId) {
       row.appendChild(cell);
       body.appendChild(row);
     });
-    status.textContent = sessions.length ? `Активных сессий: ${sessions.length}` : "Активных веб-сессий нет";
+    status.textContent = sessions.length ? `Активных сессий: ${sessions.length}` : "Активных сессий нет";
   } catch (error) {
     status.textContent = error instanceof Error ? error.message : "Не удалось загрузить сессии";
   }
@@ -893,8 +893,8 @@ async function loadUserSessions(userId = activeSupportUserId) {
 
 async function revokeUserSession(userId, sessionId = null) {
   const message = sessionId
-    ? "Завершить эту веб-сессию?"
-    : "Завершить все активные веб-сессии этого пользователя?";
+    ? "Завершить эту сессию?"
+    : "Завершить все активные сессии этого пользователя?";
   if (!window.confirm(message)) return;
   const endpoint = sessionId
     ? `/api/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}/revoke`
@@ -904,7 +904,7 @@ async function revokeUserSession(userId, sessionId = null) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
     await loadUserSessions(userId);
-    showUserActionMessage("success", sessionId ? "Веб-сессия завершена." : `Завершено сессий: ${data.revoked}.`);
+    showUserActionMessage("success", sessionId ? "Сессия завершена." : `Сессии отозваны. Активных записанных сессий: ${data.revoked}.`);
   } catch (error) {
     showUserActionMessage("error", error instanceof Error ? error.message : "Не удалось завершить сессии");
   }
@@ -922,7 +922,7 @@ $("ua-password-form").addEventListener("submit", async (event) => {
     showUserActionMessage("error", "Пароль должен содержать не менее 12 символов.");
     return;
   }
-  if (!window.confirm("Задать новый пароль? Все активные веб-сессии пользователя будут завершены.")) return;
+  if (!window.confirm("Задать новый пароль? Все активные сессии пользователя будут завершены.")) return;
   const button = event.currentTarget.querySelector("button[type=submit]");
   button.disabled = true;
   try {
@@ -933,7 +933,7 @@ $("ua-password-form").addEventListener("submit", async (event) => {
     if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
     $("ua-new-password").value = "";
     await loadUserSessions();
-    showUserActionMessage("success", "Пароль задан. Все активные веб-сессии пользователя завершены.");
+    showUserActionMessage("success", "Пароль задан. Все активные сессии пользователя завершены.");
   } catch (error) {
     showUserActionMessage("error", error instanceof Error ? error.message : "Не удалось задать пароль");
   } finally {

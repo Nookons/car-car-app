@@ -490,7 +490,11 @@ class MiniAppRepo:
                 (user_id, days - 1),
             )
             daily = [
-                {**row, "day": row["day"].isoformat(), "last_active_at": _iso(row["last_active_at"])}
+                {
+                    **row,
+                    "day": row["day"].isoformat(),
+                    "last_active_at": _iso(row["last_active_at"]),
+                }
                 for row in cur.fetchall()
             ]
             cur.execute(
@@ -505,7 +509,11 @@ class MiniAppRepo:
                 for row in cur.fetchall()
             ]
         return {
-            "user": {**user, "created_at": _iso(user["created_at"]), "last_seen_at": _iso(user["last_seen_at"])},
+            "user": {
+                **user,
+                "created_at": _iso(user["created_at"]),
+                "last_seen_at": _iso(user["last_seen_at"]),
+            },
             "days": days,
             "totals": totals,
             "daily": daily,
@@ -746,10 +754,22 @@ class MiniAppRepo:
     def set_password(self, user_id: int, password_hash: str) -> None:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
-                "update app_user set password_hash = %s, last_seen_at = now() where id = %s",
+                "update app_user set password_hash = %s, auth_version = auth_version + 1, "
+                "last_seen_at = now() where id = %s",
                 (password_hash, user_id),
             )
+            cur.execute(
+                "update web_session set revoked_at = now() "
+                "where user_id = %s and revoked_at is null",
+                (user_id,),
+            )
         conn.commit()
+
+    def user_auth_version(self, user_id: int) -> int:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute("select auth_version from app_user where id = %s", (user_id,))
+            row = cur.fetchone()
+        return int(row["auth_version"]) if row else -1
 
     def mark_email_verified(self, user_id: int, email: str) -> dict[str, Any] | None:
         with self.pool.connection() as conn, conn.cursor() as cur:
@@ -1293,6 +1313,7 @@ class MiniAppRepo:
         offset: int = 0,
         q: str | None = None,
         make: str | None = None,
+        makes: list[str] | None = None,
         model: str | None = None,
         price_min: int | None = None,
         price_max: int | None = None,
@@ -1301,8 +1322,11 @@ class MiniAppRepo:
         mileage_min: int | None = None,
         mileage_max: int | None = None,
         fuel: str | None = None,
+        fuels: list[str] | None = None,
         gearbox: str | None = None,
+        gearboxes: list[str] | None = None,
         body: str | None = None,
+        bodies: list[str] | None = None,
         drive: str | None = None,
         condition: str | None = None,
         seller_type: str | None = None,
@@ -1337,7 +1361,11 @@ class MiniAppRepo:
                 "OR l.model ILIKE %(q)s ESCAPE '!')"
             )
             params["q"] = f"%{term}%"
-        if make:
+        if makes:
+            # Мультивыбор онбординга: любая из выбранных марок.
+            conds.append("l.make = ANY(%(makes)s)")
+            params["makes"] = makes
+        elif make:
             # Значение приходит из выпадающего списка — сравниваем точно, индекс работает.
             conds.append("l.make = %(make)s")
             params["make"] = make
@@ -1362,13 +1390,22 @@ class MiniAppRepo:
         if mileage_max is not None:
             conds.append("l.mileage_km <= %(mileage_max)s")
             params["mileage_max"] = mileage_max
-        if fuel:
+        if fuels:
+            conds.append("l.fuel = ANY(%(fuels)s)")
+            params["fuels"] = fuels
+        elif fuel:
             conds.append("l.fuel = %(fuel)s")
             params["fuel"] = fuel
-        if gearbox:
+        if gearboxes:
+            conds.append("l.gearbox = ANY(%(gearboxes)s)")
+            params["gearboxes"] = gearboxes
+        elif gearbox:
             conds.append("l.gearbox = %(gearbox)s")
             params["gearbox"] = gearbox
-        if body:
+        if bodies:
+            conds.append("l.body = ANY(%(bodies)s)")
+            params["bodies"] = bodies
+        elif body:
             conds.append("l.body = %(body)s")
             params["body"] = body
         if drive:
@@ -2207,18 +2244,54 @@ class MiniAppRepo:
 
     # -- справочник для фильтров --------------------------------------------
     def filter_makes(self) -> list[dict[str, Any]]:
+        """Марки + популярность у пользователей.
+
+        `count` — активные объявления, `users` — сколько разных людей выбрали
+        марку в избранном или сохранённом поиске. Для пузырей онбординга важнее
+        второе; при пустой базе фронт откатывается на `count`.
+        """
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
                 """
-                select make, count(*) as n
-                from listing
-                where status = 'active' and make is not null and make <> ''
-                group by make
+                with picks as (
+                    select f.user_id, l.make
+                    from favorite f
+                    join listing l on l.id = f.listing_id
+                    where l.make is not null and l.make <> ''
+                    union all
+                    select s.user_id, s.criteria->>'make'
+                    from subscription s
+                    where s.criteria->>'make' is not null
+                      and s.criteria->>'make' <> ''
+                    union all
+                    select s.user_id, value
+                    from subscription s
+                    cross join lateral jsonb_array_elements_text(
+                        case
+                            when jsonb_typeof(s.criteria->'makes') = 'array'
+                            then s.criteria->'makes'
+                            else '[]'::jsonb
+                        end
+                    ) as value
+                ), counts as (
+                    select make, count(distinct user_id) as users
+                    from picks
+                    where make is not null and make <> ''
+                    group by make
+                )
+                select l.make, count(*) as n, coalesce(c.users, 0) as users
+                from listing l
+                left join counts c on lower(c.make) = lower(l.make)
+                where l.status = 'active' and l.make is not null and l.make <> ''
+                group by l.make, c.users
                 having count(*) >= 3
                 order by n desc
                 """
             )
-            return [{"value": r["make"], "count": r["n"]} for r in cur.fetchall()]
+            return [
+                {"value": r["make"], "count": r["n"], "users": int(r["users"])}
+                for r in cur.fetchall()
+            ]
 
     def filter_models(self, make: str) -> list[dict[str, Any]]:
         with self.pool.connection() as conn, conn.cursor() as cur:
@@ -2467,9 +2540,10 @@ class MiniAppRepo:
         """Одна машина под фильтр — для демо-алерта и превью онбординга."""
         allowed = {
             "q", "make", "model", "price_min", "price_max", "year_min", "year_max",
-            "mileage_min", "mileage_max", "fuel", "gearbox", "body", "drive",
-            "condition", "seller_type", "color", "doors", "seats", "power_min",
-            "power_max", "engine_min", "engine_max", "source", "published_days",
+            "mileage_min", "mileage_max", "fuel", "fuels", "gearbox", "gearboxes",
+            "body", "bodies", "makes", "drive", "condition", "seller_type",
+            "color", "doors", "seats", "power_min", "power_max", "engine_min",
+            "engine_max", "source", "published_days",
             "lat", "lon", "radius_km", "sort",
         }
         kwargs = {

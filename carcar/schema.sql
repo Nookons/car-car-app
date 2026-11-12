@@ -214,6 +214,7 @@ alter table app_user add column if not exists email_verified_at timestamptz;
 alter table app_user add column if not exists phone text;
 alter table app_user add column if not exists phone_verified_at timestamptz;
 alter table app_user add column if not exists password_hash text;
+alter table app_user add column if not exists auth_version integer not null default 0;
 
 create unique index if not exists app_user_email_key
     on app_user (lower(email)) where email is not null;

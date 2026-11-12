@@ -553,6 +553,12 @@ class DatabaseRepo:
         with self.pool.connection() as conn, conn.cursor() as cur:
             if session_id is None:
                 cur.execute(
+                    "update app_user set auth_version = auth_version + 1 where id = %s",
+                    (user_id,),
+                )
+                if cur.rowcount == 0:
+                    return 0
+                cur.execute(
                     """update web_session set revoked_at = now()
                        where user_id = %s and revoked_at is null and expires_at > now()""",
                     (user_id,),
@@ -568,7 +574,8 @@ class DatabaseRepo:
     def set_user_password(self, user_id: int, password_hash: str) -> bool:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
-                """update app_user set password_hash = %s
+                """update app_user set password_hash = %s,
+                          auth_version = auth_version + 1
                    where id = %s and (email is not null or phone_verified_at is not null)""",
                 (password_hash, user_id),
             )

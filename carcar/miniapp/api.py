@@ -36,7 +36,7 @@ from pydantic import BaseModel, Field
 from .. import webauth
 from ..cache import Cache
 from ..db import database_url
-from .auth import AuthError, issue_token, validate_init_data, verify_token
+from .auth import AuthError, TOKEN_TTL, issue_token, validate_init_data, verify_token_claims
 from .repo import MiniAppRepo
 from .webauth_routes import WebAuthSettings, build_webauth_router, csrf_ok
 
@@ -226,10 +226,24 @@ def create_app(
     ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
         """Два равноправных входа: Bearer-JWT (Telegram) и cookie (браузер)."""
         if authorization and authorization.startswith("Bearer "):
+            raw_token = authorization[7:]
             try:
-                return repo.get_user(verify_token(authorization[7:], jwt_secret)), None
+                claims = verify_token_claims(raw_token, jwt_secret)
             except AuthError:
                 return None, None
+            user_id = claims["user_id"]
+            if claims["session_id"]:
+                tracked = repo.get_web_session(webauth.token_hash(raw_token))
+                if not tracked or int(tracked["user"]["id"]) != user_id:
+                    return None, None
+                user = tracked["user"]
+            else:
+                # Поддерживаем старые JWT до истечения, пока пользователь не
+                # отзовёт все сессии или не сменит пароль.
+                user = repo.get_user(user_id)
+            if not user or repo.user_auth_version(user_id) != claims["auth_version"]:
+                return None, None
+            return user, None
 
         raw = request.cookies.get(webauth.SESSION_COOKIE)
         if not raw:
@@ -436,7 +450,7 @@ def create_app(
 
     # -- авторизация -------------------------------------------------------
     @app.post("/api/auth")
-    def auth(payload: AuthIn) -> dict:
+    def auth(payload: AuthIn, request: Request) -> dict:
         if payload.init_data == "dev" and dev_allowed and dev_tg_id:
             user = repo.ensure_user(
                 {"id": dev_tg_id, "username": "dev", "first_name": "Dev", "last_name": ""}
@@ -450,7 +464,16 @@ def create_app(
                 raise HTTPException(status_code=401, detail=str(exc)) from exc
             user = repo.ensure_user(data["user"])
         repo.record_session(user["id"])
-        return {"token": issue_token(user["id"], jwt_secret), "user": user}
+        version = repo.user_auth_version(user["id"])
+        token = issue_token(user["id"], jwt_secret, auth_version=version)
+        repo.create_web_session(
+            user["id"],
+            webauth.token_hash(token),
+            webauth.token_hash(f"bearer:{token}"),
+            ttl=TOKEN_TTL,
+            user_agent=request.headers.get("user-agent") or "Telegram Mini App",
+        )
+        return {"token": token, "user": user}
 
     @app.get("/api/admin/metrics")
     def admin_metrics(
@@ -596,6 +619,7 @@ def create_app(
         offset: int = Query(default=0, ge=0, le=10_000),
         q: str | None = Query(default=None, max_length=80),
         make: str | None = None,
+        makes: list[str] | None = Query(default=None),
         model: str | None = None,
         price_min: int | None = Query(default=None, ge=0),
         price_max: int | None = None,
@@ -604,8 +628,11 @@ def create_app(
         mileage_min: int | None = None,
         mileage_max: int | None = None,
         fuel: str | None = None,
+        fuels: list[str] | None = Query(default=None),
         gearbox: str | None = None,
+        gearboxes: list[str] | None = Query(default=None),
         body: str | None = None,
+        bodies: list[str] | None = Query(default=None),
         drive: str | None = None,
         condition: str | None = None,
         seller_type: str | None = None,
@@ -629,10 +656,13 @@ def create_app(
         search_filters = {
             key: value
             for key, value in {
-                "make": make, "model": model, "price_min": price_min,
-                "price_max": price_max, "year_min": year_min, "year_max": year_max,
+                "make": make, "makes": makes, "model": model,
+                "price_min": price_min, "price_max": price_max,
+                "year_min": year_min, "year_max": year_max,
                 "mileage_min": mileage_min, "mileage_max": mileage_max,
-                "fuel": fuel, "gearbox": gearbox, "body": body, "drive": drive,
+                "fuel": fuel, "fuels": fuels, "gearbox": gearbox,
+                "gearboxes": gearboxes, "body": body, "bodies": bodies,
+                "drive": drive,
                 "condition": condition, "seller_type": seller_type, "color": color,
                 "doors": doors, "seats": seats, "power_min": power_min,
                 "power_max": power_max, "engine_min": engine_min,
@@ -649,7 +679,12 @@ def create_app(
         # are actually used to render a results page.
         search_query = q.strip() if q else None
         if user and not warm and limit > 1 and offset == 0 and (search_query or search_filters):
-            repo.record_search(user["id"], query=search_query or None, filters=search_filters, sort=sort)
+            repo.record_search(
+                user["id"],
+                query=search_query or None,
+                filters=search_filters,
+                sort=sort,
+            )
         key = f"list:{request.url.query}"
         cached = cache.get(key)
         if cached is not None:
@@ -665,6 +700,7 @@ def create_app(
             offset=offset,
             q=q,
             make=make,
+            makes=makes,
             model=model,
             price_min=price_min,
             price_max=price_max,
@@ -673,8 +709,11 @@ def create_app(
             mileage_min=mileage_min,
             mileage_max=mileage_max,
             fuel=fuel,
+            fuels=fuels,
             gearbox=gearbox,
+            gearboxes=gearboxes,
             body=body,
+            bodies=bodies,
             drive=drive,
             condition=condition,
             seller_type=seller_type,
