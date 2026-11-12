@@ -86,7 +86,16 @@ export default function OnboardingPage() {
     started.current = true;
     track("onboarding_start");
     api<{ items: Make[] }>("/filters/makes")
-      .then((data) => setMakes(data.items.slice(0, 12)))
+      .then((data) =>
+        setMakes(
+          [...data.items]
+            .sort(
+              (a, b) =>
+                (b.users ?? 0) - (a.users ?? 0) || b.count - a.count,
+            )
+            .slice(0, 12),
+        ),
+      )
       .catch(() => {});
   }, []);
 
@@ -272,7 +281,9 @@ export default function OnboardingPage() {
                 </Chip>
                 {makes.map((make) => {
                   const weight = makeWeight(make);
-                  const scale = 0.8 + 0.25 * (weight / maxMake);
+                  const scale = hasUserStats
+                    ? 0.75 + 0.5 * (weight / maxMake)
+                    : 0.85 + 0.3 * (weight / maxMake);
                   return (
                     <Chip
                       key={make.value}
