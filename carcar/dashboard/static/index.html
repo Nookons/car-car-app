@@ -57,7 +57,7 @@
       </table>
     </section>
 
-    <section class="card" id="app-announcement-section">
+    <section class="card announcement-card" id="app-announcement-section">
       <div class="card-head"><h2>Объявление для всех пользователей</h2><span class="muted" id="announcement-state"></span></div>
       <form id="announcement-form" class="announcement-form">
         <label class="field wide">Текст сообщения<textarea id="announcement-message" maxlength="500" rows="2" required placeholder="Например: сегодня будут проводиться технические работы"></textarea></label>
@@ -219,7 +219,7 @@
         <h2>Все объявления</h2>
         <div class="listing-filters"><input id="listing-query" type="search" placeholder="Поиск по марке, модели, городу…"><select id="listing-status"><option value="all">Все статусы</option><option value="active">Активные</option><option value="removed">Неактивные</option></select><select id="listing-source"><option value="">Все площадки</option></select></div>
       </div>
-      <div class="table-scroll"><table><thead><tr><th>Объявление</th><th>Площадка</th><th>Статус</th><th>Цена</th><th>Город</th><th>Последнее обновление</th></tr></thead><tbody id="managed-listings"></tbody></table></div>
+      <div class="table-scroll"><table><thead><tr><th>Объявление</th><th>Площадка</th><th>Статус</th><th>Цена</th><th>Город</th><th>Последнее обновление</th><th>Действия</th></tr></thead><tbody id="managed-listings"></tbody></table></div>
       <div class="user-pagination"><span id="listing-page" class="muted small"></span><div><button class="ghost" id="listing-prev" type="button">Назад</button><button class="ghost" id="listing-next" type="button">Дальше</button></div></div>
     </section>
 
