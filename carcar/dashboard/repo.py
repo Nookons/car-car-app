@@ -207,6 +207,26 @@ class DatabaseRepo:
             items = [{**row, "published_at": _iso(row["published_at"]), "last_seen_at": _iso(row["last_seen_at"])} for row in cur.fetchall()]
         return {"items": items, "total": total, "limit": limit, "offset": offset}
 
+    def update_listing_admin(self, listing_id: int, fields: dict[str, Any]) -> bool:
+        allowed = {"title", "price", "city", "mileage_km", "status"}
+        updates = {key: value for key, value in fields.items() if key in allowed}
+        if not updates:
+            return False
+        assignments = ", ".join(f"{key} = %({key})s" for key in updates)
+        updates["id"] = listing_id
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(f"update public.listing set {assignments}, updated_at = now() where id = %(id)s", updates)
+            changed = cur.rowcount > 0
+        conn.commit()
+        return changed
+
+    def delete_listing_admin(self, listing_id: int) -> bool:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute("delete from public.listing where id = %s", (listing_id,))
+            changed = cur.rowcount > 0
+        conn.commit()
+        return changed
+
     # -- список ------------------------------------------------------------
     def recent(
         self,
@@ -304,6 +324,7 @@ class DatabaseRepo:
         return {
             "id": row["id"],
             "external_id": row["external_id"],
+            "status": row.get("status"),
             "source": row.get("source_code"),
             "url": row["url"],
             "title": row["title"],

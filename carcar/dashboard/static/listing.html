@@ -40,6 +40,20 @@
         <a class="primary link-btn" id="open-source" target="_blank" rel="noopener noreferrer" data-i18n="openSource">
           Открыть на otomoto
         </a>
+        <details class="admin-tools" open>
+          <summary>Управление объявлением</summary>
+          <form id="listing-admin-form" class="admin-listing-form">
+            <label>Название<input id="admin-title" required maxlength="500"></label>
+            <label>Цена<input id="admin-price" type="number" min="1" step="1" required></label>
+            <label>Город<input id="admin-city" maxlength="120"></label>
+            <label>Пробег, км<input id="admin-mileage" type="number" min="0" step="1"></label>
+            <label>Статус<select id="admin-status"><option value="active">Активно</option><option value="removed">Деактивировано</option></select></label>
+            <button class="primary" type="submit">Сохранить изменения</button>
+          </form>
+          <button class="danger" id="listing-delete" type="button">Удалить объявление навсегда</button>
+          <p class="tiny muted">Изменения относятся к данным в CarCar. Следующий сбор площадки может обновить импортированные поля.</p>
+          <p class="tiny" id="listing-admin-message" role="status"></p>
+        </details>
         <button class="primary" id="fetch" hidden>Загрузить карточку</button>
         <p class="tiny muted" id="hint"></p>
         <div class="kv" id="kv"></div>

@@ -284,6 +284,11 @@ function render() {
 
   $("open-source").href = card.url || "#";
   $("kv").innerHTML = kvRows();
+  $("admin-title").value = card.title || "";
+  $("admin-price").value = card.price || "";
+  $("admin-city").value = card.city || "";
+  $("admin-mileage").value = card.mileage_km ?? "";
+  $("admin-status").value = card.status || "active";
 
   const fetchButton = $("fetch");
   const hint = $("hint");
@@ -300,6 +305,44 @@ function render() {
   renderGallery();
   renderDescription();
 }
+
+$("listing-admin-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const message = $("listing-admin-message");
+  const button = event.currentTarget.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/listings/${listingId()}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: $("admin-title").value, price: Number($("admin-price").value),
+        city: $("admin-city").value || null,
+        mileage_km: $("admin-mileage").value === "" ? null : Number($("admin-mileage").value),
+        status: $("admin-status").value,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || "Не удалось сохранить");
+    message.textContent = "Изменения сохранены";
+    await load();
+  } catch (error) { message.textContent = error.message || "Ошибка"; }
+  finally { button.disabled = false; }
+});
+
+$("listing-delete").addEventListener("click", async () => {
+  if (!window.confirm("Удалить объявление и связанные с ним избранное и статистику навсегда? Это действие нельзя отменить.")) return;
+  const button = $("listing-delete"); button.disabled = true;
+  try {
+    const response = await fetch(`/api/listings/${listingId()}`, { method: "DELETE" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || "Не удалось удалить");
+    location.assign("/");
+  } catch (error) { $("listing-admin-message").textContent = error.message || "Ошибка удаления"; button.disabled = false; }
+});
+
+fetch("/api/session", { cache: "no-store" }).then((response) => response.ok ? response.json() : null)
+  .then((session) => { $("listing-admin-form").closest("details").hidden = !session?.authenticated; })
+  .catch(() => { $("listing-admin-form").closest("details").hidden = true; });
 
 async function load() {
   const id = listingId();

@@ -63,6 +63,14 @@ class AppAnnouncementIn(BaseModel):
     ends_at: datetime
 
 
+class ListingAdminIn(BaseModel):
+    title: str = Field(min_length=1, max_length=500)
+    price: int = Field(gt=0, le=2_000_000_000)
+    city: str | None = Field(default=None, max_length=120)
+    mileage_km: int | None = Field(default=None, ge=0, le=2_000_000)
+    status: Literal["active", "removed"]
+
+
 class DashboardLoginIn(BaseModel):
     password: str = Field(min_length=1, max_length=200)
 
@@ -573,6 +581,28 @@ def create_app(
         if not card:
             raise HTTPException(status_code=404, detail="объявление не найдено")
         return card
+
+    @app.put("/api/listings/{listing_id}")
+    def admin_update_listing(listing_id: int, payload: ListingAdminIn) -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="управление требует PostgreSQL")
+        fields = payload.model_dump()
+        fields["title"] = fields["title"].strip()
+        if not fields["title"]:
+            raise HTTPException(status_code=422, detail="укажите название")
+        if not repo.update_listing_admin(listing_id, fields):
+            raise HTTPException(status_code=404, detail="объявление не найдено")
+        admin_audit.info("action=admin_update_listing listing_id=%s status=%s", listing_id, fields["status"])
+        return {"ok": True}
+
+    @app.delete("/api/listings/{listing_id}")
+    def admin_delete_listing(listing_id: int) -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="управление требует PostgreSQL")
+        if not repo.delete_listing_admin(listing_id):
+            raise HTTPException(status_code=404, detail="объявление не найдено")
+        admin_audit.warning("action=admin_delete_listing listing_id=%s", listing_id)
+        return {"ok": True}
 
     @app.post("/api/listings/{listing_id}/fetch")
     def fetch_card(listing_id: str) -> dict:

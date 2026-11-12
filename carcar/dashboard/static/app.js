@@ -493,6 +493,29 @@ function renderManagedListings(data) {
     [item.source, item.status === "active" ? "Активно" : "Неактивно", item.price ? fmtPrice(item.price, item.currency) : "—", item.city || "—", item.last_seen_at ? new Date(item.last_seen_at).toLocaleString(lang === "ru" ? "ru-RU" : "en-GB") : "—"].forEach((value) => {
       const cell = document.createElement("td"); cell.textContent = String(value); row.appendChild(cell);
     });
+    const actions = document.createElement("td");
+    actions.className = "listing-row-actions";
+    const toggle = document.createElement("button");
+    toggle.className = "ghost"; toggle.type = "button";
+    toggle.textContent = item.status === "active" ? "Деактивировать" : "Восстановить";
+    toggle.addEventListener("click", async () => {
+      toggle.disabled = true;
+      try {
+        const detail = await fetch(`/api/listings/${item.id}`, { cache: "no-store" }).then((r) => r.json());
+        const response = await fetch(`/api/listings/${item.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: detail.title, price: detail.price, city: detail.city || null, mileage_km: detail.mileage_km ?? null, status: item.status === "active" ? "removed" : "active" }) });
+        if (!response.ok) throw new Error("Не удалось изменить статус");
+        await loadListings();
+      } catch { toggle.disabled = false; }
+    });
+    const remove = document.createElement("button");
+    remove.className = "danger"; remove.type = "button"; remove.textContent = "Удалить";
+    remove.addEventListener("click", async () => {
+      if (!confirm("Удалить объявление навсегда вместе с избранным и статистикой?")) return;
+      remove.disabled = true;
+      const response = await fetch(`/api/listings/${item.id}`, { method: "DELETE" });
+      if (response.ok) await loadListings(); else remove.disabled = false;
+    });
+    actions.append(toggle, remove); row.appendChild(actions);
     body.appendChild(row);
   });
   const total = Number(data.total || 0), start = total ? data.offset + 1 : 0, end = Math.min(data.offset + data.limit, total);
