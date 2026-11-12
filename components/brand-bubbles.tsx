@@ -97,9 +97,11 @@ export function BrandBubbles({
       });
     };
 
+    // Запас под scale-110 выбранного пузыря, чтобы его не срезало краем поля.
+    const pad = 8;
     const clamp = (body: Body) => {
-      body.x = Math.max(body.r, Math.min(width - body.r, body.x));
-      body.y = Math.max(body.r, Math.min(height - body.r, body.y));
+      body.x = Math.max(pad + body.r, Math.min(width - pad - body.r, body.x));
+      body.y = Math.max(pad + body.r, Math.min(height - pad - body.r, body.y));
     };
     bodies.forEach(clamp);
     apply();
@@ -115,18 +117,18 @@ export function BrandBubbles({
       for (const body of bodies) {
         body.x += body.vx * dt;
         body.y += body.vy * dt;
-        if (body.x - body.r <= 0) {
-          body.x = body.r;
+        if (body.x - body.r <= pad) {
+          body.x = pad + body.r;
           body.vx = Math.abs(body.vx);
-        } else if (body.x + body.r >= width) {
-          body.x = width - body.r;
+        } else if (body.x + body.r >= width - pad) {
+          body.x = width - pad - body.r;
           body.vx = -Math.abs(body.vx);
         }
-        if (body.y - body.r <= 0) {
-          body.y = body.r;
+        if (body.y - body.r <= pad) {
+          body.y = pad + body.r;
           body.vy = Math.abs(body.vy);
-        } else if (body.y + body.r >= height) {
-          body.y = height - body.r;
+        } else if (body.y + body.r >= height - pad) {
+          body.y = height - pad - body.r;
           body.vy = -Math.abs(body.vy);
         }
       }
