@@ -377,7 +377,16 @@ def create_app(
     @app.get("/api/service-status")
     def service_status() -> dict:
         """Public, read-only maintenance state for the app's thin notice bar."""
-        return {"notices": repo.service_notices(), "announcement": repo.app_announcement()}
+        cached = cache.get("service-status:v1")
+        if cached is not None:
+            return cached
+        payload = {
+            "notices": repo.service_notices(),
+            "announcement": repo.app_announcement(),
+        }
+        # The thin bar polls this route every 30s; notices change rarely.
+        cache.set("service-status:v1", payload, ttl=60)
+        return payload
 
     @app.post("/bot/webhook")
     def bot_webhook(

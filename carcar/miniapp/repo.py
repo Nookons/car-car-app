@@ -862,16 +862,8 @@ class MiniAppRepo:
                 (token_hash,),
             )
             row = cur.fetchone()
-            if not row:
-                return None
-            cur.execute(
-                """
-                update web_session set last_seen_at = now()
-                where id = %s and last_seen_at < now() - interval '5 minutes'
-                """,
-                (row["session_id"],),
-            )
-        conn.commit()
+        if not row:
+            return None
         data = dict(row)
         user = {key: data[key] for key in USER_KEYS}
         return {

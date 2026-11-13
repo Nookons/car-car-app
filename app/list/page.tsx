@@ -145,7 +145,7 @@ function resultsLabel(
 }
 
 export default function ListPage() {
-  const { token, ready } = useAuth();
+  const { token } = useAuth();
   const { t, lang } = useI18n();
   const [filters, setFilters] = React.useState<Filters>({});
   const [query, setQuery] = React.useState("");
@@ -221,7 +221,8 @@ export default function ListPage() {
 
   // Гидратация: ссылка из «Главной» важнее кэша, кэш важнее сохранённых фильтров.
   React.useEffect(() => {
-    if (!ready || started.current) return;
+    // Список публичный: не ждём медленную проверку сессии, стартуем сразу.
+    if (started.current) return;
     started.current = true;
     const fromUrl = readFiltersFromUrl();
     if (fromUrl) {
@@ -244,7 +245,7 @@ export default function ListPage() {
     const initial = loadFilters();
     setFilters(initial);
     void fetchPage(initial, 0);
-  }, [ready, fetchPage]);
+  }, [fetchPage]);
 
   // Позицию прокрутки сохраняем, чтобы возврат из объявления был на месте.
   React.useEffect(() => {
