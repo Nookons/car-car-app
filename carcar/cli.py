@@ -415,6 +415,8 @@ def main(argv: list[str] | None = None) -> int:
                     f"обогащено: {summary['enriched']} из {summary['processed']} "
                     f"(ошибок {summary['errors']}, {summary['seconds']} с)"
                 )
+                if summary.get("blocked"):
+                    return 75
 
             elif args.command == "watch":
                 summary = watch(

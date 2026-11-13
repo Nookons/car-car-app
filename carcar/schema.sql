@@ -840,3 +840,7 @@ alter default privileges for role postgres in schema public
 
 -- Cursor pagination for support notification history.
 create index if not exists notification_user_history_idx on notification (user_id, id desc);
+
+create index if not exists listing_detail_recovery_idx
+    on listing (source_id, first_seen_at, id)
+    where status = 'active' and (details_fetched_at is null or coalesce(photos_count,0) = 0);

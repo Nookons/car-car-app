@@ -7,7 +7,7 @@ import math
 import os
 import re
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from .price_model import analyse_price
@@ -27,7 +27,7 @@ FIELDS = """
     l.description, l.version, l.generation, l.doors, l.seats, l.drive, l.condition,
     l.co2_gkm, l.consumption_urban, l.consumption_extra, l.equipment,
     l.thumb_url, l.photos, l.photos_count, l.published_at, l.first_seen_at,
-    l.last_seen_at, l.status
+    l.last_seen_at, l.status, l.details_fetched_at
 """
 
 # Для выдачи не тащим описание и оборудование: это мегабайты лишнего I/O.
@@ -164,6 +164,7 @@ def _card(
         "currency": (row.get("currency") or "PLN").strip(),
         "photos": photos[:60],
         "description": row.get("description") or "",
+        "detail_status": "ready" if row.get("details_fetched_at") and row.get("photos") else "pending",
         "seller": {
             "type": "dealer"
             if row.get("seller_type") == "dealer"
@@ -290,6 +291,8 @@ class MiniAppRepo:
             raise RuntimeError("это складская эко-система — Mini App сюда не подключаем")
         # Кэш ставит API; в скриптах и тестах его может не быть.
         self.cache: Any | None = None
+        from ..cache import Cache
+        self._detail_guard = Cache(prefix="carcar-detail")
         # Оценка рынка для списков (лента, похожие) стоит ~70 % трафика из базы:
         # на 10 карточек это до 600 сравнимых машин с полями. Пока квота egress
         # впритык, считаем её только в карточке; вернуть спискам —
@@ -1585,10 +1588,16 @@ class MiniAppRepo:
                 continue
             values[key] = number if low <= number <= high else None
         tags = [tag for tag in (values.get("equipment") or []) if tag][:120]
+        photos = [photo for photo in (values.get("photos") or [])
+                  if isinstance(photo, str) and photo.startswith("https://")][:60]
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
                 """
                 update listing set
+                    photos = case when cardinality(%(photos)s::text[]) > 0
+                                  then %(photos)s::text[] else photos end,
+                    photos_count = case when cardinality(%(photos)s::text[]) > 0
+                                        then cardinality(%(photos)s::text[]) else photos_count end,
                     description = coalesce(%(description)s, description),
                     version = coalesce(%(version)s, version),
                     generation = coalesce(%(generation)s, generation),
@@ -1608,13 +1617,14 @@ class MiniAppRepo:
                     equipment = case when cardinality(%(tags)s::text[]) > 0
                                      then %(tags)s::text[] else equipment end,
                     vin = coalesce(%(vin)s, vin),
-                    details_fetched_at = now(),
+                    details_fetched_at = case when cardinality(%(photos)s::text[]) > 0
+                                                  or cardinality(photos) > 0
+                                              then now() else details_fetched_at end,
                     updated_at = now()
                 where id = %(id)s
                 """,
-                {"id": listing_id, "tags": tags, **values},
+                {**values, "id": listing_id, "tags": tags, "photos": photos},
             )
-        conn.commit()
 
     def set_description(self, listing_id: int, text: str) -> None:
         with self.pool.connection() as conn, conn.cursor() as cur:
@@ -1704,26 +1714,25 @@ class MiniAppRepo:
             events = list(reversed(events_all[-10:]))
             price_history, initial_price = _price_history(row, events_all)
 
-        needs_details = (
-            not row.get("description")
-            or not row.get("equipment")
-            or not row.get("drive")
-            or not row.get("condition")
-            or not row.get("doors")
-            or not row.get("color")
-            or not row.get("body")
-        )
-        if needs_details and row.get("url"):
+        fetched_at = row.get("details_fetched_at")
+        # Equipment, VIN, drive and description may legitimately be absent at
+        # the source. Their absence must not trigger a download on every visit.
+        stale = fetched_at is None or fetched_at < datetime.now(UTC) - timedelta(days=1)
+        needs_details = not row.get("photos") or fetched_at is None or (stale and not row.get("description"))
+        guard = self.cache if self.cache is not None else self._detail_guard
+        if needs_details and row.get("url") and guard.add(f"detail-fetch:v1:{listing_id}", True, ttl=60):
             # Карточка скачана раньше без полного набора полей — добираем лениво.
             try:
                 from ..client import Client
                 from ..config import Settings
                 from ..parse import _to_int, parse_offer
 
-                client = Client(Settings())
-                offer = parse_offer(client.get(row["url"]).text, row["url"])
+                with Client(Settings(timeout=10, retries=1)) as client:
+                    offer = parse_offer(client.get(row["url"]).text, row["url"], expected_id=row["external_id"])
                 details = offer.details or {}
                 values = {
+                    "photos": offer.photos[:60],
+                    "photos_count": len(offer.photos[:60]),
                     "description": (offer.description or "").strip()[:2000] or None,
                     "version": offer.version or None,
                     "generation": offer.generation or None,
@@ -1744,9 +1753,11 @@ class MiniAppRepo:
                     "vin": (offer.details.get("vin") or "").strip().upper() or None,
                 }
                 self.apply_detail(listing_id, values)
-                row.update({key: value for key, value in values.items() if value is not None})
-            except Exception:
-                pass
+                row["details_fetched_at"] = datetime.now(UTC)
+                row.update({key: value for key, value in values.items() if value not in (None, "", [])})
+            except Exception as exc:
+                import logging
+                logging.getLogger("carcar.miniapp").warning("detail fetch failed listing_id=%s: %s", listing_id, exc)
 
         inferred = _infer_subject_features(row)
         row.update(

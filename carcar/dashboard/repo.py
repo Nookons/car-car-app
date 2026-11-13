@@ -24,9 +24,13 @@ FIELDS = """
     l.year, l.mileage_km, l.fuel, l.gearbox, l.body, l.power_hp, l.engine_cm3,
     l.color, l.vin, l.city, l.region, l.lat, l.lon, l.seller_type, l.seller_name,
     l.thumb_url, l.photos, l.photos_count, l.published_at, l.first_seen_at,
-    l.last_seen_at, l.updated_at, l.status
+    l.last_seen_at, l.updated_at, l.status, l.details_fetched_at
 """
 
+
+DETAIL_FIELDS = FIELDS + """, l.description, l.version, l.generation, l.doors, l.seats,
+    l.drive, l.condition, l.co2_gkm, l.consumption_urban, l.consumption_extra, l.equipment
+"""
 
 def _num(value: Any) -> int | None:
     return None if value is None else int(value)
@@ -57,7 +61,7 @@ def _item(row: dict[str, Any]) -> dict[str, Any]:
         "seller_type": row.get("seller_type"),
         "thumbnail": row.get("thumb_url"),
         "photos_count": row.get("photos_count") or 0,
-        "has_detail": (row.get("photos_count") or 0) > 0,
+        "has_detail": bool(row.get("details_fetched_at") and (row.get("photos_count") or 0) > 0),
         "published_at": _iso(row.get("published_at")),
         "distance_km": round(row["distance_km"], 1)
         if row.get("distance_km") is not None
@@ -301,7 +305,7 @@ class DatabaseRepo:
         with self.pool.connection() as conn, conn.cursor() as cur:
             cur.execute(
                 f"""
-                select {FIELDS}, s.code as source_code
+                select {DETAIL_FIELDS}, s.code as source_code
                 from listing l join source s on s.id = l.source_id
                 where l.id = %s
                 """,
@@ -344,8 +348,13 @@ class DatabaseRepo:
             "price": _num(row.get("price")),
             "currency": (row.get("currency") or "PLN").strip(),
             "photos": photos[:60],
-            "description": "",
+            "description": row.get("description") or "",
             "details": {},
+            **{key: row.get(key) for key in (
+                "version", "generation", "doors", "seats", "drive", "condition",
+                "co2_gkm", "consumption_urban", "consumption_extra",
+            )},
+            "equipment": row.get("equipment") or [],
             "seller": {
                 "type": "dealer"
                 if row.get("seller_type") == "dealer"
@@ -356,8 +365,8 @@ class DatabaseRepo:
             "region": row.get("region") or "",
             "created_at": _iso(row.get("published_at")),
             "updated_at": _iso(row.get("updated_at")),
-            "has_detail": has_photos,
-            "fetched_at": _iso(row.get("updated_at")),
+            "has_detail": bool(row.get("details_fetched_at") and has_photos),
+            "fetched_at": _iso(row.get("details_fetched_at")),
             "year": row.get("year"),
             "mileage_km": row.get("mileage_km"),
             "engine_cm3": row.get("engine_cm3"),

@@ -10,6 +10,9 @@ const I18N = {
     less: "Свернуть",
     footer: "Фото и данные — с otomoto.pl, ссылки ведут на оригинал.",
     loadCard: "Загрузить карточку",
+    refreshCard: "Обновить данные",
+    readOnly: "Предпросмотр: только чтение",
+    readOnlyHint: "Здесь показаны рабочие данные без права записи. Догрузить карточку можно в рабочем Dashboard.",
     loading: "Загружаю карточку…",
     loaded: "Карточка сохранена",
     noPhotos: "Нет фотографий",
@@ -32,6 +35,8 @@ const I18N = {
       origin: "Страна",
       created: "Добавлено",
       city: "Город",
+      version: "Версия", generation: "Поколение", doors: "Двери", seats: "Места", drive: "Привод", condition: "Состояние",
+      co2: "Выбросы CO₂", urban: "Расход в городе", extra: "Расход за городом",
     },
     error404: "Объявление не найдено — возможно, оно ещё не в базе.",
     errorLoad: "Не удалось загрузить данные.",
@@ -63,6 +68,9 @@ const I18N = {
     less: "Show less",
     footer: "Photos and data from otomoto.pl; links open the original.",
     loadCard: "Load full card",
+    refreshCard: "Refresh data",
+    readOnly: "Read-only preview",
+    readOnlyHint: "Production data is read-only here. Fetch the full card in the production Dashboard.",
     loading: "Loading card…",
     loaded: "Card saved",
     noPhotos: "No photos",
@@ -85,6 +93,8 @@ const I18N = {
       origin: "Country",
       created: "Listed",
       city: "City",
+      version: "Version", generation: "Generation", doors: "Doors", seats: "Seats", drive: "Drive", condition: "Condition",
+      co2: "CO₂ emissions", urban: "Urban consumption", extra: "Extra-urban consumption",
     },
     error404: "Listing not found — it may not be in the base yet.",
     errorLoad: "Failed to load data.",
@@ -208,6 +218,13 @@ function kvRows() {
     [s.body, labelBody(card.body)],
     [s.color, card.color],
     [s.vin, card.vin],
+    [s.version, card.version], [s.generation, card.generation],
+    [s.doors, card.doors], [s.seats, card.seats],
+    [s.drive, ({fwd:"FWD", rwd:"RWD", awd:"AWD"})[card.drive] || card.drive],
+    [s.condition, lang === "ru" ? ({used:"С пробегом", new:"Новый"})[card.condition] || card.condition : card.condition],
+    [s.co2, card.co2_gkm != null ? `${card.co2_gkm} g/km` : null],
+    [s.urban, card.consumption_urban != null ? `${card.consumption_urban} l/100 km` : null],
+    [s.extra, card.consumption_extra != null ? `${card.consumption_extra} l/100 km` : null],
     [s.origin, card.country_origin],
     [s.city, [card.city, card.region].filter(Boolean).join(", ")],
     [s.created, card.created_at ? fmtDate(card.created_at) : null],
@@ -277,7 +294,7 @@ function render() {
   }
   $("location").textContent = (place || "") + distance;
 
-  const kind = card.seller?.type === "PRIVATE" ? t("private") : card.seller?.type ? t("dealer") : "";
+  const kind = ["PRIVATE", "private"].includes(card.seller?.type) ? t("private") : card.seller?.type ? t("dealer") : "";
   $("seller").textContent = card.seller?.name
     ? `${t("seller")}: ${card.seller.name}${kind ? ` · ${kind}` : ""}`
     : "";
@@ -289,14 +306,19 @@ function render() {
 
   const fetchButton = $("fetch");
   const hint = $("hint");
-  if (!card.has_detail) {
-    fetchButton.hidden = false;
-    fetchButton.textContent = t("loadCard");
-    fetchButton.disabled = false;
-    hint.textContent = t("previewOnly");
-  } else {
-    fetchButton.hidden = true;
-    hint.textContent = card.fetched_at ? `${t("loadedAt")}: ${fmtDate(card.fetched_at)}` : "";
+  const readOnly = document.body.dataset.readOnlyPreview === "true";
+  fetchButton.hidden = false;
+  fetchButton.disabled = readOnly;
+  fetchButton.textContent = readOnly ? t("readOnly") : t(card.has_detail ? "refreshCard" : "loadCard");
+  hint.textContent = readOnly ? t("readOnlyHint") : !card.has_detail ? t("previewOnly") :
+    card.fetched_at ? `${t("loadedAt")}: ${fmtDate(card.fetched_at)}` : "";
+  const equipment = card.equipment || [];
+  $("equipment-card").hidden = equipment.length === 0;
+  $("equipment-title").textContent = lang === "ru" ? "Комплектация" : "Equipment";
+  $("equipment").replaceChildren();
+  for (const label of equipment) {
+    const tag = document.createElement("span"); tag.className = "chip"; tag.textContent = label;
+    $("equipment").appendChild(tag);
   }
 
   renderGallery();
@@ -341,6 +363,8 @@ async function load() {
     if (!response.ok) throw new Error(t("errorLoad"));
     card = await response.json();
     render();
+    $("banner").className = "banner hidden";
+    $("banner").textContent = "";
   } catch (error) {
     const banner = $("banner");
     banner.className = "banner bad";
@@ -350,18 +374,23 @@ async function load() {
 
 async function fetchFull() {
   const button = $("fetch");
+  if (button.disabled || document.body.dataset.readOnlyPreview === "true") return;
   button.disabled = true;
   button.textContent = t("loading");
   try {
-    const response = await fetch(`/api/listings/${listingId()}/fetch`, { method: "POST" });
-    if (!response.ok) throw new Error(t("errorLoad"));
+    const response = await fetch(`/api/listings/${listingId()}/fetch?refresh=${Boolean(card?.has_detail)}`, {
+      method: "POST", signal: AbortSignal.timeout(30000),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(typeof result.detail === "string" ? result.detail : `${t("errorLoad")} (HTTP ${response.status})`);
+    if (!result.saved && !result.already) throw new Error(lang === "ru" ? "Источник ответил, но карточка не сохранилась. Повторите загрузку." : "The card could not be saved. Try again.");
     await load();
   } catch (error) {
     button.disabled = false;
     button.textContent = t("loadCard");
     const banner = $("banner");
     banner.className = "banner bad";
-    banner.textContent = error.message;
+    banner.textContent = error.name === "TimeoutError" ? (lang === "ru" ? "Превышено время ожидания. Обновите страницу перед повторной загрузкой." : "Request timed out. Reload before retrying.") : error.message;
   }
 }
 

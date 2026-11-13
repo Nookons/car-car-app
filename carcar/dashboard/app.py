@@ -28,7 +28,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from ..client import BlockedError, Client, FetchError
+from ..client import BlockedError, Client, FetchError, GoneError
 from ..config import Settings
 from ..control import Control, load_control, save_control
 from ..db import DatabaseSink, database_url
@@ -268,7 +268,7 @@ def create_app(
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     def make_client() -> Client:
-        settings = Settings(rps=rps)
+        settings = Settings(rps=rps, timeout=10, retries=1)
         return client_factory(settings) if client_factory else Client(settings)
 
     def dashboard_page(filename: str) -> HTMLResponse:
@@ -614,7 +614,7 @@ def create_app(
         return {"ok": True}
 
     @app.post("/api/listings/{listing_id}/fetch")
-    def fetch_card(listing_id: str) -> dict:
+    def fetch_card(listing_id: str, refresh: bool = False) -> dict:
         if not listing_id.isdigit():
             raise HTTPException(status_code=400, detail="id должен быть числом")
 
@@ -622,7 +622,7 @@ def create_app(
             row = repo.get(listing_id)
             if not row:
                 raise HTTPException(status_code=404, detail="объявление не найдено")
-            if row.get("has_detail"):
+            if row.get("has_detail") and not refresh:
                 return {"ok": True, "saved": False, "already": True}
             listing = Listing(
                 id=row["external_id"],
@@ -650,6 +650,8 @@ def create_app(
                     saved = fetch_detail(
                         client, store, listing, sink=sink, code=row.get("source") or "otomoto"
                     )
+            except GoneError as exc:
+                raise HTTPException(status_code=410, detail="Объявление снято на исходной площадке") from exc
             except BlockedError as exc:
                 raise HTTPException(status_code=503, detail=str(exc)) from exc
             except (FetchError, ParseError) as exc:
@@ -659,13 +661,13 @@ def create_app(
         row = store.find_listing(listing_id)
         if not row:
             raise HTTPException(status_code=404, detail="объявление не найдено в выдаче")
-        if store.find_detail_file(listing_id):
+        if store.find_detail_file(listing_id) and not refresh:
             return {"ok": True, "saved": False, "already": True}
 
         item = Listing(**{k: row[k] for k in Listing.__slots__ if k in row})
         try:
             with make_client() as client:
-                path = fetch_detail(client, store, item)
+                path = fetch_detail(client, store, item, refresh=refresh)
         except BlockedError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except (FetchError, ParseError) as exc:

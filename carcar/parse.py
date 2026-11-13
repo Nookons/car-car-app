@@ -266,7 +266,7 @@ class _Drive:
     parse = staticmethod(_drive_value)
 
 
-def parse_offer(html: str, url: str = "") -> Offer:
+def parse_offer(html: str, url: str = "", *, expected_id: str | None = None) -> Offer:
     data = extract_next_data(html)
     advert = data.get("props", {}).get("pageProps", {}).get("advert")
     if not isinstance(advert, dict):
@@ -285,6 +285,12 @@ def parse_offer(html: str, url: str = "") -> Offer:
         if photo.get("url")
     ]
     equipment = advert.get("equipment") or []
+    if expected_id is not None:
+        if _text(advert.get("id")) != str(expected_id):
+            raise ParseError("источник вернул другую карточку объявления")
+        photos = [photo for photo in photos if photo.startswith("https://")]
+        if not photos:
+            raise ParseError("источник не вернул фотографии: карточка не считается полной")
 
     return Offer(
         id=_text(advert.get("id")),

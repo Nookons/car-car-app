@@ -672,22 +672,36 @@ class DatabaseSink:
 
     @resilient
     def pending_details(
-        self, limit: int = 50, shard: int = 0, shards: int = 1
+        self, limit: int = 50, shard: int = 0, shards: int = 1,
+        *, code: str = "otomoto", exclude_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Объявления без карточки; shards/shard делят очередь между воркерами."""
+        """Drain oldest pending cards; revisit legacy false-success rows daily.
+
+        Errors are excluded for the rest of the run, so one invalid card cannot
+        repeatedly occupy the first batch and starve the backlog.
+        """
+        if shards < 1 or not 0 <= shard < shards:
+            raise ValueError("shard must be between 0 and shards-1")
+        source_id = self.source_id(code)
         with self.conn.cursor() as cur:
             cur.execute(
                 """
                 select external_id, url
                 from listing
-                where status = 'active' and details_fetched_at is null
+                where source_id = %s and status = 'active'
+                  and (details_fetched_at is null or (
+                      coalesce(photos_count,0) = 0
+                      and details_fetched_at < now() - interval '1 day'))
                   and (%s = 1 or id %% %s = %s)
-                order by first_seen_at desc
+                  and not (external_id = any(%s::text[]))
+                order by first_seen_at asc, id asc
                 limit %s
                 """,
-                (shards, shards, shard, limit),
+                (source_id, shards, shards, shard, exclude_ids or [], limit),
             )
-            return [{"external_id": r[0], "url": r[1]} for r in cur.fetchall()]
+            rows = [{"external_id": r[0], "url": r[1]} for r in cur.fetchall()]
+        self.conn.commit()
+        return rows
 
     def _upsert_individually(self, prepared, existing, source_id, result, events):
         bad = 0

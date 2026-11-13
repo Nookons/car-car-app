@@ -761,14 +761,14 @@ def create_app(
 
     @app.get("/api/listings/{listing_id}")
     def listing(listing_id: int) -> dict:
-        key = f"card:v6:{listing_id}"
+        key = f"card:v7:{listing_id}"
         cached = cache.get(key)
         if cached is not None:
             return cached
         card = repo.get_listing(listing_id)
         if not card:
             raise HTTPException(status_code=404, detail="объявление не найдено")
-        cache.set(key, card, ttl=600)
+        cache.set(key, card, ttl=5 if card.get("detail_status") == "pending" else 600)
         return card
 
     @app.get("/api/listings/{listing_id}/similar")

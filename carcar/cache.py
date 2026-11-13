@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from threading import Lock
 from typing import Any
 
 try:  # redis не обязателен для локального запуска
@@ -22,6 +23,7 @@ class Cache:
         self.prefix = prefix
         self._local: dict[str, tuple[float, str]] = {}
         self._redis = None
+        self._add_lock = Lock()
         url = url or os.environ.get("REDIS_URL")
         if url and redis_lib is not None:
             try:
@@ -66,6 +68,24 @@ class Cache:
         if len(self._local) > 500:  # простая защита от роста
             self._local.clear()
         self._local[self._key(key)] = (time.monotonic() + ttl, raw)
+
+    def add(self, key: str, value: Any, ttl: float = 60) -> bool:
+        """Claim a short-lived operation once, including across API replicas."""
+        raw = json.dumps(value, ensure_ascii=False, default=str)
+        if self._redis is not None:
+            try:
+                return bool(self._redis.set(self._key(key), raw, nx=True, ex=max(1, int(ttl))))
+            except Exception:  # Redis outage: fall back to a process-local guard.
+                pass
+        with self._add_lock:
+            full = self._key(key)
+            now = time.monotonic()
+            if self._local.get(full, (0, ""))[0] > now:
+                return False
+            if len(self._local) > 500:
+                self._local = {k: v for k, v in self._local.items() if v[0] > now}
+            self._local[full] = (now + ttl, raw)
+            return True
 
     def invalidate(self, prefix: str) -> None:
         if self._redis is not None:

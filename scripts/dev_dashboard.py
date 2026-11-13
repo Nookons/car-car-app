@@ -48,7 +48,7 @@ def preview_app():
         stamp = revision()
         for asset in ("style.css", "app.js", "listing.js"):
             body = re.sub(rf'/static/{re.escape(asset)}(?:\?[^" ]*)?"', f'/static/{asset}?v={stamp}"', body)
-        return HTMLResponse(body.replace("<body>", "<body>" + notice).replace("</body>", reload_script + "</body>"), status_code=response.status_code, headers={"Cache-Control": "no-store"})
+        return HTMLResponse(body.replace("<body>", '<body data-read-only-preview="true">' + notice).replace("</body>", reload_script + "</body>"), status_code=response.status_code, headers={"Cache-Control": "no-store"})
 
     return app
 

@@ -21,13 +21,17 @@ case "$MODE" in
     enrich)
         # Бесконечный догруз карточек: после 30 минут процесс сам перезапускается.
         while true; do
-            python -m carcar enrich \
+            if python -m carcar enrich \
                 --limit "${CARCAR_ENRICH_LIMIT:-100000}" \
                 --minutes 30 \
                 --rps "${CARCAR_RPS:-0.5}" \
                 --shard "${CARCAR_SHARD:-0}" \
-                --shards "${CARCAR_SHARDS:-1}"
-            sleep 10
+                --shards "${CARCAR_SHARDS:-1}"; then
+                sleep 10
+            else
+                echo "[entrypoint] enrich failed or blocked; cooling down for 5 minutes"
+                sleep 300
+            fi
         done
         ;;
     sweep)
