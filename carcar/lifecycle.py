@@ -114,7 +114,6 @@ def pass_completed(
     *,
     page: int,
     total_pages: int | None,
-    pages: int,
     errors: int,
     stopped_early: bool,
     max_error_ratio: float = MAX_SWEEP_ERROR_RATIO,
@@ -124,10 +123,14 @@ def pass_completed(
     Условия: известен `total_pages`, пройдены все страницы, обход не прерван
     лимитом/дедлайном, а ошибок не больше допустимой доли. При сомнении
     лучше не подтверждать снятия — следующий проход всё исправит.
+
+    `page` — следующая страница после последней обработанной. Если проход
+    был разбит на несколько запусков (resume), счётчик страниц текущего
+    процесса меньше `total_pages`; это нормально, главное — дошли до конца.
     """
     if stopped_early or total_pages is None or total_pages <= 0:
         return False
-    if page <= total_pages or pages < total_pages:
+    if page <= total_pages:
         return False
-    allowed = max(1, int(pages * max(0.0, max_error_ratio)))
+    allowed = max(1, int(total_pages * max(0.0, max_error_ratio)))
     return errors <= allowed

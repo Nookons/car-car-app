@@ -63,7 +63,6 @@ def test_pass_completed_requires_full_clean_pass():
     base = {
         "page": 3,
         "total_pages": 2,
-        "pages": 2,
         "errors": 0,
         "stopped_early": False,
     }
@@ -71,8 +70,13 @@ def test_pass_completed_requires_full_clean_pass():
     assert pass_completed(**{**base, "stopped_early": True}) is False
     assert pass_completed(**{**base, "total_pages": None}) is False
     assert pass_completed(**{**base, "page": 2}) is False
-    assert pass_completed(**{**base, "pages": 1}) is False
     assert pass_completed(**{**base, "errors": 2}) is False
+
+
+def test_pass_completed_accepts_resumed_process_with_fewer_pages():
+    # После resume текущий процесс прошёл 783 страницы из 7972 — это нормально,
+    # главное, что следующая страница уже за последней.
+    assert pass_completed(page=7973, total_pages=7972, errors=0, stopped_early=False) is True
 
 
 def test_outcome_price_drop_is_sold_candidate():

@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from .canonical import canon_body
-from .client import Client, FetchError, GoneError
+from .client import BlockedError, Client, FetchError, GoneError
 from .config import Settings
 from .db import DatabaseSink
 from .geo import get_geo
@@ -107,7 +107,7 @@ def discover(
                 ready = []
                 for item in fresh:
                     try:
-                        if fetch_detail(client, store, item, sink=sink):
+                        if fetch_detail(client, store, item, sink=sink, code=settings.source):
                             ready.append(item)
                         else:
                             log.info("карточка %s не загрузилась — уведомление отложено", item.id)
@@ -198,7 +198,7 @@ def fetch_detail(
 ) -> Path | str | None:
     """Карточка объявления: в БД — фото/VIN/точные координаты, иначе файл."""
     response = client.get(listing.url)
-    offer = parse_offer(response.text, listing.url)
+    offer = parse_offer(response.text, listing.url, expected_id=listing.id)
 
     if sink is not None:
         seller_location = (offer.raw.get("seller") or {}).get("location") or {}
@@ -335,8 +335,6 @@ def sweep(
             }
         pass_started_at = start_pass()
         page = 1
-    elif total_pages and next_page > total_pages:
-        # Старое состояние без completed_at: проход уже дошёл до конца.
         pass_started_at = start_pass()
         page = 1
     else:
@@ -416,20 +414,23 @@ def sweep(
     completed = pass_completed(
         page=page,
         total_pages=total_pages,
-        pages=totals["pages"],
         errors=totals["errors"],
         stopped_early=stopped_early,
     )
     removed = 0
     if completed:
         assert total_pages is not None
+        # `saved` накапливает счётчики с прошлых запусков этого же прохода;
+        # `totals` считает только текущий процесс (после resume он меньше).
+        inserted_total = int(saved.get("inserted") or totals["inserted"])
+        updated_total = int(saved.get("updated") or totals["updated"])
         try:
             state.complete_sweep_pass(
-                pages=totals["pages"],
+                pages=total_pages,
                 total_pages=total_pages,
                 errors=totals["errors"],
-                inserted=totals["inserted"],
-                updated=totals["updated"],
+                inserted=inserted_total,
+                updated=updated_total,
             )
         except Exception as exc:  # noqa: BLE001
             log.exception("sweep: не удалось сохранить завершение прохода: %s", exc)
@@ -439,7 +440,7 @@ def sweep(
                     settings.source,
                     pass_started_at,
                     errors=totals["errors"],
-                    pages=totals["pages"],
+                    pages=total_pages,
                 )
                 removed = int(stats.get("removed") or 0)
             except Exception as exc:  # noqa: BLE001
@@ -474,9 +475,15 @@ def enrich(
     started = time.monotonic()
     deadline = started + minutes * 60
     processed = enriched = errors = 0
+    excluded: set[str] = set()
+    blocked = False
+    state = CollectorState(store, settings.source, sink)
 
     while time.monotonic() < deadline and processed < limit:
-        batch = sink.pending_details(limit=50, shard=shard, shards=shards)
+        if state.paused()[0]:
+            break
+        batch = sink.pending_details(limit=50, shard=shard, shards=shards,
+                                     code=settings.source, exclude_ids=list(excluded))
         if not batch:
             break
         for row in batch:
@@ -503,17 +510,29 @@ def enrich(
                 thumbnail="",
             )
             try:
-                if fetch_detail(client, store, listing, sink=sink):
+                if fetch_detail(client, store, listing, sink=sink, code=settings.source):
                     enriched += 1
+                else:
+                    excluded.add(row["external_id"])
             except GoneError:
-                sink.mark_removed(row["external_id"])
+                sink.mark_removed(row["external_id"], code=settings.source)
                 log.info("снято с продажи: %s", row["external_id"])
+            except BlockedError as exc:
+                errors += 1
+                blocked = True
+                log.warning("enrich приостановлен: %s", exc)
+                processed += 1
+                break
             except Exception as exc:  # noqa: BLE001
                 errors += 1
+                excluded.add(row["external_id"])
                 log.warning("enrich %s: %s", row["external_id"], exc)
             processed += 1
+        if blocked:
+            break
 
     return {
+        "blocked": blocked,
         "processed": processed,
         "enriched": enriched,
         "errors": errors,
