@@ -25,6 +25,7 @@ from .canonical import Prepared, prepare
 from .lifecycle import (
     MAX_SWEEP_ERROR_RATIO,
     MISSES_TO_REMOVE,
+    REMOVAL_GRACE_DAYS,
     classify_outcome,
     dom_days,
     price_change_pct,
@@ -572,6 +573,7 @@ class DatabaseSink:
         pages: int = 0,
         min_misses: int = MISSES_TO_REMOVE,
         max_error_ratio: float = MAX_SWEEP_ERROR_RATIO,
+        grace_days: int = REMOVAL_GRACE_DAYS,
         dry_run: bool = False,
     ) -> dict[str, Any]:
         """Подтверждает снятые после полного обхода.
@@ -579,11 +581,13 @@ class DatabaseSink:
         Логика в три шага, все в одной транзакции:
           1. кого видели в этом проходе — `missed_sweeps = 0`;
           2. кого не видели — `missed_sweeps += 1`;
-          3. кто пропущен `min_misses` полных проходов подряд — `removed`.
+          3. кто пропущен `min_misses` полных проходов подряд и не виделся
+             `grace_days` дней до старта прохода — `removed`.
 
         Два пропуска защищают от ложного снятия, если одна страница выдачи
-        не открылась. Если ошибок в проходе слишком много, не трогаем счётчики
-        вообще: лучше подождать чистый проход, чем испортить историю.
+        не открылась. Суточный grace защищает от «перескока» страницы в
+        динамической выдаче. Если ошибок в проходе слишком много, не трогаем
+        счётчики вообще: лучше подождать чистый проход.
         """
         allowed = max(1, int(pages * max(0.0, max_error_ratio)))
         if errors > allowed:
@@ -623,8 +627,14 @@ class DatabaseSink:
                 """
                 select id from listing
                 where source_id = %s and status = 'active' and missed_sweeps >= %s
+                  and last_seen_at < %s - make_interval(days => %s)
                 """,
-                (source_id, max(1, min_misses)),
+                (
+                    source_id,
+                    max(1, min_misses),
+                    pass_started_at,
+                    max(0, grace_days),
+                ),
             )
             candidates = [row[0] for row in cur.fetchall()]
 
