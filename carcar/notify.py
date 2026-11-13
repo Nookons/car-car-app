@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import os
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -223,6 +224,38 @@ class Notifier:
     def market(self, conn: psycopg.Connection, item: dict[str, Any]) -> dict[str, Any] | None:
         """Оценка рынка для уведомления — та же модель, что в карточке."""
         if not item.get("price") or not item.get("make") or not item.get("model"):
+            return None
+        # Сначала — заранее посчитанная метрика. Это дешёвый lookup по PK,
+        # без self-join'а по всей таблице.
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select estimate, base_median, verdict, diff_pct,
+                           used_count, active_count
+                    from listing_market_metric
+                    where listing_id = %s
+                    order by computed_at desc
+                    limit 1
+                    """,
+                    (item["id"],),
+                )
+                metric = cur.fetchone()
+        except psycopg.errors.UndefinedTable:
+            metric = None
+        if metric:
+            median = metric["estimate"] if metric["estimate"] is not None else metric["base_median"]
+            sample = int(metric["used_count"] or metric["active_count"] or 0)
+            if median is not None and sample >= 5:
+                return {
+                    "median": int(median),
+                    "sample": sample,
+                    "diff_pct": metric["diff_pct"],
+                    "verdict": metric["verdict"],
+                }
+        # Live-расчёт оставлен только для явного CARCAR_NOTIFY_MARKET=1.
+        # По умолчанию лучше отправить уведомление без оценки, чем положить БД.
+        if os.environ.get("CARCAR_NOTIFY_MARKET", "0") != "1":
             return None
         fields = (
             "id, title, price, year, mileage_km, engine_cm3, power_hp, body, "

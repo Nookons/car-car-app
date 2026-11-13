@@ -301,7 +301,11 @@ class MiniAppRepo:
         self.pool = ConnectionPool(
             url,
             min_size=1,
-            max_size=10,
+            # Nano/Supavisor не переживает API-пул на 10 соединений:
+            # при тяжёлых запросах остальные сервисы получают
+            # ECHECKOUTTIMEOUT. Четырёх достаточно для текущего трафика.
+            max_size=int(os.environ.get("CARCAR_DB_POOL_MAX", "4")),
+            timeout=10,
             open=True,
             kwargs={
                 "connect_timeout": 10,
