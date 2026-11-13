@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from datetime import datetime
 from typing import Any
 
@@ -27,10 +28,10 @@ FIELDS = """
     l.last_seen_at, l.updated_at, l.status, l.details_fetched_at
 """
 
-
 DETAIL_FIELDS = FIELDS + """, l.description, l.version, l.generation, l.doors, l.seats,
     l.drive, l.condition, l.co2_gkm, l.consumption_urban, l.consumption_extra, l.equipment
 """
+
 
 def _num(value: Any) -> int | None:
     return None if value is None else int(value)
@@ -629,9 +630,108 @@ class DatabaseRepo:
                 (user_id, days, search_limit),
             )
             searches = [{"at": _iso(row["created_at"]), **(row["meta"] or {})} for row in cur.fetchall()]
+            cur.execute("select count(*) filter (where active)::int active, count(*)::int total from subscription where user_id=%s", (user_id,))
+            subscription_counts = cur.fetchone()
+            cur.execute("select id,name,criteria,active,created_at from subscription where user_id=%s order by active desc,id desc limit 100", (user_id,))
+            subscriptions = [{**row, "created_at": _iso(row["created_at"])} for row in cur.fetchall()]
         return {
             "user": {**user, "created_at": _iso(user["created_at"]), "last_seen_at": _iso(user["last_seen_at"])},
             "days": days, "totals": totals, "daily": daily, "searches": searches,
+            "subscriptions": subscriptions, "subscription_counts": subscription_counts,
+        }
+
+    def delete_user_subscription(self, user_id: int, sub_id: int) -> dict[str, Any] | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "delete from subscription where id=%s and user_id=%s returning id,name",
+                (sub_id, user_id),
+            )
+            deleted = cur.fetchone()
+            if not deleted:
+                return None
+            cancelled = self._cancel_unmatched_notifications(cur, user_id, "subscription deleted by administrator")
+        return {"id": deleted["id"], "cancelled_notifications": cancelled}
+
+    @staticmethod
+    def _cancel_unmatched_notifications(cur, user_id: int, reason: str) -> int:
+        from ..notify import matches
+        cur.execute("select criteria from subscription where user_id=%s and active", (user_id,))
+        remaining = [row["criteria"] or {} for row in cur.fetchall()]
+        cur.execute(
+            """select n.id notification_id,l.status,l.title,l.make,l.model,l.price,l.year,
+                      l.mileage_km,l.fuel,l.gearbox,l.body,l.drive,l.condition,l.color,
+                      l.seller_type,l.power_hp,l.engine_cm3,l.doors,l.seats,l.lat,l.lon,
+                      l.published_at,l.first_seen_at,s.code source_code
+               from notification n join listing l on l.id=n.listing_id
+               join source s on s.id=l.source_id
+               where n.user_id=%s and n.kind='new'
+                 and n.status in ('pending','held','failed') for update of n""", (user_id,))
+        cancelled = [row["notification_id"] for row in cur.fetchall()
+                     if not any(matches(criteria, row) for criteria in remaining)]
+        if cancelled:
+            cur.execute(
+                """update notification set status='dead', last_error=%s
+                   where user_id=%s and id=any(%s) and kind='new'
+                     and status in ('pending','held','failed')""", ("cancelled: " + reason, user_id, cancelled))
+        return len(cancelled)
+
+    def set_user_subscription_active(self, user_id: int, sub_id: int, active: bool) -> dict[str, Any] | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update subscription set active=%s where id=%s and user_id=%s returning id,active",
+                (active, sub_id, user_id),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            cancelled = 0 if active else self._cancel_unmatched_notifications(
+                cur, user_id, "subscription paused by administrator"
+            )
+        return {"id": row["id"], "active": bool(row["active"]), "cancelled_notifications": cancelled}
+
+    def user_notifications(
+        self, user_id: int, days: int = 30, limit: int = 50, before_id: int | None = None,
+    ) -> dict[str, Any] | None:
+        from ..notify import matches
+
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute("select id from app_user where id=%s", (user_id,))
+            if not cur.fetchone():
+                return None
+            cur.execute("select criteria from subscription where user_id=%s and active", (user_id,))
+            criteria = [row["criteria"] or {} for row in cur.fetchall()]
+            cur.execute("""select case when left(coalesce(last_error,''),10)='cancelled:' then 'cancelled' else status end state,
+                                  count(*)::int total
+                           from notification where user_id=%s and created_at>=now()-make_interval(days=>%s)
+                           group by 1""", (user_id, days))
+            totals = {row["state"]: row["total"] for row in cur.fetchall()}
+            cursor_filter = " and n.id < %s" if before_id is not None else ""
+            params = (user_id, days, before_id, limit + 1) if before_id is not None else (user_id, days, limit + 1)
+            cur.execute(f"""select n.id,n.kind,n.status delivery_status,n.created_at,n.sent_at,n.attempts,n.last_error,
+                                  l.id listing_id,l.title,l.status,l.make,l.model,l.price,l.year,l.mileage_km,
+                                  l.fuel,l.gearbox,l.body,l.drive,l.condition,l.color,l.seller_type,l.power_hp,
+                                  l.engine_cm3,l.doors,l.seats,l.lat,l.lon,l.published_at,l.first_seen_at,s.code source_code
+                           from notification n join listing l on l.id=n.listing_id join source s on s.id=l.source_id
+                           where n.user_id=%s and n.created_at>=now()-make_interval(days=>%s)
+                           {cursor_filter}
+                           order by n.id desc limit %s""", params)
+            rows = cur.fetchall()
+        has_more = len(rows) > limit
+        items = []
+        for row in rows[:limit]:
+            error = str(row.get("last_error") or "")
+            items.append({
+                "id": row["id"], "listing_id": row["listing_id"], "title": row["title"],
+                "kind": row["kind"],
+                "status": "cancelled" if error.startswith("cancelled:") else row["delivery_status"],
+                "created_at": _iso(row["created_at"]), "sent_at": _iso(row["sent_at"]),
+                "attempts": row["attempts"],
+                "error": re.sub(r"bot[0-9]+:[A-Za-z0-9_-]+", "bot[скрыто]", error),
+                "matches_current_filters": any(matches(c, row) for c in criteria) if row["kind"] == "new" else None,
+            })
+        return {
+            "items": items, "totals": totals, "limit": limit, "days": days,
+            "next_before_id": items[-1]["id"] if has_more and items else None,
         }
 
     def user_web_sessions(self, user_id: int) -> list[dict[str, Any]]:
@@ -854,6 +954,18 @@ class DatabaseRepo:
             "days": days,
             "months": months,
         }
+
+    def resource_usage(self) -> dict[str, Any]:
+        """Lightweight PostgreSQL measurements, independent of billing meters."""
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute("""select pg_database_size(current_database())::bigint database_bytes,
+                                  current_setting('max_connections')::int max_connections,
+                                  current_setting('superuser_reserved_connections')::int +
+                                    coalesce(nullif(current_setting('reserved_connections',true),''),'0')::int reserved_connections,
+                                  count(*) filter(where backend_type='client backend')::int connections,
+                                  count(*) filter(where backend_type='client backend' and state='active')::int active_connections
+                           from pg_stat_activity""")
+            return dict(cur.fetchone())
 
     # -- счётчики ----------------------------------------------------------
     def stats(self) -> dict[str, Any]:

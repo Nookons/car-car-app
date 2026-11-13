@@ -41,7 +41,8 @@
       <a class="sidebar-link selected" href="#overview" data-view="overview">Обзор</a>
       <a class="sidebar-link" href="#users" data-view="users">Пользователи</a>
       <a class="sidebar-link" href="#listings" data-view="listings">Объявления</a>
-      <a class="sidebar-link" href="#services" data-view="services">Сервисы сбора</a>
+      <a class="sidebar-link" href="#services" data-view="services">Сервисы приложения</a>
+      <a class="sidebar-link" href="#supabase" data-view="supabase">Supabase Pro</a>
       <a class="sidebar-link" href="#logs" data-view="logs">Ошибки и события</a>
       <a class="sidebar-link" href="#notices" data-view="notices">Уведомления</a>
     </nav>
@@ -50,6 +51,34 @@
   <main class="hidden" id="dashboard-main">
     <div class="dashboard-page-head"><h1 id="dashboard-view-title">Обзор</h1><span class="muted small">Состояние приложения и активность</span></div>
     <section class="banner hidden" id="banner"></section>
+
+    <section class="card" id="railway-section" data-views="services" aria-busy="true">
+      <div class="card-head"><div><h2>Сервисы Railway</h2><p class="muted small" id="railway-environment">Подключение к проекту…</p></div><button class="ghost" id="railway-refresh" type="button">Обновить</button></div>
+      <p class="banner bad hidden" id="railway-error" role="status"></p>
+      <div class="platform-summary" id="railway-summary"></div>
+      <div class="table-scroll"><table><thead><tr><th>Сервис</th><th>Контейнер</th><th>Последний деплой</th><th>Обновление</th><th>Реплики</th><th></th></tr></thead><tbody id="railway-services"><tr><td colspan="6" class="muted">Загрузка сервисов…</td></tr></tbody></table></div>
+      <p class="tiny muted" id="railway-updated" role="status"></p>
+      <p class="tiny muted">Контейнеры и деплои — из Railway. Успешный деплой не заменяет проверку работы приложения: опросы и состояние сборщика показаны ниже.</p>
+    </section>
+
+    <section id="supabase-section" data-views="supabase" aria-busy="true" class="platform-loading">
+      <div class="card platform-intro">
+        <div class="card-head"><div><h2>Supabase <span class="platform-plan">Pro</span></h2><p class="muted small" id="supabase-period">Загрузка ресурсов…</p></div><div class="topbar-right"><a class="ghost link" id="supabase-source" href="https://supabase.com/dashboard" target="_blank" rel="noopener">Открыть Usage ↗</a><button class="ghost" id="supabase-refresh" type="button">Обновить БД</button></div></div>
+        <p class="banner bad hidden" id="supabase-error" role="status"></p>
+        <p class="tiny muted" id="supabase-live-updated" role="status"></p>
+      </div>
+      <div class="resource-cards">
+        <article class="card resource-card"><span class="label">Размер PostgreSQL · сейчас</span><strong class="resource-number" id="supabase-db-size">—</strong><p class="tiny muted">Объём базы с индексами. Физический диск также содержит WAL и системные файлы.</p></article>
+        <article class="card resource-card"><span class="label">Подключения PostgreSQL · сейчас</span><strong class="resource-number" id="supabase-connections">—</strong><div id="supabase-connections-meter"></div><p class="tiny muted" id="supabase-connections-note"></p></article>
+        <article class="card resource-card"><span class="label">Выделенный диск · снимок</span><strong class="resource-number" id="supabase-disk">—</strong><p class="tiny muted" id="supabase-disk-note">Объём диска не равен занятому месту. 8 ГБ входят в Pro для каждого проекта.</p></article>
+      </div>
+      <article class="card">
+        <div class="card-head"><h2>Квоты за расчётный период</h2><span class="platform-plan" id="supabase-billing-freshness">Проверка снимка…</span></div>
+        <p class="small muted" id="supabase-billing-note"></p>
+        <div class="table-scroll"><table class="quota-table"><thead><tr><th>Ресурс</th><th>Использовано / включено</th><th>Запас</th><th>Использование квоты</th></tr></thead><tbody id="supabase-quotas"><tr><td colspan="4" class="muted">Загрузка квот…</td></tr></tbody></table></div>
+        <p class="tiny muted">Месячный биллинг — проверенный снимок Usage, с указанной датой. PostgreSQL и подключения обновляются автоматически раз в минуту. При включённом Spend Cap перерасход может привести к ограничениям; выделенный диск тарифицируется отдельно. <a href="https://supabase.com/docs/guides/platform/billing-on-supabase" target="_blank" rel="noopener">Правила Supabase ↗</a></p>
+      </article>
+    </section>
 
     <section class="card" id="collectors-section" data-views="overview services">
       <div class="card-head"><h2 data-i18n="collectors">Коллекторы объявлений</h2></div>
@@ -267,32 +296,53 @@
     </section>
   </main>
 
-  <dialog class="service-dialog user-detail-dialog" id="ua-user-dialog">
+  <dialog class="service-dialog user-detail-dialog" id="ua-user-dialog" aria-labelledby="ua-user-title">
     <div class="service-form">
       <div class="card-head">
         <div><p class="eyebrow">АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЯ</p><h2 id="ua-user-title">Статистика</h2></div>
-        <button class="ghost" type="button" id="ua-user-close" aria-label="Закрыть">✕</button>
+        <div class="support-header-actions"><button class="ghost" type="button" id="ua-user-refresh">Обновить</button><button class="ghost" type="button" id="ua-user-close" aria-label="Закрыть">✕</button></div>
       </div>
       <p class="muted small" id="ua-user-meta">Загрузка…</p>
       <p class="banner bad hidden" id="ua-user-error" role="alert"></p>
       <div id="ua-user-content" class="hidden">
-        <div class="cards analytics-kpis user-detail-kpis">
-          <article class="card kpi"><span class="label">Сессии</span><strong id="ua-user-sessions">—</strong></article>
-          <article class="card kpi"><span class="label">Поиски</span><strong id="ua-user-searches">—</strong></article>
-          <article class="card kpi"><span class="label">Просмотры</span><strong id="ua-user-views">—</strong></article>
-          <article class="card kpi"><span class="label">Избранное</span><strong id="ua-user-favorites">—</strong></article>
-          <article class="card kpi"><span class="label">Подписки</span><strong id="ua-user-subscriptions">—</strong></article>
-          <article class="card kpi"><span class="label">Активных дней</span><strong id="ua-user-days">—</strong></article>
+        <div class="support-tabs" role="tablist" aria-label="Карточка пользователя">
+          <button role="tab" type="button" id="support-tab-overview" data-support-tab="overview" aria-controls="support-panel-overview">Обзор</button>
+          <button role="tab" type="button" id="support-tab-subscriptions" data-support-tab="subscriptions" aria-controls="support-panel-subscriptions">Подписки</button>
+          <button role="tab" type="button" id="support-tab-searches" data-support-tab="searches" aria-controls="support-panel-searches">Поиски</button>
+          <button role="tab" type="button" id="support-tab-notifications" data-support-tab="notifications" aria-controls="support-panel-notifications">Уведомления</button>
+          <button role="tab" type="button" id="support-tab-access" data-support-tab="access" aria-controls="support-panel-access">Доступ</button>
         </div>
-        <div class="user-detail-scroll">
+        <div class="user-detail-scroll" role="tabpanel" id="support-panel-subscriptions" data-support-panel="subscriptions" aria-labelledby="support-tab-subscriptions">
+          <h3>Подписки пользователя</h3>
+          <p id="ua-subscription-message" class="muted small" role="status"></p>
+          <table><thead><tr><th>Название</th><th>Статус</th><th>Фильтры</th><th>Создана</th><th>Действия</th></tr></thead><tbody id="ua-user-subscription-list"></tbody></table>
+        </div>
+        <div class="user-detail-scroll" role="tabpanel" id="support-panel-searches" data-support-panel="searches" aria-labelledby="support-tab-searches">
           <h3>Поисковые запросы и фильтры · 30 дней</h3>
           <table><thead><tr><th>Время</th><th>Фраза</th><th>Фильтры</th><th>Сортировка</th></tr></thead><tbody id="ua-user-searches-list"></tbody></table>
         </div>
-        <div class="user-detail-scroll">
-          <h3>Активность по дням</h3>
-          <table><thead><tr><th>Дата</th><th>Сессии</th><th>Поиски</th><th>Просмотры</th><th>Избранное</th><th>Подписки</th></tr></thead><tbody id="ua-user-daily"></tbody></table>
+        <div class="user-detail-scroll" role="tabpanel" id="support-panel-overview" data-support-panel="overview" aria-labelledby="support-tab-overview">
+        <div class="cards analytics-kpis user-detail-kpis">
+          <article class="card kpi"><span class="label">Визиты · 30 дней</span><strong id="ua-user-sessions">—</strong></article>
+          <article class="card kpi"><span class="label">Поиски</span><strong id="ua-user-searches">—</strong></article>
+          <article class="card kpi"><span class="label">Просмотры</span><strong id="ua-user-views">—</strong></article>
+          <article class="card kpi"><span class="label">Избранное</span><strong id="ua-user-favorites">—</strong></article>
+          <article class="card kpi"><span class="label">Активные подписки</span><strong id="ua-user-subscriptions">—</strong></article>
+          <article class="card kpi"><span class="label">Активных дней</span><strong id="ua-user-days">—</strong></article>
         </div>
-        <section class="support-tools">
+          <h3>Активность по дням · 30 дней</h3>
+          <table><thead><tr><th>Дата</th><th>Визиты</th><th>Поиски</th><th>Просмотры</th><th>Избранное</th><th>Подписки</th></tr></thead><tbody id="ua-user-daily"></tbody></table>
+        </div>
+        <section class="user-detail-scroll" role="tabpanel" id="support-panel-notifications" data-support-panel="notifications" aria-labelledby="support-tab-notifications">
+          <div class="card-head"><h3>Доставка уведомлений · 30 дней</h3><button class="ghost" type="button" id="ua-notifications-refresh">Обновить</button></div>
+          <p class="muted small" id="ua-notifications-state" role="status"></p>
+          <div id="ua-notifications-totals" class="delivery-totals"></div>
+          <p class="tiny muted">По 50 уведомлений на странице, сначала новые. Соответствие проверяется по текущим активным подпискам.</p>
+          <div class="support-pagination"><button class="ghost" type="button" id="ua-notifications-prev" disabled>Назад</button><span id="ua-notifications-page" class="muted small">Страница 1</span><button class="ghost" type="button" id="ua-notifications-next" disabled>Далее</button></div>
+          <table><thead><tr><th>Создано</th><th>Объявление</th><th>Доставка</th><th>Попытки</th><th>Текущие фильтры</th><th>Ошибка</th></tr></thead><tbody id="ua-notifications-list"></tbody></table>
+
+        </section>
+        <section class="support-tools" role="tabpanel" id="support-panel-access" data-support-panel="access" aria-labelledby="support-tab-access">
           <div class="card-head"><div><h3>Доступ и безопасность</h3><p class="muted small">Управление сессиями приложения и паролем пользователя</p></div><button class="ghost" id="ua-sessions-refresh" type="button">Обновить сессии</button></div>
           <div class="support-actions">
             <form id="ua-password-form" class="password-reset-form">
@@ -311,6 +361,16 @@
           <p class="banner hidden" id="ua-admin-action-success" role="status"></p>
         </section>
       </div>
+    </div>
+  </dialog>
+
+  <dialog class="admin-alert-dialog" id="subscription-delete-dialog" aria-labelledby="subscription-delete-title" aria-describedby="subscription-delete-description">
+    <h2 id="subscription-delete-title">Удалить подписку?</h2>
+    <p id="subscription-delete-description"></p>
+    <p id="subscription-delete-error" class="hidden" role="alert"></p>
+    <div class="admin-dialog-actions">
+      <button class="admin-button admin-button-outline" id="subscription-delete-cancel" type="button" autofocus>Отмена</button>
+      <button class="admin-button admin-button-destructive" id="subscription-delete-confirm" type="button">Удалить</button>
     </div>
   </dialog>
 

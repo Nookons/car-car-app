@@ -168,6 +168,12 @@ let userSearchTimer = null;
 let userAnalyticsRequest = 0;
 let userDetailRequest = 0;
 let activeSupportUserId = null;
+let activeSupportTab = "overview";
+let notificationsRequest = 0;
+let notificationCursors = [null];
+let notificationPage = 0;
+let nextNotificationCursor = null;
+let sessionsRequest = 0;
 let userOffset = 0;
 const userPageSize = 50;
 
@@ -264,7 +270,8 @@ function renderState(status) {
   const state = status.state;
   const pill = $("state-pill");
   pill.dataset.state = state;
-  $("state-text").textContent = t("states")[state] || state;
+  pill.title = lang === "ru" ? "Состояние сбора по времени последнего опроса" : "Collection status based on the latest poll";
+  $("state-text").textContent = state === "stale" ? (lang === "ru" ? "Нет опросов" : "No recent polls") : t("states")[state] || state;
 
   const hb = status.heartbeat || {};
   const parts = [];
@@ -836,13 +843,24 @@ async function loadUserDetail(userId) {
   const error = $("ua-user-error");
   const content = $("ua-user-content");
   if (!dialog.open) dialog.showModal();
+  if (activeSupportUserId !== String(userId)) {
+    activeSupportTab = "overview";
+    notificationCursors = [null]; notificationPage = 0; nextNotificationCursor = null;
+    $("ua-new-password").value = "";
+    $("ua-admin-action-error").classList.add("hidden");
+    $("ua-admin-action-success").classList.add("hidden");
+    $("ua-notifications-list").replaceChildren();
+    $("ua-notifications-totals").replaceChildren();
+    $("ua-sessions").replaceChildren();
+  }
   activeSupportUserId = String(userId);
   error.classList.add("hidden");
   content.classList.add("hidden");
   $("ua-user-meta").textContent = "Загрузка…";
+  $("ua-subscription-message").textContent = "";
   $("ua-user-title").textContent = `Пользователь #${userId}`;
   try {
-    const response = await fetch(`/api/user-metrics/${encodeURIComponent(userId)}?days=30&search_limit=100`, { cache: "no-store" });
+    const response = await dashboardFetch(`/api/user-metrics/${encodeURIComponent(userId)}?days=30&search_limit=100`, { cache: "no-store" });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
     if (requestId !== userDetailRequest) return;
@@ -859,14 +877,43 @@ async function loadUserDetail(userId) {
     $("ua-user-searches").textContent = fmtInt(totals.searches);
     $("ua-user-views").textContent = fmtInt(totals.listing_views);
     $("ua-user-favorites").textContent = fmtInt(totals.favorites_added);
-    $("ua-user-subscriptions").textContent = fmtInt(totals.subscriptions_created);
+    $("ua-user-subscriptions").textContent = fmtInt(data.subscription_counts?.active);
+    fillAnalyticsTable("ua-user-subscription-list", data.subscriptions, (tr, sub) => {
+      addAnalyticsCell(tr, sub.name || `#${sub.id}`);
+      addAnalyticsCell(tr, sub.active ? "Активна" : "На паузе");
+      addAnalyticsCell(tr, formatSupportFilters(sub.criteria));
+      const conflicts = supportFilterConflicts(sub.criteria);
+      if (conflicts.length) {
+        const warning = document.createElement("small");
+        warning.className = "filter-conflict";
+        warning.textContent = `Конфликт сохранённых полей: ${conflicts.join(", ")}.`;
+        tr.lastElementChild.appendChild(warning);
+      }
+      addAnalyticsCell(tr, fmtDateTime(sub.created_at));
+      const actions = document.createElement("td");
+      actions.className = "subscription-actions";
+      const toggle = document.createElement("button");
+      toggle.type="button"; toggle.className="admin-button admin-button-outline";
+      toggle.textContent=sub.active ? "Пауза" : "Возобновить";
+      toggle.setAttribute("aria-label", `${toggle.textContent}: ${sub.name || sub.id}`);
+      toggle.addEventListener("click", () => toggleUserSubscription(userId,sub,toggle));
+      actions.appendChild(toggle);
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "admin-button admin-button-destructive";
+      remove.textContent = "Удалить";
+      remove.setAttribute("aria-label", `Удалить подписку «${sub.name || sub.id}»`);
+      remove.addEventListener("click", () => openSubscriptionDelete(userId, sub));
+      actions.appendChild(remove);
+      tr.appendChild(actions);
+    }, 5);
     $("ua-user-days").textContent = fmtInt(totals.active_days);
     fillAnalyticsTable("ua-user-searches-list", data.searches, (tr, item) => {
       addAnalyticsCell(tr, new Date(item.at).toLocaleString("ru-RU"));
       addAnalyticsCell(tr, item.query || "—");
-      const filters = Object.entries(item.filters || {}).map(([key, value]) => `${key}: ${value}`).join(" · ");
+      const filters = formatSupportFilters(item.filters);
       addAnalyticsCell(tr, filters || "—");
-      addAnalyticsCell(tr, item.sort || "new");
+      addAnalyticsCell(tr, ({new:"Сначала новые",price_asc:"Дешевле",price_desc:"Дороже"})[item.sort] || item.sort || "Сначала новые");
     }, 4);
     fillAnalyticsTable("ua-user-daily", data.daily, (tr, day) => {
       addAnalyticsCell(tr, day.day);
@@ -878,7 +925,7 @@ async function loadUserDetail(userId) {
     }, 6);
     content.classList.remove("hidden");
     $("ua-user-meta").classList.remove("muted");
-    await loadUserSessions(user.id);
+    renderSupportTab();
   } catch (cause) {
     if (requestId !== userDetailRequest) return;
     $("ua-user-meta").textContent = "";
@@ -903,20 +950,168 @@ function showUserActionMessage(kind, message) {
   target.classList.remove("hidden");
 }
 
+const supportFilterLabels = {q:"Поиск",make:"Марка",makes:"Марки",model:"Модель",body:"Кузов",bodies:"Кузова",fuel:"Топливо",fuels:"Топливо",gearbox:"КПП",gearboxes:"КПП",price_min:"Цена от",price_max:"Цена до",year_min:"Год от",year_max:"Год до",mileage_min:"Пробег от",mileage_max:"Пробег до",power_min:"Мощность от",power_max:"Мощность до",engine_min:"Объём от",engine_max:"Объём до",radius_km:"Радиус, км",lat:"Широта",lon:"Долгота",source:"Площадка",drive:"Привод",seller_type:"Продавец",condition:"Состояние",color:"Цвет",doors:"Двери",seats:"Места",published_days:"Опубликовано за дней"};
+const supportValues = {sedan:"Седан",van:"Фургон",suv:"Внедорожник",wagon:"Универсал",hatchback:"Хэтчбек",coupe:"Купе",petrol:"Бензин",diesel:"Дизель",electric:"Электро",hybrid:"Гибрид",automatic:"Автомат",manual:"Механика",private:"Частный",dealer:"Дилер",used:"С пробегом",new:"Новый"};
+function formatSupportFilters(filters = {}) {
+  return Object.entries(filters || {}).filter(([key,value])=>key!=="sort" && value!=null && value!=="" && (!Array.isArray(value)||value.length)).map(([key,value])=>{
+    const display=Array.isArray(value) ? value.map(v=>supportValues[v]||v).join(", ") : typeof value==="number" ? (/^year_/.test(key) ? String(value) : value.toLocaleString("ru-RU",{maximumFractionDigits:6})) : supportValues[value]||value;
+    return `${supportFilterLabels[key]||key}: ${display}`;
+  }).join(" · ");
+}
+function supportFilterConflicts(filters = {}) {
+  return [["make","makes"],["body","bodies"],["fuel","fuels"],["gearbox","gearboxes"]]
+    .filter(([single,multi]) => filters?.[single] && Array.isArray(filters[multi]) && !filters[multi].includes(filters[single]))
+    .map(([single,multi]) => `«${supportFilterLabels[single]}» / «${supportFilterLabels[multi]}»`);
+}
+function renderSupportTab() {
+  document.querySelectorAll("[data-support-tab]").forEach(el=>{const on=el.dataset.supportTab===activeSupportTab; el.setAttribute("aria-selected",String(on)); el.tabIndex=on?0:-1;});
+  document.querySelectorAll("[data-support-panel]").forEach(el=>{el.hidden=el.dataset.supportPanel!==activeSupportTab;});
+  if(activeSupportTab==="access") void loadUserSessions();
+  if(activeSupportTab==="notifications") void loadUserNotifications();
+}
+document.querySelectorAll("[data-support-tab]").forEach((button,index,buttons)=>{
+  button.addEventListener("click",()=>{activeSupportTab=button.dataset.supportTab; renderSupportTab();});
+  button.addEventListener("keydown",event=>{
+    let next;
+    if(event.key==="ArrowRight") next=(index+1)%buttons.length;
+    if(event.key==="ArrowLeft") next=(index-1+buttons.length)%buttons.length;
+    if(event.key==="Home") next=0;
+    if(event.key==="End") next=buttons.length-1;
+    if(next!=null){event.preventDefault();buttons[next].click();buttons[next].focus();}
+  });
+});
+$("ua-user-refresh").addEventListener("click",()=>{if(activeSupportUserId) void loadUserDetail(activeSupportUserId);});
+const subscriptionChanges = new Set();
+async function toggleUserSubscription(userId,sub,button) {
+  const key=`${userId}:${sub.id}`;
+  if(subscriptionChanges.has(key)) return;
+  subscriptionChanges.add(key);button.disabled=true;
+  try {
+    const response=await fetch(`/api/users/${encodeURIComponent(userId)}/subscriptions/${sub.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({active:!sub.active})});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(typeof result.detail==="string"?result.detail:"Не удалось изменить подписку");
+    if(String(activeSupportUserId)===String(userId)) {
+      await loadUserDetail(userId);
+      $("ua-subscription-message").textContent=sub.active ? `Подписка на паузе. Отменено уведомлений: ${fmtInt(result.cancelled_notifications)}.` : "Подписка возобновлена.";
+      void loadUserAnalytics();
+    }
+  } catch(error){if(String(activeSupportUserId)===String(userId))$("ua-subscription-message").textContent=error.message;}
+  finally {subscriptionChanges.delete(key);button.disabled=false;}
+}
+const deliveryLabels={sent:"Доставлено",pending:"В очереди",held:"Ожидает дайджеста",failed:"Повтор отправки",dead:"Ошибка доставки",cancelled:"Отменено"};
+async function loadUserNotifications() {
+  if(!activeSupportUserId) return;
+  const userId=String(activeSupportUserId),requestId=++notificationsRequest;
+  $("ua-notifications-state").textContent="Загрузка истории…";
+  $("ua-notifications-prev").disabled=true;
+  $("ua-notifications-next").disabled=true;
+  const params = new URLSearchParams({days:"30", limit:"50"});
+  if(notificationCursors[notificationPage]!=null) params.set("before_id",notificationCursors[notificationPage]);
+  try {
+    const response=await dashboardFetch(`/api/users/${userId}/notifications?${params}`,{cache:"no-store"});
+    const data=await response.json();
+    if(requestId!==notificationsRequest || userId!==String(activeSupportUserId))return;
+    if(!response.ok)throw new Error(typeof data.detail==="string"?data.detail:"Не удалось загрузить историю");
+    $("ua-notifications-totals").replaceChildren();
+    for(const [state,total] of Object.entries(data.totals||{})) {
+      const badge=document.createElement("span");badge.className=`delivery-badge delivery-${state}`;
+      badge.textContent=`${deliveryLabels[state]||state}: ${fmtInt(total)}`;$("ua-notifications-totals").appendChild(badge);
+    }
+    fillAnalyticsTable("ua-notifications-list",data.items,(tr,item)=>{
+      addAnalyticsCell(tr,fmtDateTime(item.created_at));
+      const td=document.createElement("td"),link=document.createElement("a");
+      link.href=`/listing/${encodeURIComponent(item.listing_id)}`;link.target="_blank";link.rel="noopener";link.textContent=item.title||`#${item.listing_id}`;td.appendChild(link);tr.appendChild(td);
+      addAnalyticsCell(tr,deliveryLabels[item.status]||item.status);
+      if(item.sent_at) tr.lastElementChild.title=`Доставлено: ${fmtDateTime(item.sent_at)}`;
+      addAnalyticsCell(tr,fmtInt(item.attempts));
+      addAnalyticsCell(tr,item.matches_current_filters==null ? "Снижение цены" : item.matches_current_filters ? "Соответствует" : "Не соответствует",item.matches_current_filters===false?"filter-mismatch":"");
+      addAnalyticsCell(tr,item.error||"—");
+    },6);
+    nextNotificationCursor=data.next_before_id;
+    $("ua-notifications-prev").disabled=notificationPage===0;
+    $("ua-notifications-next").disabled=nextNotificationCursor==null;
+    $("ua-notifications-page").textContent=`Страница ${notificationPage+1}`;
+    $("ua-notifications-state").textContent=data.items.length ? `Показано ${data.items.length} уведомлений` : "Уведомлений за этот период нет";
+  }catch(error){
+    if(requestId!==notificationsRequest || userId!==String(activeSupportUserId)) return;
+    $("ua-notifications-state").textContent=error.message;
+    $("ua-notifications-list").replaceChildren();
+    $("ua-notifications-prev").disabled=notificationPage===0;
+  }
+}
+$("ua-notifications-refresh").addEventListener("click",()=>{
+  notificationCursors=[null]; notificationPage=0; void loadUserNotifications();
+});
+$("ua-notifications-prev").addEventListener("click",()=>{
+  if(notificationPage>0){notificationPage--; void loadUserNotifications();}
+});
+$("ua-notifications-next").addEventListener("click",()=>{
+  if(nextNotificationCursor!=null){notificationPage++; notificationCursors[notificationPage]=nextNotificationCursor; void loadUserNotifications();}
+});
+
+let pendingSubscriptionDelete = null;
+let subscriptionDeleteBusy = false;
+function openSubscriptionDelete(userId, sub) {
+  pendingSubscriptionDelete = {userId:String(userId), subId:sub.id};
+  $("subscription-delete-description").textContent = `Подписка «${sub.name || `#${sub.id}`}» будет удалена. Ожидающие уведомления, которые больше не подходят под другие активные подписки, будут отменены. Восстановить подписку можно только созданием заново.`;
+  $("subscription-delete-error").classList.add("hidden");
+  $("subscription-delete-dialog").showModal();
+}
+$("subscription-delete-cancel").addEventListener("click", () => $("subscription-delete-dialog").close());
+$("subscription-delete-dialog").addEventListener("cancel", event => { if (subscriptionDeleteBusy) event.preventDefault(); });
+$("subscription-delete-dialog").addEventListener("close", () => { if (!subscriptionDeleteBusy) pendingSubscriptionDelete = null; });
+$("subscription-delete-confirm").addEventListener("click", async () => {
+  if (!pendingSubscriptionDelete || subscriptionDeleteBusy) return;
+  const {userId, subId} = pendingSubscriptionDelete;
+  subscriptionDeleteBusy = true;
+  $("subscription-delete-confirm").disabled = true;
+  $("subscription-delete-cancel").disabled = true;
+  $("subscription-delete-error").classList.add("hidden");
+  try {
+    const response = await fetch(`/api/users/${encodeURIComponent(userId)}/subscriptions/${encodeURIComponent(subId)}`, {method:"DELETE"});
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(typeof result.detail === "string" ? result.detail : "Не удалось удалить подписку");
+    $("subscription-delete-dialog").close();
+    pendingSubscriptionDelete = null;
+    if (String(activeSupportUserId) === userId && $("ua-user-dialog").open) {
+      await loadUserDetail(userId);
+      $("ua-subscription-message").textContent = `Подписка удалена. Отменено ожидающих уведомлений: ${fmtInt(result.cancelled_notifications)}.`;
+    }
+    void loadUserAnalytics();
+  } catch (error) {
+    $("subscription-delete-error").textContent = error.message || "Ошибка удаления";
+    $("subscription-delete-error").classList.remove("hidden");
+  } finally {
+    subscriptionDeleteBusy = false;
+    $("subscription-delete-confirm").disabled = false;
+    $("subscription-delete-cancel").disabled = false;
+  }
+});
+
+function sessionDeviceLabel(ua) {
+  if (!ua) return "Неизвестное устройство";
+  const os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android" : /Macintosh/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : "Устройство";
+  const browser = /Edg/.test(ua) ? "Edge" : /Chrome|CriOS/.test(ua) ? "Chrome" : /Firefox|FxiOS/.test(ua) ? "Firefox" : /Version.*Safari/.test(ua) ? "Safari" : "Приложение";
+  return `${os} · ${browser}`;
+}
+
 async function loadUserSessions(userId = activeSupportUserId) {
   if (!userId) return;
   const status = $("ua-sessions-status");
+  const requestId=++sessionsRequest;
   status.textContent = "Загружаю…";
   try {
-    const response = await fetch(`/api/users/${encodeURIComponent(userId)}/sessions`, { cache: "no-store" });
+    const response = await dashboardFetch(`/api/users/${encodeURIComponent(userId)}/sessions`, { cache: "no-store" });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+    if (requestId!==sessionsRequest || String(userId)!==String(activeSupportUserId)) return;
     const body = $("ua-sessions");
     body.replaceChildren();
     const sessions = data.items || [];
     sessions.forEach((session) => {
       const row = document.createElement("tr");
-      addAnalyticsCell(row, session.user_agent || "Неизвестное устройство");
+      addAnalyticsCell(row, sessionDeviceLabel(session.user_agent));
+      row.firstElementChild.title = session.user_agent || "";
       addAnalyticsCell(row, fmtDateTime(session.last_seen_at));
       const cell = document.createElement("td");
       const button = document.createElement("button");
@@ -930,6 +1125,7 @@ async function loadUserSessions(userId = activeSupportUserId) {
     });
     status.textContent = sessions.length ? `Активных сессий: ${sessions.length}` : "Активных сессий нет";
   } catch (error) {
+    if (requestId!==sessionsRequest || String(userId)!==String(activeSupportUserId)) return;
     status.textContent = error instanceof Error ? error.message : "Не удалось загрузить сессии";
   }
 }
@@ -1264,7 +1460,9 @@ function showDashboard() {
   loadLogs();
   loadListings();
   loadAnnouncement();
-  dashboardIntervals = [setInterval(() => { if (!document.hidden) load(); }, 15000), setInterval(() => { if (!document.hidden && ["overview", "services"].includes(dashboardView())) loadMetrics(); }, 60000), setInterval(() => { if (!document.hidden && dashboardView() === "logs") loadLogs(); }, 30000), setInterval(() => { if (!document.hidden && dashboardView() === "listings" && !$("listing-query").matches(":focus")) loadListings(); }, 60000)];
+  if (dashboardView() === "services") loadRailway();
+  if (dashboardView() === "supabase") loadSupabase();
+  dashboardIntervals = [setInterval(() => { if (!document.hidden && dashboardView() === "services") loadRailway(); if (!document.hidden && dashboardView() === "supabase") loadSupabase(); }, 60000), setInterval(() => { if (!document.hidden) load(); }, 15000), setInterval(() => { if (!document.hidden && ["overview", "services"].includes(dashboardView())) loadMetrics(); }, 60000), setInterval(() => { if (!document.hidden && dashboardView() === "logs") loadLogs(); }, 30000), setInterval(() => { if (!document.hidden && dashboardView() === "listings" && !$("listing-query").matches(":focus")) loadListings(); }, 60000)];
 }
 
 async function checkDashboardSession() {
@@ -1311,7 +1509,96 @@ $("dashboard-logout").addEventListener("click", async () => {
   }
 });
 
-const viewTitles = {overview:"Обзор",users:"Пользователи",listings:"Объявления",services:"Сервисы сбора",logs:"Ошибки и события",notices:"Уведомления"};
+const railwayStateLabels = {running:"Работает",deploying:"Развёртывается",failed:"Ошибка",not_deployed:"Не запускался",sleeping:"Спит",stopped:"Остановлен",unknown:"Нет данных"};
+const deploymentLabels = {SUCCESS:"Успешно",FAILED:"Ошибка сборки",CRASHED:"Процесс завершился с ошибкой",BUILDING:"Сборка",DEPLOYING:"Запуск",QUEUED:"В очереди",INITIALIZING:"Подготовка",WAITING:"Ожидание",REMOVED:"Удалён",CANCELED:"Отменён",SLEEPING:"Спит"};
+function platformTime(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("ru-RU",{timeZone:"Europe/Warsaw",hour12:false});
+}
+function platformNumber(value,unit="count") {
+  if (value==null || !Number.isFinite(Number(value))) return "—";
+  return new Intl.NumberFormat("ru-RU",{maximumFractionDigits:unit==="GB"?3:0}).format(value)+(unit==="GB"?" ГБ":"");
+}
+function platformMeter(data,accessibleLabel="Использование квоты",unit="count") {
+  const wrapper=document.createElement("div"); wrapper.className=`resource-meter meter-${data.state||"unknown"}`;
+  const track=document.createElement("div");track.className="resource-track"; track.setAttribute("role","progressbar");
+  track.setAttribute("aria-label",accessibleLabel);track.setAttribute("aria-valuemin","0");track.setAttribute("aria-valuemax","100");
+  if(data.percent!=null){
+    track.setAttribute("aria-valuenow",String(Math.min(100,data.percent)));
+    track.setAttribute("aria-valuetext",`${platformNumber(data.used,unit)} из ${platformNumber(data.limit,unit)}`);
+    const fill=document.createElement("span"); fill.style.width=`${Math.max(0,Math.min(100,data.percent))}%`;track.appendChild(fill);
+  } else track.setAttribute("aria-valuetext","Данные недоступны");
+  const label=document.createElement("span");label.textContent=data.percent==null?"Нет данных":new Intl.NumberFormat("ru-RU",{maximumFractionDigits:2}).format(data.percent)+"%";
+  wrapper.append(track,label);return wrapper;
+}
+async function loadRailway() {
+  const button=$("railway-refresh"),error=$("railway-error"); button.disabled=true;
+  $("railway-section").setAttribute("aria-busy","true");
+  try {
+    const response=await dashboardFetch("/api/platform/railway",{cache:"no-store"});
+    if(!response.ok) throw new Error("Не удалось загрузить сервисы Railway");
+    const data=await response.json();
+    error.classList.toggle("hidden",!data.error);error.textContent=data.error||"";
+    $("railway-environment").textContent=data.configured ? `${data.project_name} · ${data.environment}` : "Railway: мониторинг не подключён";
+    const services=data.services||[];
+    $("railway-summary").replaceChildren();
+    if(data.configured) for(const [label,total] of [["Всего",services.length],["Работают",services.filter(s=>s.state==="running").length],["Требуют внимания",services.filter(s=>s.latest_failed||s.state==="failed").length],["Не запущены",services.filter(s=>["not_deployed","stopped","sleeping"].includes(s.state)).length]]){
+      const item=document.createElement("span"); item.textContent=`${label}: ${total}`;$("railway-summary").appendChild(item);
+    }
+    fillAnalyticsTable("railway-services",services,(tr,service)=>{
+      addAnalyticsCell(tr,service.name);
+      const cell=document.createElement("td"),badge=document.createElement("span");badge.className=`platform-state state-${data.stale?"unknown":service.state}`;
+      badge.textContent=(railwayStateLabels[service.state]||service.state)+(data.stale?" · устарело":"");cell.appendChild(badge);tr.appendChild(cell);
+      addAnalyticsCell(tr,deploymentLabels[service.latest_status]||service.latest_status||"Не было",service.latest_failed?"danger-action":"");
+      addAnalyticsCell(tr,platformTime(service.deployed_at));addAnalyticsCell(tr,service.replicas);
+      const td=document.createElement("td"),link=document.createElement("a");link.href=service.url;link.target="_blank";link.rel="noopener";link.textContent="Railway ↗";td.appendChild(link);tr.appendChild(td);
+    },6);
+    $("railway-updated").textContent=(data.stale?"Последние известные данные: ":"Обновлено: ")+platformTime(data.updated_at)+" · автоматически раз в минуту";
+  } catch(cause){
+    error.textContent=cause.message;error.classList.remove("hidden");
+    document.querySelectorAll("#railway-services .platform-state").forEach(badge=>{
+      badge.className="platform-state state-unknown";
+      if(!badge.textContent.includes("нет связи")) badge.textContent+=" · нет связи";
+    });
+  }
+  finally{button.disabled=false;$("railway-section").setAttribute("aria-busy","false");}
+}
+async function loadSupabase() {
+  const button=$("supabase-refresh"),error=$("supabase-error");button.disabled=true;
+  $("supabase-section").setAttribute("aria-busy","true");
+  try {
+    const response=await dashboardFetch("/api/platform/supabase",{cache:"no-store"});
+    if(!response.ok)throw new Error("Не удалось получить ресурсы Supabase");
+    const data=await response.json(),billing=data.billing||{},connections=data.connections||{};
+    error.textContent=data.error||"";error.classList.toggle("hidden",!data.error);
+    $("supabase-db-size").textContent=data.database_bytes==null?"—":new Intl.NumberFormat("ru-RU",{maximumFractionDigits:2}).format(data.database_bytes/(1024**3))+" ГиБ";
+    $("supabase-connections").textContent=`${platformNumber(connections.used)} / ${platformNumber(connections.limit)}`;
+    $("supabase-connections-meter").replaceChildren(platformMeter(data.stale?{...connections,state:"unknown"}:connections,"Подключения PostgreSQL"));
+    $("supabase-connections-note").textContent=`Активных: ${platformNumber(connections.active)}. Резерв: ${platformNumber(connections.reserved)}. Лимит сервера: ${platformNumber(connections.server_max)}.`;
+    $("supabase-disk").textContent=platformNumber(billing.allocated_disk_gb,"GB");
+    $("supabase-disk-note").textContent=`Выделенный объём, не занятое место. В пакет входит ${platformNumber(billing.included_disk_gb,"GB")}. Данные — из снимка Usage.`;
+    $("supabase-live-updated").textContent=(data.stale?"Последние известные данные БД: ":"БД обновлена: ")+platformTime(data.updated_at);
+    const dateOnly=value=>value?new Date(value+"T12:00:00Z").toLocaleDateString("ru-RU",{timeZone:"Europe/Warsaw"}):"—";
+    $("supabase-period").textContent=`Расчётный период: ${dateOnly(billing.period_start)} — ${dateOnly(billing.period_end)} · квоты организации CarCar`;
+    $("supabase-source").href=data.usage_url||"https://supabase.com/dashboard";
+    $("supabase-billing-freshness").textContent=!billing.valid_period?"Нужен снимок текущего периода":billing.stale?"Снимок требует обновления":"Проверенный снимок";
+    $("supabase-billing-freshness").classList.toggle("is-stale",!billing.valid_period||billing.stale);
+    $("supabase-billing-note").textContent=`Сверено в Supabase: ${platformTime(billing.verified_at)}. Месячные показатели не обновляются кнопкой «Обновить БД».`;
+    fillAnalyticsTable("supabase-quotas",billing.metrics,(tr,metric)=>{
+      addAnalyticsCell(tr,metric.label);
+      if(metric.note){const note=document.createElement("small");note.className="quota-note";note.textContent=metric.note;tr.lastElementChild.appendChild(note);}
+      addAnalyticsCell(tr,`${platformNumber(metric.used,metric.unit)} / ${platformNumber(metric.limit,metric.unit)}`);
+      addAnalyticsCell(tr,platformNumber(metric.remaining,metric.unit));
+      const td=document.createElement("td");td.appendChild(platformMeter(metric,metric.label,metric.unit));tr.appendChild(td);
+    },4);
+    $("supabase-section").classList.remove("platform-loading");
+  }catch(cause){error.textContent=cause.message;error.classList.remove("hidden");}
+  finally{button.disabled=false;$("supabase-section").setAttribute("aria-busy","false");}
+}
+$("railway-refresh").addEventListener("click",loadRailway);
+$("supabase-refresh").addEventListener("click",loadSupabase);
+
+const viewTitles = {overview:"Обзор",users:"Пользователи",listings:"Объявления",services:"Сервисы приложения",supabase:"Ресурсы Supabase",logs:"Ошибки и события",notices:"Уведомления"};
 function dashboardView() {
   const hash = location.hash.slice(1);
   if (hash.startsWith("user=") || hash === "user-analytics") return "users";
@@ -1327,6 +1614,8 @@ function renderDashboardView() {
   if (lastMetrics && ["overview", "services"].includes(view)) renderMetrics();
   else if (dashboardStarted && ["overview", "services"].includes(view)) loadMetrics();
   if (current && view === "services") renderChart(current.polls || []);
+  if (dashboardStarted && view === "services") loadRailway();
+  if (dashboardStarted && view === "supabase") loadSupabase();
 }
 window.addEventListener("hashchange", renderDashboardView);
 let resizeTimer;

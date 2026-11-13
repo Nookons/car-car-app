@@ -1,0 +1,26 @@
+{
+  "project_ref": "aiqmqmhqbhufcybrccxt",
+  "organization_slug": "ndzmgirbbzbasiscidmh",
+  "plan": "Pro",
+  "verified_at": "2026-11-13T08:02:48Z",
+  "source": "Supabase Usage, authenticated Chrome session",
+  "period_start": "2026-11-12",
+  "period_end": "2026-12-12",
+  "overage_policy": "restricted",
+  "allocated_disk_gb": 8,
+  "included_disk_gb": 8,
+  "metrics": [
+    {"key":"egress","label":"Исходящий трафик","used":0.471,"limit":250,"unit":"GB"},
+    {"key":"cached_egress","label":"Трафик из CDN-кэша","used":0,"limit":250,"unit":"GB"},
+    {"key":"storage","label":"Файлы в Storage","used":0,"limit":100,"unit":"GB","note":"Средний объём за расчётный период"},
+    {"key":"mau","label":"Пользователи Supabase Auth","used":0,"limit":100000,"unit":"count","note":"Не MAU CarCar: вход в приложение работает через собственную авторизацию"},
+    {"key":"sso_mau","label":"Пользователи SSO","used":0,"limit":50,"unit":"count"},
+    {"key":"third_party_mau","label":"Сторонняя авторизация","used":0,"limit":100000,"unit":"count"},
+    {"key":"image_transformations","label":"Преобразования изображений","used":0,"limit":100,"unit":"count"},
+    {"key":"realtime_connections","label":"Пик соединений Realtime","used":0,"limit":500,"unit":"count"},
+    {"key":"realtime_messages","label":"Сообщения Realtime","used":0,"limit":5000000,"unit":"count"},
+    {"key":"edge_invocations","label":"Вызовы Edge Functions","used":0,"limit":2000000,"unit":"count"},
+    {"key":"log_ingestion","label":"Приём логов","used":0.039,"limit":20,"unit":"GB","informational":true,"note":"Показатель наблюдения: в Supabase сейчас льготный период для логов"},
+    {"key":"log_query","label":"Чтение логов","used":0,"limit":2000,"unit":"GB","informational":true,"note":"Показатель наблюдения; не жёсткое ограничение"}
+  ]
+}

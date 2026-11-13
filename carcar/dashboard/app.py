@@ -38,6 +38,7 @@ from ..runner import fetch_detail
 from ..store import Store
 from .. import webauth
 from .repo import DatabaseRepo
+from .platform import RailwayMonitor, SupabaseMonitor
 
 STATIC = Path(__file__).parent / "static"
 STATS_TTL = 10.0
@@ -70,6 +71,10 @@ class ListingStatusIn(BaseModel):
 
 class DashboardLoginIn(BaseModel):
     password: str = Field(min_length=1, max_length=200)
+
+
+class SubscriptionControlIn(BaseModel):
+    active: bool = Field(strict=True)
 
 
 class UserPasswordIn(BaseModel):
@@ -211,6 +216,7 @@ def create_app(
     client_factory: Callable[[Settings], Client] | None = None,
     use_db: bool = False,
     db_url: str | None = None,
+    platform_local_cli: bool = False,
 ) -> FastAPI:
     store = Store(root=Path(root), source=source)
     source_code = source
@@ -245,6 +251,8 @@ def create_app(
         repo = DatabaseRepo(url)
         db_url = url
 
+    supabase_monitor = SupabaseMonitor(repo, db_url) if repo is not None else None
+    railway_monitor = RailwayMonitor(local_cli=platform_local_cli)
     app = FastAPI(title="CarCar dashboard", docs_url=None, redoc_url=None)
 
     @app.middleware("http")
@@ -515,6 +523,18 @@ def create_app(
             cache[key] = (time.monotonic(), result)
             return result
 
+    @app.get("/api/platform/supabase")
+    def supabase_resources(response: Response) -> dict:
+        response.headers["Cache-Control"] = "private, no-store"
+        if supabase_monitor is None:
+            raise HTTPException(status_code=503, detail="Метрики PostgreSQL доступны в режиме базы данных")
+        return supabase_monitor.get()
+
+    @app.get("/api/platform/railway")
+    def railway_resources(response: Response) -> dict:
+        response.headers["Cache-Control"] = "private, no-store"
+        return railway_monitor.get()
+
     @app.get("/api/logs")
     def logs(limit: int = Query(default=100, ge=1, le=200)) -> dict:
         if repo is None:
@@ -545,6 +565,42 @@ def create_app(
         if detail is None:
             raise HTTPException(status_code=404, detail="пользователь не найден")
         return detail
+
+    @app.delete("/api/users/{user_id}/subscriptions/{sub_id}")
+    def delete_user_subscription(user_id: int, sub_id: int) -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="управление требует PostgreSQL")
+        result = repo.delete_user_subscription(user_id, sub_id)
+        if result is None:
+            raise HTTPException(status_code=404, detail="подписка пользователя не найдена")
+        admin_audit.info("action=delete_user_subscription user_id=%s sub_id=%s cancelled=%s",
+                         user_id, sub_id, result["cancelled_notifications"])
+        return {"ok": True, **result}
+
+    @app.patch("/api/users/{user_id}/subscriptions/{sub_id}")
+    def user_subscription_control(user_id: int, sub_id: int, payload: SubscriptionControlIn) -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="управление требует PostgreSQL")
+        result = repo.set_user_subscription_active(user_id, sub_id, payload.active)
+        if result is None:
+            raise HTTPException(status_code=404, detail="подписка пользователя не найдена")
+        admin_audit.info("action=subscription_active user_id=%s sub_id=%s active=%s cancelled=%s",
+                         user_id, sub_id, payload.active, result["cancelled_notifications"])
+        return {"ok": True, **result}
+
+    @app.get("/api/users/{user_id}/notifications")
+    def user_notifications(
+        user_id: int,
+        days: int = Query(default=30, ge=1, le=90),
+        limit: int = Query(default=50, ge=1, le=100),
+        before_id: int | None = Query(default=None, ge=1),
+    ) -> dict:
+        if repo is None:
+            raise HTTPException(status_code=503, detail="история требует PostgreSQL")
+        result = repo.user_notifications(user_id, days, limit, before_id)
+        if result is None:
+            raise HTTPException(status_code=404, detail="пользователь не найден")
+        return result
 
     @app.get("/api/users/{user_id}/sessions")
     def user_sessions(user_id: int) -> dict:

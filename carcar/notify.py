@@ -11,12 +11,14 @@ import json
 import logging
 import math
 import time
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
 import psycopg
 from psycopg.rows import dict_row
 
+from .criteria import normalize_criteria
 from .messages import digest, grid_caption, price_drop_caption
 from .messages import messages as msg
 from .miniapp.price_model import analyse_price
@@ -60,6 +62,9 @@ def _distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 def matches(criteria: dict[str, Any], row: dict[str, Any]) -> bool:
     """Подходит ли объявление под критерии подписки."""
+    criteria = normalize_criteria(criteria)
+    if row.get("status") not in (None, "active"):
+        return False
     if not criteria:
         return True
 
@@ -155,6 +160,19 @@ def matches(criteria: dict[str, Any], row: dict[str, Any]) -> bool:
         if _distance_km(sub_lat, sub_lon, item_lat, item_lon) > radius:
             return False
 
+    if criteria.get("published_days") is not None:
+        published = row.get("published_at") or row.get("first_seen_at")
+        try:
+            if isinstance(published, str):
+                published = datetime.fromisoformat(published.replace("Z", "+00:00"))
+            if not isinstance(published, datetime):
+                return False
+            if published.tzinfo is None:
+                published = published.replace(tzinfo=UTC)
+            if published < datetime.now(UTC) - timedelta(days=float(criteria["published_days"])):
+                return False
+        except (ValueError, TypeError):
+            return False
     return True
 
 
@@ -193,7 +211,7 @@ class Notifier:
                        l.engine_cm3, l.power_hp, l.drive, l.color, l.doors, l.seats,
                        l.condition, l.co2_gkm, l.consumption_urban, l.consumption_extra,
                        l.generation, l.equipment,
-                       l.seller_name, l.seller_type,
+                       l.seller_name, l.seller_type, l.status, l.published_at, l.first_seen_at,
                        s.code as source_code
                 from listing l join source s on s.id = l.source_id
                 where s.code = %s and l.external_id = %s and l.status = 'active'
@@ -249,6 +267,20 @@ class Notifier:
                 """
             )
             return cur.fetchall()
+
+    def current_criteria(self, conn, user_id: int) -> list[dict[str, Any]]:
+        with conn.cursor() as cur:
+            cur.execute("""select s.criteria from subscription s join app_user u on u.id=s.user_id
+                           where s.user_id=%s and s.active and u.notify_new""", (user_id,))
+            return [row["criteria"] or {} for row in cur.fetchall()]
+
+    def cancel_unmatched(self, conn, user_id: int, listing_id: int) -> None:
+        with conn.cursor() as cur:
+            cur.execute("""update notification set status='dead',
+                           last_error='cancelled: no current matching subscription'
+                           where user_id=%s and listing_id=%s and kind='new'
+                             and status in ('pending','failed','held')""", (user_id, listing_id))
+        conn.commit()
 
     def favorited(
         self, conn: psycopg.Connection, listing_id: int
@@ -497,10 +529,14 @@ class Notifier:
                     select n.id, n.user_id, n.listing_id, n.attempts, n.kind, n.payload,
                            u.tg_id, u.lang,
                            l.title, l.price, l.currency, l.year, l.mileage_km,
-                           l.city, l.thumb_url, l.url
+                           l.city, l.thumb_url, l.url, l.status, l.make, l.model,
+                           l.fuel,l.gearbox,l.body,l.drive,l.condition,l.color,l.seller_type,
+                           l.power_hp,l.engine_cm3,l.doors,l.seats,l.lat,l.lon,
+                           l.published_at,l.first_seen_at,s.code as source_code
                     from notification n
                     join app_user u on u.id = n.user_id
                     join listing l on l.id = n.listing_id
+                    join source s on s.id=l.source_id
                     where n.status in ('pending', 'failed') and u.tg_id is not null
                       and n.next_attempt_at <= now()
                       and (
@@ -521,10 +557,18 @@ class Notifier:
                     (limit,),
                 )
                 rows = cur.fetchall()
+            criteria_by_user = {}
             for row in rows:
                 item = dict(row)
                 item["id"] = row["listing_id"]
                 kind = str(row.get("kind") or "new")
+                if kind == "new":
+                    user_id = row["user_id"]
+                    if user_id not in criteria_by_user:
+                        criteria_by_user[user_id] = self.current_criteria(conn, user_id)
+                    if not any(matches(criteria, item) for criteria in criteria_by_user[user_id]):
+                        self.cancel_unmatched(conn, user_id, row["listing_id"])
+                        continue
                 try:
                     if kind == "price_drop":
                         payload = row.get("payload") or {}
@@ -569,7 +613,7 @@ class Notifier:
                     """
                     select u.id, u.tg_id, u.lang, count(*) as total
                     from notification n join app_user u on u.id = n.user_id
-                    where n.status = 'held' and u.tg_id is not null
+                    where n.status = 'held' and u.tg_id is not null and u.notify_new
                       and n.kind <> 'price_drop'
                       and n.created_at < now() - make_interval(mins => %s)
                     group by u.id, u.tg_id, u.lang
@@ -582,8 +626,9 @@ class Notifier:
                 with conn.cursor() as cur:
                     cur.execute(
                         """
-                        select l.id, l.title, l.price, l.url
+                        select l.*,s.code as source_code
                         from notification n join listing l on l.id = n.listing_id
+                        join source s on s.id=l.source_id
                         where n.user_id = %s and n.status = 'held'
                           and n.kind <> 'price_drop'
                           and n.created_at < now() - make_interval(mins => %s)
@@ -591,10 +636,17 @@ class Notifier:
                         """,
                         (user["id"], min_age_minutes),
                     )
-                    items = cur.fetchall()
+                    candidates = cur.fetchall()
+                criteria = self.current_criteria(conn, user["id"])
+                items = []
+                for item in candidates:
+                    if any(matches(c, item) for c in criteria):
+                        items.append(item)
+                    else:
+                        self.cancel_unmatched(conn, user["id"], item["id"])
                 if not items:
                     continue
-                text = digest([dict(item) for item in items], user.get("lang"), int(user["total"]))
+                text = digest([dict(item) for item in items], user.get("lang"), len(items))
                 keyboard = {
                     "inline_keyboard": [[
                         {
@@ -624,10 +676,9 @@ class Notifier:
                         update notification set status = 'sent', sent_at = now(),
                                attempts = attempts + 1, telegram_message_id = %s
                         where user_id = %s and status = 'held'
-                          and kind <> 'price_drop'
-                          and created_at < now() - make_interval(mins => %s)
+                          and kind <> 'price_drop' and listing_id=any(%s)
                         """,
-                        (message_id, user["id"], min_age_minutes),
+                        (message_id, user["id"], [item["id"] for item in items]),
                     )
                 conn.commit()
                 sent += 1
@@ -639,7 +690,7 @@ class Notifier:
         conn = self.connect()
         try:
             with conn.cursor() as cur:
-                cur.execute("select count(*) as n from notification where status = 'dead'")
+                cur.execute("select count(*) as n from notification where status = 'dead' and coalesce(last_error, '') not like 'cancelled:%%'")
                 row = cur.fetchone()
                 dead = int(row["n"]) if row else 0
                 cur.execute(
