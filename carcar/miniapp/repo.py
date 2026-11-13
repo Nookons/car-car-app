@@ -1569,8 +1569,13 @@ class MiniAppRepo:
 
         return items, total, approx
 
-    def apply_detail(self, listing_id: int, values: dict[str, Any]) -> None:
+    def apply_detail(self, listing_id: int, values: dict[str, Any]) -> dict[str, Any]:
         values = dict(values)
+        from ..canonical import canon_body, canon_fuel, canon_gearbox
+        for key, canonicalize in (("fuel", canon_fuel), ("gearbox", canon_gearbox), ("body", canon_body)):
+            values[key] = canonicalize(values.get(key))
+        vin = (values.get("vin") or "").strip().upper()
+        values["vin"] = vin if len(vin) == 17 else None
         for key, low, high in (
             ("power_hp", 10, 2000),
             ("engine_cm3", 600, 10_000),
@@ -1625,6 +1630,7 @@ class MiniAppRepo:
                 """,
                 {**values, "id": listing_id, "tags": tags, "photos": photos},
             )
+        return {**values, "photos": photos, "photos_count": len(photos), "equipment": tags}
 
     def set_description(self, listing_id: int, text: str) -> None:
         with self.pool.connection() as conn, conn.cursor() as cur:
@@ -1733,7 +1739,7 @@ class MiniAppRepo:
                 values = {
                     "photos": offer.photos[:60],
                     "photos_count": len(offer.photos[:60]),
-                    "description": (offer.description or "").strip()[:2000] or None,
+                    "description": (offer.description or "").strip() or None,
                     "version": offer.version or None,
                     "generation": offer.generation or None,
                     "body": details.get("body_type") or None,
@@ -1752,7 +1758,11 @@ class MiniAppRepo:
                     "equipment": offer.equipment or [],
                     "vin": (offer.details.get("vin") or "").strip().upper() or None,
                 }
-                self.apply_detail(listing_id, values)
+                from ..canonical import canon_body, canon_fuel, canon_gearbox
+                values["fuel"] = canon_fuel(values["fuel"])
+                values["gearbox"] = canon_gearbox(values["gearbox"])
+                values["body"] = canon_body(values["body"])
+                values = self.apply_detail(listing_id, values)
                 row["details_fetched_at"] = datetime.now(UTC)
                 row.update({key: value for key, value in values.items() if value not in (None, "", [])})
             except Exception as exc:

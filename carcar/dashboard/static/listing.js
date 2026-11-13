@@ -220,7 +220,7 @@ function kvRows() {
     [s.vin, card.vin],
     [s.version, card.version], [s.generation, card.generation],
     [s.doors, card.doors], [s.seats, card.seats],
-    [s.drive, ({fwd:"FWD", rwd:"RWD", awd:"AWD"})[card.drive] || card.drive],
+    [s.drive, (lang === "ru" ? {front:"Передний",rear:"Задний",awd:"Полный"} : {front:"Front",rear:"Rear",awd:"AWD"})[card.drive] || card.drive],
     [s.condition, lang === "ru" ? ({used:"С пробегом", new:"Новый"})[card.condition] || card.condition : card.condition],
     [s.co2, card.co2_gkm != null ? `${card.co2_gkm} g/km` : null],
     [s.urban, card.consumption_urban != null ? `${card.consumption_urban} l/100 km` : null],

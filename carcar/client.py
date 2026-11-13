@@ -30,7 +30,7 @@ USER_AGENTS = [
 ]
 
 # Статусы, после которых имеет смысл повторить запрос.
-RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+RETRY_STATUSES = frozenset({429, *range(500, 600)})
 
 
 # Общий «тормоз» на все воркеры: получили 429/403 — молчим все вместе.
@@ -193,7 +193,11 @@ class Client:
                 )
                 continue
 
-            response.raise_for_status()
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                self.stats.errors += 1
+                raise FetchError(f"{response.status_code} на {url}") from exc
             text = response.text
             wire = int(getattr(response, "num_bytes_downloaded", 0) or 0)
             self.stats.wire_bytes += wire

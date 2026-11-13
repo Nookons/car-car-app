@@ -27,6 +27,8 @@ FUEL = {
     "hybryda plug-in": "plugin_hybrid",
     "elektryczny": "electric",
     "lpg": "lpg",
+    "benzyna lpg": "lpg",
+    "benzyna cng": "cng",
     "cng": "cng",
     "inne": "other",
     "other": "other",
@@ -41,6 +43,8 @@ GEARBOX = {
     "polautomatyczna": "semi_auto",
     "manual": "manual",
     "automatic": "automatic",
+    "other": "other",
+    "inna": "other",
 }
 
 BODY = {
@@ -82,10 +86,22 @@ def canon_body(value: str | None) -> str | None:
     return _canon(value, BODY)
 
 
+def canon_fuel(value: str | None) -> str | None:
+    return _canon(value, FUEL)
+
+
+def canon_gearbox(value: str | None) -> str | None:
+    return _canon(value, GEARBOX)
+
+
 def _canon(value: str | None, mapping: dict[str, str], default: str | None = None) -> str | None:
     if not value:
         return default
-    return mapping.get(normalize(value), default)
+    normalized = normalize(value)
+    if normalized in mapping:
+        return mapping[normalized]
+    # Canonical values such as plugin_hybrid and wagon must be idempotent.
+    return next((canonical for canonical in mapping.values() if normalize(canonical) == normalized), default)
 
 
 def _year(value: Any) -> int | None:

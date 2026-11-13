@@ -70,13 +70,13 @@ def test_lazy_detail_saves_photos_with_metadata_and_closes_http_client(monkeypat
     calls = []
     saved = []
     fake_client(monkeypatch, offer_html, calls)
-    repo.apply_detail = lambda listing_id, values: saved.append((listing_id, values))
+    repo.apply_detail = lambda listing_id, values: (saved.append((listing_id, values)), values)[1]
     card = repo.get_listing(12)
     assert saved[0][0] == 12
     assert saved[0][1]['photos'] == offer.photos[:60]
     assert saved[0][1]['photos_count'] == len(offer.photos[:60])
     assert card['photos'] == offer.photos[:60]
-    assert card['description'] == offer.description.strip()[:2000]
+    assert card['description'] == offer.description.strip()
     assert card['detail_status'] == 'ready'
     assert calls == ['https://example/card', 'closed']
 
@@ -213,3 +213,49 @@ def test_fetch_guard_claims_once_until_expiration(monkeypatch):
     assert not cache.add('same-card',True,ttl=60)
     clock[0] = 71
     assert cache.add('same-card',True,ttl=60)
+
+
+@pytest.mark.parametrize('raw,expected', [('Benzyna','petrol'), ('Hybryda Plug-in','plugin_hybrid'),
+                                         ('plugin_hybrid','plugin_hybrid'), ('Benzyna+LPG','lpg')])
+def test_fuel_normalization_accepts_source_labels_and_is_idempotent(raw,expected):
+    from carcar.canonical import canon_fuel
+    assert canon_fuel(raw) == expected
+    assert canon_fuel(expected) == expected
+
+
+def test_apply_detail_normalizes_labels_and_rejects_invalid_vin():
+    repo = repo_for(None)
+    repo.apply_detail(12,dict(fuel='Benzyna',gearbox='Automatyczna',body='Sedan',vin='not-a-vin'))
+    params = repo.pool.c.calls[0][1]
+    assert params['fuel'] == 'petrol'
+    assert params['gearbox'] == 'automatic'
+    assert params['body'] == 'sedan'
+    assert params['vin'] is None
+
+
+def test_lazy_detail_preserves_long_description(monkeypatch,offer_html):
+    payload = extract_next_data(offer_html)
+    advert = payload['props']['pageProps']['advert']
+    description = 'Original seller description. ' * 160
+    advert['description'] = '<p>'+description+'</p>'
+    html = '<script id="__NEXT_DATA__">'+json.dumps(payload)+'</script>'
+    repo = repo_for(dict(id=12,external_id=str(advert['id']),title='BMW',price=0,
+                        url='https://example/card',photos=[],details_fetched_at=None))
+    fake_client(monkeypatch,html,[])
+    saved = []
+    repo.apply_detail = lambda listing_id,values: (saved.append(values), values)[1]
+    card = repo.get_listing(12)
+    assert len(saved[0]['description']) > 2000
+    assert card['description'] == description.strip()
+
+
+def test_cloudflare_transient_error_is_retried(monkeypatch):
+    import httpx
+    from carcar.client import Client
+    statuses = iter([520,200])
+    monkeypatch.setattr('carcar.client.time.sleep',lambda _:None)
+    with Client(Settings(retries=2),transport=httpx.MockTransport(
+        lambda request:httpx.Response(next(statuses),text='ok')
+    )) as client:
+        assert client.get('https://example/card').status == 200
+        assert client.stats.retries == 1

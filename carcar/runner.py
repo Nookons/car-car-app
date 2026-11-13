@@ -225,7 +225,7 @@ def fetch_detail(
             color=(offer.details.get("color") or "").strip() or None,
             power_hp=power,
             engine_cm3=engine,
-            description=(offer.description or "").strip()[:2000] or None,
+            description=(offer.description or "").strip() or None,
             version=offer.version or None,
             generation=offer.generation or None,
             doors=offer.doors,
