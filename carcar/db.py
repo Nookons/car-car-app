@@ -25,6 +25,7 @@ from .canonical import Prepared, prepare
 from .lifecycle import (
     MAX_SWEEP_ERROR_RATIO,
     MISSES_TO_REMOVE,
+    classify_outcome,
     dom_days,
     price_change_pct,
 )
@@ -512,6 +513,8 @@ class DatabaseSink:
             days, basis = dom_days(
                 row["published_at"], row["first_seen_at"], row["last_seen_at"]
             )
+            change = price_change_pct(row["first_price"], row["last_price"])
+            outcome, reason = classify_outcome(days, change, row["price_changes"])
             values.append(
                 (
                     row["id"], row["source_id"], row["external_id"], row["make"],
@@ -520,10 +523,9 @@ class DatabaseSink:
                     row["drive"], row["generation"], row["color"], row["city"],
                     row["region"], row["seller_type"], row["first_price"],
                     row["last_price"], row["currency"], row["price_changes"],
-                    price_change_pct(row["first_price"], row["last_price"]),
-                    row["published_at"], row["first_seen_at"], row["last_seen_at"],
-                    row["removed_at"], days, basis, removal_kind,
-                    row["details_fetched_at"],
+                    change, row["published_at"], row["first_seen_at"],
+                    row["last_seen_at"], row["removed_at"], days, basis,
+                    removal_kind, row["details_fetched_at"], outcome, reason,
                 )
             )
         if not values:
@@ -536,10 +538,11 @@ class DatabaseSink:
                 city, region, seller_type, first_price, last_price, currency,
                 price_changes, price_change_pct, published_at, first_seen_at,
                 last_seen_at, removed_at, dom_days, dom_basis, removal_kind,
-                details_fetched_at
+                details_fetched_at, outcome, outcome_reason
             ) values (
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s
             )
             on conflict (listing_id) do update set
                 first_price = excluded.first_price,
@@ -551,7 +554,9 @@ class DatabaseSink:
                 dom_days = excluded.dom_days,
                 dom_basis = excluded.dom_basis,
                 removal_kind = excluded.removal_kind,
-                details_fetched_at = excluded.details_fetched_at
+                details_fetched_at = excluded.details_fetched_at,
+                outcome = excluded.outcome,
+                outcome_reason = excluded.outcome_reason
             """,
             values,
         )

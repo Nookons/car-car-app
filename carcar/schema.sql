@@ -215,6 +215,11 @@ create table if not exists listing_lifecycle (
     dom_basis         text not null check (dom_basis in ('published_at', 'first_seen_at')),
     removal_kind      text not null check (removal_kind in
                           ('disappeared', 'gone_404', 'legacy')),
+    -- эвристика: площадка не отдаёт «продано», поэтому отделяем истечение
+    -- 30-дневного размещения от кандидата в продажу
+    outcome           text not null default 'unknown' check (outcome in
+                          ('sold_candidate', 'expired', 'unknown')),
+    outcome_reason    text,
 
     details_fetched_at timestamptz,
     created_at        timestamptz not null default now()
@@ -226,6 +231,25 @@ create index if not exists listing_lifecycle_removed_idx
     on listing_lifecycle (removed_at desc);
 create index if not exists listing_lifecycle_source_idx
     on listing_lifecycle (source_id, removed_at desc);
+create index if not exists listing_lifecycle_outcome_idx
+    on listing_lifecycle (outcome, removed_at desc);
+
+-- Вернувшееся объявление (relist/restore) больше не считается снятым.
+create or replace function cleanup_restored_listing() returns trigger
+language plpgsql
+as $$
+begin
+    if new.status = 'active' and old.status = 'removed' then
+        delete from listing_lifecycle where listing_id = new.id;
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists listing_restored_cleanup on listing;
+create trigger listing_restored_cleanup
+after update of status on listing
+for each row execute function cleanup_restored_listing();
 
 -- ---------------------------------------------------------------------------
 -- Наблюдаемость и отбракованные записи
@@ -813,3 +837,6 @@ alter default privileges for role postgres in schema public
     revoke all privileges on sequences from anon, authenticated;
 alter default privileges for role postgres in schema public
     revoke execute on functions from public, anon, authenticated;
+
+-- Cursor pagination for support notification history.
+create index if not exists notification_user_history_idx on notification (user_id, id desc);

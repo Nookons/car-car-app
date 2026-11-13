@@ -25,6 +25,41 @@ MISSES_TO_REMOVE = 2
 # не подтверждает снятия: иначе объявления с упавшей страницы «исчезнут».
 MAX_SWEEP_ERROR_RATIO = 0.01
 
+# Классификация снятия. Площадка не отдаёт «продано», поэтому это эвристика:
+#   * expired — ровно тот же срок, что и обычное размещение (30 дней), без
+#     изменения цены; так уходит основная масса старых объявлений;
+#   * sold_candidate — цена падала перед снятием: продавец торговался;
+#   * unknown — сигнала не хватило.
+OUTCOME_SOLD = "sold_candidate"
+OUTCOME_EXPIRED = "expired"
+OUTCOME_UNKNOWN = "unknown"
+
+EXPIRY_WINDOW_DAYS = 28.0
+PRICE_DROP_THRESHOLD_PCT = -3.0
+
+
+def classify_outcome(
+    dom_days: float,
+    price_change_pct: float | None,
+    price_changes: int = 0,
+) -> tuple[str, str]:
+    """Пытается отличить продажу от истечения срока размещения.
+
+    Возвращает `(outcome, reason)`. Это не истина, а кандидат для индекса:
+    цена вниз перед снятием — сильный сигнал торга; ровные 30 дней без
+    изменения цены — почти наверняка истечение. Всё остальное — `unknown`,
+    чтобы не выдумывать продажу.
+    """
+    change = 0.0 if price_change_pct is None else price_change_pct
+    if price_change_pct is not None and price_change_pct <= PRICE_DROP_THRESHOLD_PCT:
+        return OUTCOME_SOLD, "price_drop_before_removal"
+    if dom_days >= EXPIRY_WINDOW_DAYS and abs(change) < 1.0:
+        return OUTCOME_EXPIRED, "expiry_window_no_price_change"
+    if price_changes > 0:
+        return OUTCOME_UNKNOWN, "price_changed_but_no_drop"
+    return OUTCOME_UNKNOWN, "insufficient_signal"
+
+
 
 def effective_start(
     published_at: datetime | None, first_seen_at: datetime

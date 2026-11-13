@@ -114,7 +114,9 @@ data/
 ```
 
 Для уже существующей базы перед деплоем кода, который пишет `removed_at`:
-`psql "$DATABASE_URL" -f db/migrations/20261117_listing_lifecycle.sql`.
+`psql "$DATABASE_URL" -f db/migrations/20261117_listing_lifecycle.sql`,
+затем `20261118_listing_outcome.sql` и (когда sweep не пишет)
+`20261119_listing_restore_cleanup.sql`.
 
 | Таблица | Зачем |
 |---|---|

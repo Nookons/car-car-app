@@ -7,6 +7,10 @@
 from datetime import UTC, datetime
 
 from carcar.lifecycle import (
+    OUTCOME_EXPIRED,
+    OUTCOME_SOLD,
+    OUTCOME_UNKNOWN,
+    classify_outcome,
     dom_days,
     is_confirmed,
     next_missed,
@@ -69,3 +73,32 @@ def test_pass_completed_requires_full_clean_pass():
     assert pass_completed(**{**base, "page": 2}) is False
     assert pass_completed(**{**base, "pages": 1}) is False
     assert pass_completed(**{**base, "errors": 2}) is False
+
+
+def test_outcome_price_drop_is_sold_candidate():
+    outcome, reason = classify_outcome(35, -5.0, 2)
+    assert outcome == OUTCOME_SOLD
+    assert reason == "price_drop_before_removal"
+
+
+def test_outcome_30_day_window_without_price_change_is_expired():
+    outcome, reason = classify_outcome(29.5, None, 0)
+    assert outcome == OUTCOME_EXPIRED
+    assert reason == "expiry_window_no_price_change"
+
+
+def test_outcome_short_listing_without_signal_is_unknown():
+    outcome, reason = classify_outcome(10, 0.0, 0)
+    assert outcome == OUTCOME_UNKNOWN
+    assert reason == "insufficient_signal"
+
+
+def test_outcome_price_change_without_drop_is_unknown():
+    outcome, reason = classify_outcome(10, 4.0, 1)
+    assert outcome == OUTCOME_UNKNOWN
+    assert reason == "price_changed_but_no_drop"
+
+
+def test_outcome_price_drop_wins_over_expiry_window():
+    outcome, _ = classify_outcome(40, -3.5, 1)
+    assert outcome == OUTCOME_SOLD
