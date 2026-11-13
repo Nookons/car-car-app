@@ -10,6 +10,7 @@ heartbeat, журнал опросов, пауза.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -30,6 +31,16 @@ log = logging.getLogger("carcar")
 
 # После стольких ошибок подряд сборщик сам ставит паузу, чтобы не долбить площадку.
 AUTO_PAUSE_AFTER = 5
+
+
+def _market_metrics_enabled() -> bool:
+    """Рыночные метрики в горячем пути выключены по умолчанию.
+
+    Они пишут в listing_market_metric, которую пока никто не читает, и на
+    больших объёмах дают 20-30-секундные self-join'ы на каждый лот.
+    Включать только отдельным фоновым джобом: CARCAR_MARKET_METRICS=1.
+    """
+    return os.environ.get("CARCAR_MARKET_METRICS", "0") == "1"
 
 
 def utcnow() -> datetime:
@@ -102,20 +113,20 @@ def discover(
             stats.unchanged += result.unchanged
             stats.rejected += result.rejected
             if fresh and sink is not None:
-                # Метрики считаем до карточки (по полям выдачи), затем карточка
-                # их уточнит отдельным проходом. Ошибка метрик не должна
-                # задерживать публикацию.
-                try:
-                    from .market_metrics import analyze_external_ids
+                # Метрики в горячем пути отключены: они не используются
+                # читателями и на 269k строк стоили десятки секунд на лот.
+                if _market_metrics_enabled():
+                    try:
+                        from .market_metrics import analyze_external_ids
 
-                    analyze_external_ids(
-                        sink,
-                        settings.source,
-                        [str(item.id) for item in fresh],
-                        stage="preliminary",
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    log.warning("метрики для %s новых не посчитаны: %s", len(fresh), exc)
+                        analyze_external_ids(
+                            sink,
+                            settings.source,
+                            [str(item.id) for item in fresh],
+                            stage="preliminary",
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        log.warning("метрики для %s новых не посчитаны: %s", len(fresh), exc)
                 # Сначала догружаем карточку, потом уведомляем: иначе пользователь
                 # получает объявление без фото, описания и характеристик.
                 ready = []
@@ -252,8 +263,9 @@ def fetch_detail(
             equipment=offer.equipment,
             code=code,
         )
-        if changed:
+        if changed and _market_metrics_enabled():
             # Карточка добавила кузов/цвет/комплектацию — уточняем метрики.
+            # По умолчанию выключено: это самый тяжёлый запрос конвейера.
             try:
                 from .market_metrics import analyze_external_ids
 
@@ -632,6 +644,14 @@ def collect(
     return summary
 
 
+def _safe_heartbeat(state: CollectorState, payload: dict[str, Any]) -> None:
+    """Heartbeat не должен ронять демон, если база временно недоступна."""
+    try:
+        state.heartbeat(payload)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("heartbeat не записан: %s", exc)
+
+
 def watch(
     client: Client,
     store: Store,
@@ -664,8 +684,7 @@ def watch(
             if not paused_logged:
                 print(f"пауза: {pause_reason or 'без причины'}")
                 paused_logged = True
-            state.heartbeat(
-                {
+            _safe_heartbeat(state, {
                     "status": "paused",
                     "mode": "watch",
                     "round": rounds,
@@ -709,13 +728,15 @@ def watch(
             backoff = min(interval * (2 ** failures), 600.0)
 
             if failures >= AUTO_PAUSE_AFTER:
-                state.set_paused(
-                    True,
-                    f"авто-пауза: {failures} ошибок подряд ({str(exc)[:120]})",
-                    by="collector",
-                )
-                state.heartbeat(
-                    {
+                try:
+                    state.set_paused(
+                        True,
+                        f"авто-пауза: {failures} ошибок подряд ({str(exc)[:120]})",
+                        by="collector",
+                    )
+                except Exception as pause_exc:  # noqa: BLE001
+                    log.warning("watch: не удалось поставить паузу: %s", pause_exc)
+                _safe_heartbeat(state, {
                         "status": "paused",
                         "mode": "watch",
                         "round": rounds,
@@ -730,8 +751,7 @@ def watch(
                 log.error("авто-пауза после %d ошибок подряд", failures)
                 break
 
-            state.heartbeat(
-                {
+            _safe_heartbeat(state, {
                     "status": "error",
                     "mode": "watch",
                     "round": rounds,
@@ -801,8 +821,7 @@ def watch(
                 "wire_bytes": wire_round,
             }
         )
-        state.heartbeat(
-            {
+        _safe_heartbeat(state, {
                 "status": "running",
                 "mode": "watch",
                 "round": rounds,
@@ -827,8 +846,7 @@ def watch(
         "client": client.stats.as_dict(),
     }
     store.write_run(summary)
-    state.heartbeat(
-        {
+    _safe_heartbeat(state, {
             "status": "paused" if state.paused()[0] else "idle",
             "mode": "watch",
             "round": rounds,
