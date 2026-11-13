@@ -1278,6 +1278,9 @@ class MiniAppRepo:
             select * from comps where rn <= 60
         """
         with self.pool.connection() as conn, conn.cursor() as cur:
+            # Оценка рынка вспомогательная: тяжёлый запрос не должен
+            # задерживать выдачу объявлений и держать соединение.
+            cur.execute("set local statement_timeout = '2000ms'")
             cur.execute(
                 f"select {subject_fields} from listing l where l.id = any(%(ids)s::bigint[])",
                 {"ids": ids},
