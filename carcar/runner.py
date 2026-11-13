@@ -388,11 +388,17 @@ def sweep(
             log.exception("sweep: страница %d не удалась: %s", page, exc)
             time.sleep(min(60.0, 5.0 * consecutive))
             if consecutive >= 8:
-                state.set_paused(
-                    True,
-                    f"авто-пауза: sweep, {totals['errors']} ошибок",
-                    by="collector",
-                )
+                # Если база недоступна, set_paused сам может упасть. Это не
+                # повод ронять процесс: прогресс уже в sweep_state, следующий
+                # запуск продолжит с места.
+                try:
+                    state.set_paused(
+                        True,
+                        f"авто-пауза: sweep, {totals['errors']} ошибок",
+                        by="collector",
+                    )
+                except Exception as pause_exc:  # noqa: BLE001
+                    log.warning("sweep: не удалось поставить паузу: %s", pause_exc)
                 stopped_early = True
                 break
             continue
@@ -406,12 +412,17 @@ def sweep(
         totals["updated"] += result.updated
         totals["rejected"] += result.rejected
 
-        state.sweep_save(
-            next_page=page + 1,
-            total_pages=total_pages,
-            inserted=saved.get("inserted", 0) + result.inserted,
-            updated=saved.get("updated", 0) + result.updated,
-        )
+        try:
+            state.sweep_save(
+                next_page=page + 1,
+                total_pages=total_pages,
+                inserted=saved.get("inserted", 0) + result.inserted,
+                updated=saved.get("updated", 0) + result.updated,
+            )
+        except Exception as exc:  # noqa: BLE001
+            # Прогресс не сохранился — страница повторится при resume,
+            # upsert идемпотентен. Не роняем весь обход из-за этого.
+            log.warning("sweep: прогресс не сохранён на стр. %d: %s", page, exc)
         saved = {
             "next_page": page + 1,
             "total_pages": total_pages,

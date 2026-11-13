@@ -165,3 +165,28 @@ def test_reconcile_after_two_complete_passes(tmp_path, monkeypatch):
         if isinstance(call, tuple) and call[0] == "reconcile"
     ]
     assert len(reconciles) == 2
+
+
+class DbDownSink(FakeSink):
+    def upsert(self, items: list, code: str) -> UpsertResult:
+        raise RuntimeError("db down")
+
+    def set_paused(self, *args: object, **kwargs: object) -> None:
+        raise RuntimeError("db down")
+
+
+def test_sweep_survives_db_down_and_pause_failure(tmp_path, monkeypatch):
+    sink = DbDownSink()
+    settings = Settings(data_dir=tmp_path, rps=1000)
+    store = Store(root=tmp_path)
+    monkeypatch.setattr(
+        "carcar.runner.parse_search",
+        lambda html, url: SearchPage(url=url, total=32, page_size=32, offset=0, items=[]),
+    )
+    monkeypatch.setattr("carcar.runner.time.sleep", lambda *_: None)
+
+    summary = sweep(_client(settings), store, settings, sink=sink)
+
+    assert summary["completed"] is False
+    assert summary["errors"] == 8
+    assert summary["pages"] == 0
