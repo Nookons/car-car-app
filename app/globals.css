@@ -80,3 +80,144 @@
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Главный экран на телефоне: снизу фиксированная навигация, на планшете её нет. */
+.mobile-hero {
+  min-height: calc(100dvh - 3.8125rem - 4.5rem - env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 768px) {
+  .mobile-hero {
+    min-height: calc(100dvh - 3.8125rem);
+  }
+}
+
+/* Тема главного экрана: светлая тема — светлый фон, тёмная — ночная сцена. */
+:root {
+  --hero-bg: #f5f6f9;
+  --hero-ink: #2b0a1e;
+  --hero-muted: #57514f;
+  --hero-hint: #6f6662;
+  --hero-orange: #e8461f;
+  --hero-surface: radial-gradient(65% 70% at 20% 34%, #ffffff 0%, #fafaf9 20%, #f5f6f9 50%, #f5f6f9 100%);
+  --hero-primary-bg: #e8461f;
+  --hero-badge-bg: rgba(255, 255, 255, 0.72);
+  --hero-badge-border: rgba(43, 10, 30, 0.1);
+  --hero-badge-ink: #5c4b45;
+  --hero-input-bg: #ffffff;
+  --hero-input-border: rgba(43, 10, 30, 0.15);
+  --hero-input-ink: #2b0a1e;
+  --hero-input-placeholder: #756b65;
+  --hero-input-focus-bg: #ffffff;
+  --hero-input-focus-border: rgba(43, 10, 30, 0.3);
+  --hero-secondary-bg: #ffffff;
+  --hero-secondary-border: rgba(43, 10, 30, 0.2);
+  --hero-secondary-ink: #2b0a1e;
+  --hero-secondary-hover-bg: #f3f1ee;
+  --hero-seller-bg: #0b0a0c;
+  --hero-seller-ink: #ffffff;
+  --hero-seller-border: rgba(255, 255, 255, 0.15);
+  --hero-seller-label: rgba(255, 255, 255, 0.62);
+  --hero-market-bg: #0b0a0c;
+  --hero-market-ink: #ffffff;
+  --hero-market-border: rgba(255, 255, 255, 0.15);
+  --hero-market-label: rgba(255, 255, 255, 0.62);
+  --hero-card-shadow: 0 14px 30px -16px rgba(0, 0, 0, 0.55);
+  --hero-line: rgba(255, 255, 255, 0.8);
+  --hero-marker-bg: #ffffff;
+  --hero-marker-center: #3a1028;
+  --hero-example-bg: rgba(255, 255, 255, 0.82);
+  --hero-example-ink: #2b0a1e;
+  --hero-example-border: rgba(43, 10, 30, 0.12);
+  --hero-photo-filter: brightness(0.95) saturate(1.02) contrast(1);
+  --hero-photo-grade: linear-gradient(90deg, #f5f6f9 0%, rgba(245, 246, 249, 0.82) 8%, rgba(245, 246, 249, 0.3) 15%, transparent 24%), linear-gradient(180deg, rgba(245, 246, 249, 0.2), transparent 25%, rgba(43, 10, 30, 0.12));
+  --hero-fade: linear-gradient(90deg, #f5f6f9 0%, #f5f6f9 46%, rgba(245, 246, 249, 0.96) 51%, rgba(245, 246, 249, 0.7) 54%, transparent 56.5%);
+  --hero-mobile-photo-overlay: linear-gradient(180deg, rgba(7, 7, 10, 0.6) 0%, rgba(7, 7, 10, 0.1) 28%, rgba(7, 7, 10, 0.35) 100%);
+}
+
+.dark {
+  --hero-bg: #07070a;
+  --hero-ink: #ffffff;
+  --hero-muted: #b8b0ac;
+  --hero-hint: #a49c96;
+  --hero-orange: #f04a1c;
+  --hero-surface: radial-gradient(65% 70% at 24% 36%, #1a1114 0%, #110c0e 22%, #07070a 55%, #07070a 100%);
+  --hero-primary-bg: #f04a1c;
+  --hero-badge-bg: rgba(255, 255, 255, 0.04);
+  --hero-badge-border: rgba(255, 255, 255, 0.15);
+  --hero-badge-ink: rgba(255, 255, 255, 0.75);
+  --hero-input-bg: rgba(255, 255, 255, 0.04);
+  --hero-input-border: rgba(255, 255, 255, 0.25);
+  --hero-input-ink: #ffffff;
+  --hero-input-placeholder: #9b938e;
+  --hero-input-focus-bg: rgba(255, 255, 255, 0.07);
+  --hero-input-focus-border: rgba(255, 255, 255, 0.4);
+  --hero-secondary-bg: rgba(255, 255, 255, 0.03);
+  --hero-secondary-border: rgba(255, 255, 255, 0.25);
+  --hero-secondary-ink: #ffffff;
+  --hero-secondary-hover-bg: rgba(255, 255, 255, 0.08);
+  --hero-seller-bg: #0b0a0c;
+  --hero-seller-ink: #ffffff;
+  --hero-seller-border: rgba(255, 255, 255, 0.15);
+  --hero-seller-label: rgba(255, 255, 255, 0.62);
+  --hero-market-bg: #0b0a0c;
+  --hero-market-ink: #ffffff;
+  --hero-market-border: rgba(255, 255, 255, 0.15);
+  --hero-market-label: rgba(255, 255, 255, 0.62);
+  --hero-card-shadow: 0 14px 30px -16px rgba(0, 0, 0, 0.9);
+  --hero-line: rgba(255, 255, 255, 0.7);
+  --hero-marker-bg: #ffffff;
+  --hero-marker-center: #3a1028;
+  --hero-example-bg: rgba(11, 10, 12, 0.7);
+  --hero-example-ink: rgba(255, 255, 255, 0.6);
+  --hero-example-border: rgba(255, 255, 255, 0.1);
+  --hero-photo-filter: brightness(0.78) saturate(1.05) contrast(1.03);
+  --hero-photo-grade: linear-gradient(90deg, #07070a 0%, rgba(7, 7, 10, 0.85) 10%, rgba(7, 7, 10, 0.25) 26%, transparent 45%), linear-gradient(180deg, rgba(7, 7, 10, 0.35), transparent 30%, rgba(7, 7, 10, 0.3));
+  --hero-fade: linear-gradient(90deg, #07070a 0%, #07070a 46%, rgba(7, 7, 10, 0.94) 51%, rgba(7, 7, 10, 0.55) 56%, transparent 61%);
+  --hero-mobile-photo-overlay: linear-gradient(180deg, rgba(7, 7, 10, 0.6) 0%, rgba(7, 7, 10, 0.1) 28%, rgba(7, 7, 10, 0.35) 100%);
+}
+
+.hero-badge {
+  background: var(--hero-badge-bg);
+  border-color: var(--hero-badge-border);
+  color: var(--hero-badge-ink);
+}
+
+.hero-input {
+  background: var(--hero-input-bg);
+  border-color: var(--hero-input-border);
+  color: var(--hero-input-ink);
+}
+.hero-input::placeholder {
+  color: var(--hero-input-placeholder);
+}
+.hero-input:focus {
+  background: var(--hero-input-focus-bg);
+  border-color: var(--hero-input-focus-border);
+}
+
+.hero-secondary {
+  background: var(--hero-secondary-bg);
+  border-color: var(--hero-secondary-border);
+  color: var(--hero-secondary-ink);
+}
+.hero-secondary:hover {
+  background: var(--hero-secondary-hover-bg);
+}
+
+.hero-seller-card {
+  background: var(--hero-seller-bg);
+  color: var(--hero-seller-ink);
+  border-color: var(--hero-seller-border);
+}
+
+.hero-market-card {
+  background: var(--hero-market-bg);
+  color: var(--hero-market-ink);
+  border-color: var(--hero-market-border);
+}
+
+.hero-example {
+  background: var(--hero-example-bg);
+  color: var(--hero-example-ink);
+  border-color: var(--hero-example-border);
+}

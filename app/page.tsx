@@ -2,14 +2,14 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowRight, MagnifyingGlass, Sparkle } from "@phosphor-icons/react";
+import { ArrowRight } from "@phosphor-icons/react";
 import { useAuth } from "@/components/auth-provider";
+import { BrandLogo } from "@/components/brand-logo";
+import { DesktopHero } from "@/components/desktop-hero";
+import { MobileHero } from "@/components/mobile-hero";
 import { ListingRow } from "@/components/listing-row";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
-import { brandLogoUrl } from "@/lib/brands";
 import { num } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import type { Listing } from "@/lib/types";
@@ -24,13 +24,11 @@ const QUICK = [
 
 type Make = { value: string; count: number };
 
-const HOME_MAKES = 8;
+const HOME_MAKES = 12;
 
 export default function HomePage() {
-  const { token, authed, user, ready, error } = useAuth();
-  const router = useRouter();
+  const { token, authed, error } = useAuth();
   const { t } = useI18n();
-  const [query, setQuery] = React.useState("");
   const [items, setItems] = React.useState<Listing[]>([]);
   const [recs, setRecs] = React.useState<Listing[]>([]);
   const [makes, setMakes] = React.useState<Make[]>([]);
@@ -63,65 +61,20 @@ export default function HomePage() {
       .catch(() => setRecs([]));
   }, [token, authed]);
 
-  if (!ready) return <HomeSkeleton />;
-  if (error) return <p className="py-10 text-center text-sm text-muted-foreground">{error}</p>;
-
   return (
-    <div className="space-y-6">
-      <section className="space-y-1">
-        <h1 className="text-xl font-semibold">
-          {t("home.greeting")}
-          {user?.first_name ? `, ${user.first_name}` : ""} 👋
-        </h1>
-        <p className="text-sm text-muted-foreground">{t("home.subtitle")}</p>
-      </section>
+    <div className="space-y-8">
+      <div className="-mt-4">
+        <MobileHero />
+        <DesktopHero />
+      </div>
 
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          const term = query.trim();
-          router.push(term ? `/list?q=${encodeURIComponent(term)}` : "/list");
-        }}
-        className="relative"
-      >
-        <MagnifyingGlass
-          size={18}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-        />
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={t("list.searchPlaceholder")}
-          aria-label={t("list.search")}
-          maxLength={80}
-          enterKeyHint="search"
-          autoComplete="off"
-          className="pl-10 pr-12"
-        />
-        <button
-          type="submit"
-          aria-label={t("list.search")}
-          className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg bg-secondary text-muted-foreground transition hover:text-foreground"
-        >
-          <ArrowRight size={16} />
-        </button>
-      </form>
+      {error ? (
+        <p className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
 
-      <Link
-        href="/onboarding"
-        className="mx-auto flex w-full max-w-2xl items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 transition hover:bg-primary/10"
-      >
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
-          <Sparkle size={20} weight="fill" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold">{t("onboarding.title")}</span>
-          <span className="block text-xs text-muted-foreground">{t("onboarding.subtitle")}</span>
-        </span>
-        <ArrowRight size={18} className="shrink-0 text-muted-foreground" />
-      </Link>
-
-      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 min-[1152px]:mx-0 min-[1152px]:flex-wrap min-[1152px]:overflow-visible min-[1152px]:px-0">
         {QUICK.map((quick) => (
           <Link
             key={quick.href}
@@ -134,25 +87,17 @@ export default function HomePage() {
       </div>
 
       {makes.length > 0 ? (
-        <section className="mx-auto w-full max-w-2xl space-y-2">
+        <section className="mx-auto w-full max-w-2xl space-y-2 min-[1152px]:max-w-none">
           <h2 className="text-base font-semibold">{t("home.brands")}</h2>
-          <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+          <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 min-[1152px]:mx-0 min-[1152px]:grid min-[1152px]:grid-cols-12 min-[1152px]:gap-2 min-[1152px]:overflow-visible min-[1152px]:px-0">
             {makes.map((make) => (
               <Link
                 key={make.value}
                 href={`/list?make=${encodeURIComponent(make.value)}`}
                 title={`${make.value}: ${num(make.count)}`}
-                className="flex w-[78px] shrink-0 flex-col items-center gap-1 rounded-xl border bg-card px-2 py-2.5 shadow-sm transition hover:shadow-md"
+                className="flex w-[78px] shrink-0 flex-col items-center gap-1 rounded-xl border bg-card px-2 py-2.5 shadow-sm transition hover:shadow-md min-[1152px]:w-auto"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={brandLogoUrl(make.value)}
-                  alt=""
-                  width={32}
-                  height={32}
-                  loading="lazy"
-                  className="h-8 w-8 object-contain"
-                />
+                <BrandLogo make={make.value} className="h-8 w-8 text-[10px]" />
                 <span className="line-clamp-2 min-h-[1.9em] w-full break-words text-center text-[10px] font-medium leading-tight">
                   {make.value}
                 </span>
@@ -164,14 +109,14 @@ export default function HomePage() {
       ) : null}
 
       {recs.length > 0 ? (
-        <section className="mx-auto w-full max-w-2xl space-y-3">
+        <section className="mx-auto w-full max-w-2xl space-y-3 min-[1152px]:max-w-none">
           <div className="flex items-baseline justify-between">
             <h2 className="text-base font-semibold">{t("home.forYou")}</h2>
             <Link href="/feed" className="inline-flex items-center gap-1 text-sm text-muted-foreground">
               {t("feed.forYou")} <ArrowRight size={16} />
             </Link>
           </div>
-          <div className="-mx-4 space-y-3 md:mx-0">
+          <div className="-mx-4 space-y-3 md:mx-0 min-[1152px]:grid min-[1152px]:grid-cols-2 min-[1152px]:gap-4 min-[1152px]:space-y-0">
             {recs.map((item, index) => (
               <ListingRow key={item.id} item={item} priority={index < 2} />
             ))}
@@ -179,7 +124,7 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      <section className="mx-auto w-full max-w-2xl space-y-3">
+      <section className="mx-auto w-full max-w-2xl space-y-3 min-[1152px]:max-w-none">
         <div className="flex items-baseline justify-between">
           <h2 className="text-base font-semibold">{t("home.new")}</h2>
           <Link href="/list" className="inline-flex items-center gap-1 text-sm text-muted-foreground">
@@ -187,13 +132,13 @@ export default function HomePage() {
           </Link>
         </div>
         {loading ? (
-          <div className="-mx-4 space-y-3 md:mx-0">
-            {Array.from({ length: 3 }).map((_, index) => (
+          <div className="-mx-4 space-y-3 md:mx-0 min-[1152px]:grid min-[1152px]:grid-cols-2 min-[1152px]:gap-4 min-[1152px]:space-y-0">
+            {Array.from({ length: 4 }).map((_, index) => (
               <RowSkeleton key={index} />
             ))}
           </div>
         ) : (
-          <div className="-mx-4 space-y-3 md:mx-0">
+          <div className="-mx-4 space-y-3 md:mx-0 min-[1152px]:grid min-[1152px]:grid-cols-2 min-[1152px]:gap-4 min-[1152px]:space-y-0">
             {items.map((item, index) => (
               <ListingRow key={item.id} item={item} priority={index < 2} />
             ))}
@@ -217,24 +162,6 @@ function RowSkeleton() {
         <Skeleton className="h-3 w-1/4" />
         <Skeleton className="h-3 w-3/4" />
         <Skeleton className="h-3 w-1/2" />
-      </div>
-    </div>
-  );
-}
-
-function HomeSkeleton() {
-  return (
-    <div className="space-y-6">
-      <Skeleton className="h-12 w-2/3" />
-      <div className="flex gap-2">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <Skeleton key={index} className="h-10 w-28 rounded-full" />
-        ))}
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <Skeleton key={index} className="h-56" />
-        ))}
       </div>
     </div>
   );
