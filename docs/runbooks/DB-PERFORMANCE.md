@@ -1,16 +1,21 @@
 # Runbook: перегрузка Postgres / фоновый конвейер
 
-## Текущее состояние
+## Текущее состояние (13.11.2026, после стабилизации)
 
-- `enricher`, `enricher2`, `collector`, `worker` остановлены: БД стабилизирована.
-- API, Vercel и dashboard работают; сайт отдаёт уже собранные объявления.
-- Причина: market metrics в `runner.py` (26-секундный self-join на каждый лот)
-  и live market в `notify.py` (8.9 с на уведомление). Таблица
-  `listing_market_metric` при этом никем не читается.
-- В коде оба тяжёлых пути теперь **выключены по умолчанию**:
+- `collector`, `worker`, `enricher`, `enricher2` снова Online; `enricher3`/`bot` offline.
+- Причина перегрузки: market metrics в `runner.py` (26-секундный self-join на каждый лот)
+  и live market в `notify.py` (8.9 с на уведомление).
+- Оба тяжёлых пути **выключены по умолчанию**:
   - `CARCAR_MARKET_METRICS=0` — не считать market metrics в watch/enrich;
   - `CARCAR_NOTIFY_MARKET=0` — не делать live-расчёт рынка в уведомлениях.
 - API-пул уменьшен до 4 (`CARCAR_DB_POOL_MAX`, по умолчанию 4), checkout timeout 10 с.
+- Индексы `listing_market_comps_idx` и `listing_active_city_idx` применены.
+- В `listing_market_metric` около 100 строк; worker читает её для уведомлений,
+  но новые метрики в горячем пути не пишутся.
+- Остаётся backlog **181k** активных без карточки — enricher'ы разгребают его
+  в фоне; это дни работы, не ошибка БД.
+- Supabase после рестарта: `shared_buffers` 256 MB, `effective_cache_size` 768 MB.
+  Если это всё ещё Nano — апгрейд до Small/Medium остаётся обязательным запасом.
 
 ## P0: поднять compute Supabase
 
@@ -22,9 +27,12 @@ Nano → **Small** минимум, лучше **Medium**:
 
 Без этого возвращать enricher'ы нельзя.
 
-## Применить индексы
+## Индексы
 
 Миграция: [`db/migrations/20261113_market_perf.sql`](../../db/migrations/20261113_market_perf.sql).
+Индексы уже применены 13.11.2026 (`listing_market_comps_idx`,
+`listing_active_city_idx`). Повторно применять не нужно; ниже — команда для
+чистого окружения.
 
 `CONCURRENTLY` нельзя запускать в транзакции. Применить statement'ами при
 остановленном конвейере:

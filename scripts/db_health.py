@@ -27,7 +27,6 @@ from psycopg.rows import dict_row
 ALERTS = {
     "active_queries_over_5s": 1,
     "collector_lag_min": 10,
-    "needs_details": 120_000,
     "market_metric_rows": 1_000,
 }
 
@@ -85,8 +84,6 @@ def check() -> dict[str, Any]:
         warnings.append(f"долгих активных запросов: {row['active_queries_over_5s']}")
     if lag is not None and lag > ALERTS["collector_lag_min"]:
         warnings.append(f"collector молчит {lag:.0f} мин")
-    if row.get("needs_details", 0) > ALERTS["needs_details"]:
-        warnings.append(f"без карточки: {row['needs_details']}")
     if row.get("market_metric_rows", 0) > ALERTS["market_metric_rows"]:
         warnings.append(f"listing_market_metric разрослась: {row['market_metric_rows']}")
     row["warnings"] = warnings
