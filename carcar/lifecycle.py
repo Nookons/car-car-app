@@ -48,6 +48,7 @@ def classify_outcome(
     dom_days: float,
     price_change_pct: float | None,
     price_changes: int = 0,
+    detection_lag_days: float = 0.0,
 ) -> tuple[str, str]:
     """Пытается отличить продажу от истечения срока размещения.
 
@@ -55,7 +56,14 @@ def classify_outcome(
     цена вниз перед снятием — сильный сигнал торга; ровные 30 дней без
     изменения цены — почти наверняка истечение. Всё остальное — `unknown`,
     чтобы не выдумывать продажу.
+
+    `detection_lag_days` — сколько прошло между последним наблюдением и
+    подтверждением снятия. Если больше суток, дата снятия ненадёжна (старая
+    запись, всплывшая при полном обходе), и `dom_days` — только нижняя оценка.
+    Такие строки не должны попадать в «срок продажи».
     """
+    if detection_lag_days > REMOVAL_GRACE_DAYS:
+        return OUTCOME_UNKNOWN, "stale_detection"
     change = 0.0 if price_change_pct is None else price_change_pct
     if price_change_pct is not None and price_change_pct <= PRICE_DROP_THRESHOLD_PCT:
         return OUTCOME_SOLD, "price_drop_before_removal"

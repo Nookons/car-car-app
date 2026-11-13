@@ -220,6 +220,10 @@ create table if not exists listing_lifecycle (
     outcome           text not null default 'unknown' check (outcome in
                           ('sold_candidate', 'expired', 'unknown')),
     outcome_reason    text,
+    -- сколько прошло между последним наблюдением и подтверждением снятия;
+    -- > 1 дня — старая запись, dom_days только нижняя оценка
+    detection_lag_days numeric(8, 2) not null default 0
+                          check (detection_lag_days >= 0),
 
     details_fetched_at timestamptz,
     created_at        timestamptz not null default now()
@@ -233,6 +237,8 @@ create index if not exists listing_lifecycle_source_idx
     on listing_lifecycle (source_id, removed_at desc);
 create index if not exists listing_lifecycle_outcome_idx
     on listing_lifecycle (outcome, removed_at desc);
+create index if not exists listing_lifecycle_stale_idx
+    on listing_lifecycle (detection_lag_days) where detection_lag_days > 0;
 
 -- Вернувшееся объявление (relist/restore) больше не считается снятым.
 create or replace function cleanup_restored_listing() returns trigger
@@ -250,6 +256,47 @@ drop trigger if exists listing_restored_cleanup on listing;
 create trigger listing_restored_cleanup
 after update of status on listing
 for each row execute function cleanup_restored_listing();
+
+-- ---------------------------------------------------------------------------
+-- Рыночные метрики по объявлению: одна текущая строка.
+-- ---------------------------------------------------------------------------
+
+create table if not exists listing_market_metric (
+    listing_id      bigint primary key references listing(id) on delete cascade,
+    computed_at     timestamptz not null default now(),
+    model_version   smallint not null,
+    stage           text not null default 'preliminary'
+                        check (stage in ('preliminary', 'final')),
+    segment_key     text not null,
+
+    price           numeric(12, 0),
+    estimate        numeric(12, 0),
+    base_median     numeric(12, 0),
+    price_p10       numeric(12, 0),
+    price_p90       numeric(12, 0),
+    diff_pct        numeric(6, 2),
+    verdict         text check (verdict in ('below', 'fair', 'above', 'unknown')),
+    confidence      text check (confidence in ('low', 'medium', 'high')),
+
+    active_count    integer not null default 0,
+    used_count      integer not null default 0,
+    avg_similarity  numeric(5, 2),
+
+    off_market_count     integer not null default 0,
+    sold_candidate_count integer not null default 0,
+    dom_p25         numeric(6, 1),
+    dom_median      numeric(6, 1),
+    dom_p75         numeric(6, 1),
+    dom_sample      integer not null default 0,
+
+    flags           text[] not null default '{}',
+    report          jsonb not null default '{}'::jsonb
+);
+
+create index if not exists listing_market_metric_segment_idx
+    on listing_market_metric (segment_key, computed_at desc);
+create index if not exists listing_market_metric_computed_idx
+    on listing_market_metric (computed_at desc);
 
 -- ---------------------------------------------------------------------------
 -- Наблюдаемость и отбракованные записи
@@ -618,6 +665,7 @@ alter table source        enable row level security;
 alter table listing       enable row level security;
 alter table listing_event enable row level security;
 alter table listing_lifecycle enable row level security;
+alter table listing_market_metric enable row level security;
 alter table crawl_run     enable row level security;
 alter table ingest_reject enable row level security;
 
@@ -841,6 +889,7 @@ alter default privileges for role postgres in schema public
 -- Cursor pagination for support notification history.
 create index if not exists notification_user_history_idx on notification (user_id, id desc);
 
+-- Includes legacy records incorrectly marked complete without photographs.
 create index if not exists listing_detail_recovery_idx
     on listing (source_id, first_seen_at, id)
     where status = 'active' and (details_fetched_at is null or coalesce(photos_count,0) = 0);

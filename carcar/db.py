@@ -515,7 +515,12 @@ class DatabaseSink:
                 row["published_at"], row["first_seen_at"], row["last_seen_at"]
             )
             change = price_change_pct(row["first_price"], row["last_price"])
-            outcome, reason = classify_outcome(days, change, row["price_changes"])
+            lag_days = max(
+                0.0, (row["removed_at"] - row["last_seen_at"]).total_seconds() / 86_400
+            )
+            outcome, reason = classify_outcome(
+                days, change, row["price_changes"], lag_days
+            )
             values.append(
                 (
                     row["id"], row["source_id"], row["external_id"], row["make"],
@@ -527,6 +532,7 @@ class DatabaseSink:
                     change, row["published_at"], row["first_seen_at"],
                     row["last_seen_at"], row["removed_at"], days, basis,
                     removal_kind, row["details_fetched_at"], outcome, reason,
+                    round(lag_days, 2),
                 )
             )
         if not values:
@@ -539,11 +545,11 @@ class DatabaseSink:
                 city, region, seller_type, first_price, last_price, currency,
                 price_changes, price_change_pct, published_at, first_seen_at,
                 last_seen_at, removed_at, dom_days, dom_basis, removal_kind,
-                details_fetched_at, outcome, outcome_reason
+                details_fetched_at, outcome, outcome_reason, detection_lag_days
             ) values (
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s
+                %s, %s, %s
             )
             on conflict (listing_id) do update set
                 first_price = excluded.first_price,
@@ -557,7 +563,8 @@ class DatabaseSink:
                 removal_kind = excluded.removal_kind,
                 details_fetched_at = excluded.details_fetched_at,
                 outcome = excluded.outcome,
-                outcome_reason = excluded.outcome_reason
+                outcome_reason = excluded.outcome_reason,
+                detection_lag_days = excluded.detection_lag_days
             """,
             values,
         )

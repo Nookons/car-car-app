@@ -102,6 +102,20 @@ def discover(
             stats.unchanged += result.unchanged
             stats.rejected += result.rejected
             if fresh and sink is not None:
+                # Метрики считаем до карточки (по полям выдачи), затем карточка
+                # их уточнит отдельным проходом. Ошибка метрик не должна
+                # задерживать публикацию.
+                try:
+                    from .market_metrics import analyze_external_ids
+
+                    analyze_external_ids(
+                        sink,
+                        settings.source,
+                        [str(item.id) for item in fresh],
+                        stage="preliminary",
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("метрики для %s новых не посчитаны: %s", len(fresh), exc)
                 # Сначала догружаем карточку, потом уведомляем: иначе пользователь
                 # получает объявление без фото, описания и характеристик.
                 ready = []
@@ -238,6 +252,14 @@ def fetch_detail(
             equipment=offer.equipment,
             code=code,
         )
+        if changed:
+            # Карточка добавила кузов/цвет/комплектацию — уточняем метрики.
+            try:
+                from .market_metrics import analyze_external_ids
+
+                analyze_external_ids(sink, code, [listing.id], stage="final")
+            except Exception as exc:  # noqa: BLE001
+                log.warning("финальные метрики %s не посчитаны: %s", listing.id, exc)
         return "db" if changed else None
 
     return store.save_detail(

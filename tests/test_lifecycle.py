@@ -106,3 +106,14 @@ def test_outcome_price_change_without_drop_is_unknown():
 def test_outcome_price_drop_wins_over_expiry_window():
     outcome, _ = classify_outcome(40, -3.5, 1)
     assert outcome == OUTCOME_SOLD
+
+
+def test_outcome_stale_detection_is_unknown():
+    outcome, reason = classify_outcome(35, -5.0, 2, detection_lag_days=8)
+    assert outcome == OUTCOME_UNKNOWN
+    assert reason == "stale_detection"
+
+
+def test_outcome_short_lag_keeps_price_signal():
+    outcome, _ = classify_outcome(20, -5.0, 2, detection_lag_days=0.5)
+    assert outcome == OUTCOME_SOLD

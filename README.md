@@ -26,6 +26,7 @@
 | [`docs/PERF-market.md`](docs/PERF-market.md) | рынок: почему `model_option` устарел и как лента считает оценку |
 | [`docs/RANKING.md`](docs/RANKING.md) | ранжирование: один «котёл» сигналов (показы, открытия, избранное), формула score, свежесть |
 | [`docs/LIFECYCLE.md`](docs/LIFECYCLE.md) | снятие с рынка: подтверждение двумя проходами, `dom_days`, архив `listing_lifecycle` |
+| [`docs/MARKET-METRICS.md`](docs/MARKET-METRICS.md) | рыночные метрики объявления: цена, аналоги, срок, таблица `listing_market_metric` |
 | [`docs/PLAN-2027-AUDIT.md`](docs/PLAN-2027-AUDIT.md) | сверка приложения с планом 2027 и приоритет первых 14 дней |
 | [`docs/RETENTION.md`](docs/RETENTION.md) | удержание и переманивание: две кривые, три контура, каталог фич, приоритеты и метрики |
 
@@ -116,13 +117,14 @@ data/
 Для уже существующей базы перед деплоем кода, который пишет `removed_at`:
 `psql "$DATABASE_URL" -f db/migrations/20261117_listing_lifecycle.sql`,
 затем `20261118_listing_outcome.sql` и (когда sweep не пишет)
-`20261119_listing_restore_cleanup.sql`.
+`20261119_listing_restore_cleanup.sql`, затем `20261120_listing_detection_lag.sql` и `20261121_listing_market_metric.sql`.
 
 | Таблица | Зачем |
 |---|---|
 | `source` | площадки (otomoto, olx, …) |
 | `listing` | объявления: один набор полей для всех источников |
 | `listing_lifecycle` | лёгкий архив снятых: цены, `dom_days`, `removed_at` (переживает очистку) |
+| `listing_market_metric` | текущая рыночная метрика объявления: оценка, позиция, DOM |
 | `listing_event` | история цены и статуса — только при изменении |
 | `crawl_run` | прогоны: страницы, новые, обновлённые, ошибки |
 | `ingest_reject` | отбраковка с причиной (не мусор в основной таблице) |

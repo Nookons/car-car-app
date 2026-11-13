@@ -139,6 +139,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_purge.add_argument("--days", type=int, default=30, help="сколько дней хранить снятые")
     p_purge.add_argument("--data", type=Path, default=Path("data"))
 
+    p_metrics = sub.add_parser(
+        "market-metrics", help="пересчитать рыночные метрики по объявлениям"
+    )
+    p_metrics.add_argument("--limit", type=int, default=50)
+    p_metrics.add_argument(
+        "--stage", choices=("preliminary", "final"), default="final"
+    )
+    p_metrics.add_argument("--listing-id", type=int, default=0)
+
     return parser
 
 
@@ -243,6 +252,28 @@ def main(argv: list[str] | None = None) -> int:
             f"очистка: снятых объявлений {row[0]}, прогонов {row[1]}, "
             f"отказов {row[2]}, событий {row[3]}"
         )
+        return 0
+
+    if args.command == "market-metrics":
+        url = database_url()
+        if not url:
+            print("нужен DATABASE_URL", file=sys.stderr)
+            return 2
+        sink = DatabaseSink(url)
+        try:
+            if args.listing_id:
+                from .market_metrics import analyze_listings
+
+                count = analyze_listings(
+                    sink, [args.listing_id], stage=args.stage
+                )
+            else:
+                from .market_metrics import analyze_recent
+
+                count = analyze_recent(sink, args.limit, stage=args.stage)
+        finally:
+            sink.close()
+        print(f"метрики: {count}")
         return 0
 
     if args.command == "bot":
